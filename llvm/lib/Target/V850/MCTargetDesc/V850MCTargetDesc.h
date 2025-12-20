@@ -1,0 +1,53 @@
+//===-- V850MCTargetDesc.h - V850 Target Descriptions -----------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// This file provides V850 specific target descriptions.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef LLVM_LIB_TARGET_V850_MCTARGETDESC_V850MCTARGETDESC_H
+#define LLVM_LIB_TARGET_V850_MCTARGETDESC_V850MCTARGETDESC_H
+
+#include "llvm/MC/MCTargetOptions.h"
+#include "llvm/Support/DataTypes.h"
+#include <memory>
+
+namespace llvm {
+class MCAsmBackend;
+class MCCodeEmitter;
+class MCContext;
+class MCInstrInfo;
+class MCObjectTargetWriter;
+class MCRegisterInfo;
+class MCSubtargetInfo;
+class Target;
+
+MCCodeEmitter *createV850MCCodeEmitter(MCInstrInfo const &MCII, MCContext &Ctx);
+
+MCAsmBackend *createV850AsmBackend(const Target &T, const MCSubtargetInfo &STI,
+                                   const MCRegisterInfo &MRI,
+                                   const MCTargetOptions &Options);
+
+std::unique_ptr<MCObjectTargetWriter> createV850ELFObjectWriter(uint8_t OSABI);
+
+} // namespace llvm
+
+// Defines symbolic names for V850 registers.
+// This defines a mapping from register name to register number.
+#define GET_REGINFO_ENUM
+#include "V850GenRegisterInfo.inc"
+
+// Defines symbolic names for V850 instructions.
+#define GET_INSTRINFO_ENUM
+#define GET_INSTRINFO_MC_HELPER_DECLS
+#include "V850GenInstrInfo.inc"
+
+#define GET_SUBTARGETINFO_ENUM
+#include "V850GenSubtargetInfo.inc"
+
+#endif // LLVM_LIB_TARGET_V850_MCTARGETDESC_V850MCTARGETDESC_H
