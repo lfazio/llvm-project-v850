@@ -1969,6 +1969,7 @@ Triple Triple::getBigEndianArchVariant() const {
   case Triple::ve:
   case Triple::csky:
   case Triple::xtensa:
+  case Triple::v850:
 
   // ARM is intentionally unsupported here, changing the architecture would
   // drop any arch suffixes.
