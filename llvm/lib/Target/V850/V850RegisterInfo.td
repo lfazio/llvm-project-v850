@@ -47,70 +47,70 @@ class V850Reg<bits<5> Enc, string n, list<string> altNames = []>
 
 // r0 - Zero register (always reads as 0, writes are ignored)
 // Used to synthesize immediate-zero operations (e.g., MOV r0, rX for clear)
-def R0 : V850Reg<0, "r0", ["zero"]>;
+def R0 : V850Reg<0, "gr0", ["zero"]>, DwarfRegNum<[0]>;
 
 // r1 - Assembler reserved register (used for address generation helpers)
 // Higher cost to discourage allocation
 let CostPerUse = [1] in
-def R1 : V850Reg<1, "r1">;
+def R1 : V850Reg<1, "gr1">, DwarfRegNum<[1]>;
 
 // r2 - Variable/RTOS register (may be used by real-time OS)
 // Higher cost to discourage allocation
 let CostPerUse = [1] in
-def R2 : V850Reg<2, "r2">;
+def R2 : V850Reg<2, "gr2">, DwarfRegNum<[2]>;
 
 // r3 - Stack Pointer
 let CostPerUse = [1] in
-def SP : V850Reg<3, "r3", ["sp"]>;
+def SP : V850Reg<3, "gr3", ["sp"]>, DwarfRegNum<[3]>;
 
 // r4 - Global Pointer (global data area access)
 let CostPerUse = [1] in
-def GP : V850Reg<4, "r4", ["gp"]>;
+def GP : V850Reg<4, "gr4", ["gp"]>, DwarfRegNum<[4]>;
 
 // r5 - Text Pointer (text area start address)
 let CostPerUse = [1] in
-def TP : V850Reg<5, "r5", ["tp"]>;
+def TP : V850Reg<5, "gr5", ["tp"]>, DwarfRegNum<[5]>;
 
 // r6-r9 - Argument/result registers (caller-saved)
 // These are used to pass arguments and return values
-def R6  : V850Reg<6,  "r6">;
-def R7  : V850Reg<7,  "r7">;
-def R8  : V850Reg<8,  "r8">;
-def R9  : V850Reg<9,  "r9">;
+def R6  : V850Reg<6,  "gr6">, DwarfRegNum<[6]>;
+def R7  : V850Reg<7,  "gr7">, DwarfRegNum<[7]>;
+def R8  : V850Reg<8,  "gr8">, DwarfRegNum<[8]>;
+def R9  : V850Reg<9,  "gr9">, DwarfRegNum<[9]>;
 
 // r10-r19 - Caller-saved temporary registers
 // Return value in r10 (32-bit) or r10:r11 (64-bit)
-def R10 : V850Reg<10, "r10">;
-def R11 : V850Reg<11, "r11">;
-def R12 : V850Reg<12, "r12">;
-def R13 : V850Reg<13, "r13">;
-def R14 : V850Reg<14, "r14">;
-def R15 : V850Reg<15, "r15">;
-def R16 : V850Reg<16, "r16">;
-def R17 : V850Reg<17, "r17">;
-def R18 : V850Reg<18, "r18">;
-def R19 : V850Reg<19, "r19">;
+def R10 : V850Reg<10, "gr10">, DwarfRegNum<[10]>;
+def R11 : V850Reg<11, "gr11">, DwarfRegNum<[11]>;
+def R12 : V850Reg<12, "gr12">, DwarfRegNum<[12]>;
+def R13 : V850Reg<13, "gr13">, DwarfRegNum<[13]>;
+def R14 : V850Reg<14, "gr14">, DwarfRegNum<[14]>;
+def R15 : V850Reg<15, "gr15">, DwarfRegNum<[15]>;
+def R16 : V850Reg<16, "gr16">, DwarfRegNum<[16]>;
+def R17 : V850Reg<17, "gr17">, DwarfRegNum<[17]>;
+def R18 : V850Reg<18, "gr18">, DwarfRegNum<[18]>;
+def R19 : V850Reg<19, "gr19">, DwarfRegNum<[19]>;
 
 // r20-r29 - Callee-saved registers
 // Functions must preserve these across calls
-def R20 : V850Reg<20, "r20">;
-def R21 : V850Reg<21, "r21">;
-def R22 : V850Reg<22, "r22">;
-def R23 : V850Reg<23, "r23">;
-def R24 : V850Reg<24, "r24">;
-def R25 : V850Reg<25, "r25">;
-def R26 : V850Reg<26, "r26">;
-def R27 : V850Reg<27, "r27">;
-def R28 : V850Reg<28, "r28">;
-def R29 : V850Reg<29, "r29">;
+def R20 : V850Reg<20, "gr20">, DwarfRegNum<[20]>;
+def R21 : V850Reg<21, "gr21">, DwarfRegNum<[21]>;
+def R22 : V850Reg<22, "gr22">, DwarfRegNum<[22]>;
+def R23 : V850Reg<23, "gr23">, DwarfRegNum<[23]>;
+def R24 : V850Reg<24, "gr24">, DwarfRegNum<[24]>;
+def R25 : V850Reg<25, "gr25">, DwarfRegNum<[25]>;
+def R26 : V850Reg<26, "gr26">, DwarfRegNum<[26]>;
+def R27 : V850Reg<27, "gr27">, DwarfRegNum<[27]>;
+def R28 : V850Reg<28, "gr28">, DwarfRegNum<[28]>;
+def R29 : V850Reg<29, "gr29">, DwarfRegNum<[29]>;
 
 // r30 - Element Pointer (base for SLD/SST short-format memory access)
 let CostPerUse = [1] in
-def EP : V850Reg<30, "r30", ["ep"]>;
+def EP : V850Reg<30, "gr30", ["ep"]>, DwarfRegNum<[30]>;
 
 // r31 - Link Pointer (return address for function calls)
 let CostPerUse = [1] in
-def LP : V850Reg<31, "r31", ["lp"]>;
+def LP : V850Reg<31, "gr31", ["lp"]>, DwarfRegNum<[31]>;
 
 //===----------------------------------------------------------------------===//
 // Register Classes
