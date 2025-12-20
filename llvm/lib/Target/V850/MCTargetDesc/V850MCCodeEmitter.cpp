@@ -53,6 +53,16 @@ public:
   unsigned getMachineOpValue(const MCInst &MI, const MCOperand &MO,
                              SmallVectorImpl<MCFixup> &Fixups,
                              const MCSubtargetInfo &STI) const;
+
+  // Get encoding for 9-bit branch target
+  unsigned getBranchTarget9OpValue(const MCInst &MI, unsigned OpNo,
+                                   SmallVectorImpl<MCFixup> &Fixups,
+                                   const MCSubtargetInfo &STI) const;
+
+  // Get encoding for 22-bit branch target
+  unsigned getBranchTarget22OpValue(const MCInst &MI, unsigned OpNo,
+                                    SmallVectorImpl<MCFixup> &Fixups,
+                                    const MCSubtargetInfo &STI) const;
 };
 
 } // end anonymous namespace
@@ -87,6 +97,28 @@ unsigned V850MCCodeEmitter::getMachineOpValue(const MCInst &MI,
     return static_cast<unsigned>(MO.getImm());
 
   llvm_unreachable("Unhandled expression!");
+  return 0;
+}
+
+unsigned V850MCCodeEmitter::getBranchTarget9OpValue(
+    const MCInst &MI, unsigned OpNo, SmallVectorImpl<MCFixup> &Fixups,
+    const MCSubtargetInfo &STI) const {
+  const MCOperand &MO = MI.getOperand(OpNo);
+  if (MO.isImm())
+    return MO.getImm() >> 1; // Shift right by 1 (bit 0 is implicit 0)
+
+  // TODO: Handle fixups for symbolic operands
+  return 0;
+}
+
+unsigned V850MCCodeEmitter::getBranchTarget22OpValue(
+    const MCInst &MI, unsigned OpNo, SmallVectorImpl<MCFixup> &Fixups,
+    const MCSubtargetInfo &STI) const {
+  const MCOperand &MO = MI.getOperand(OpNo);
+  if (MO.isImm())
+    return MO.getImm() >> 1; // Shift right by 1 (bit 0 is implicit 0)
+
+  // TODO: Handle fixups for symbolic operands
   return 0;
 }
 

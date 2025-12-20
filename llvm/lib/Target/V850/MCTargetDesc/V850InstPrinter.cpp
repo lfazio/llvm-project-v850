@@ -56,3 +56,30 @@ void V850InstPrinter::printOperand(const MCInst *MI, unsigned OpNo,
   assert(MO.isExpr() && "Unknown operand kind in printOperand");
   MAI.printExpr(O, *MO.getExpr());
 }
+
+void V850InstPrinter::printCondCode(const MCInst *MI, unsigned OpNo,
+                                    const MCSubtargetInfo &STI, raw_ostream &O) {
+  const MCOperand &MO = MI->getOperand(OpNo);
+  unsigned CC = MO.getImm() & 0xF;
+
+  static const char *CondNames[] = {
+      "v",   // 0000 - Overflow
+      "c",   // 0001 - Carry/Lower
+      "z",   // 0010 - Zero/Equal
+      "nh",  // 0011 - Not higher
+      "n",   // 0100 - Negative
+      "t",   // 0101 - Always (BR)
+      "lt",  // 0110 - Less than
+      "le",  // 0111 - Less or equal
+      "nv",  // 1000 - No overflow
+      "nc",  // 1001 - No carry/Not lower
+      "nz",  // 1010 - Not zero/Not equal
+      "h",   // 1011 - Higher
+      "p",   // 1100 - Positive
+      "sa",  // 1101 - Saturated
+      "ge",  // 1110 - Greater or equal
+      "gt"   // 1111 - Greater than
+  };
+
+  O << CondNames[CC];
+}
