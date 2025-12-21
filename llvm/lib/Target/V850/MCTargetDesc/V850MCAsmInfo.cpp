@@ -27,7 +27,7 @@ V850MCAsmInfo::V850MCAsmInfo(const Triple & /*TheTriple*/,
   UsesELFSectionDirectiveForBSS = true;
 
   // Comment string
-  CommentString = "#";
+  CommentString = ";";
 
   // Private label prefix
   PrivateGlobalPrefix = ".L";
