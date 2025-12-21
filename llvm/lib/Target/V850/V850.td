@@ -52,10 +52,20 @@ def V850InstPrinter : AsmWriter {
 }
 
 //===----------------------------------------------------------------------===//
+// V850 assembly parser
+//===----------------------------------------------------------------------===//
+
+def V850AsmParser : AsmParser {
+  let ShouldEmitMatchRegisterAltName = 1;
+  let AllowDuplicateRegisterNames = 1;
+}
+
+//===----------------------------------------------------------------------===//
 // Declare the target which we are implementing
 //===----------------------------------------------------------------------===//
 
 def V850 : Target {
   let InstructionSet = V850InstrInfo;
   let AssemblyWriters = [V850InstPrinter];
+  let AssemblyParsers = [V850AsmParser];
 }
