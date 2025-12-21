@@ -179,6 +179,9 @@ public:
   bool isBrtarget22() const { return isImm(); }
   bool isCondcode() const { return isImm(); }
 
+  // Memory operand predicates for different addressing modes
+  bool isMemDisp16() const { return isMem(); }
+
   SMLoc getStartLoc() const override { return StartLoc; }
   SMLoc getEndLoc() const override { return EndLoc; }
 
@@ -309,6 +312,22 @@ public:
   void addCondcodeOperands(MCInst &Inst, unsigned N) const {
     addImmOperands(Inst, N);
   }
+
+  // Add memory operand as two separate operands: base register and displacement
+  // This is used by Format VIII instructions (SET1, NOT1, CLR1, TST1)
+  // The instruction encoding expects (bit3, reg1, disp16) but assembly is
+  // "set1 bit, disp[reg]"
+  void addMemDisp16Operands(MCInst &Inst, unsigned N) const {
+    assert(N == 2 && "Invalid number of operands for MemDisp16!");
+    assert(isMem() && "Expected memory operand!");
+    // Add base register first (reg1 in encoding)
+    Inst.addOperand(MCOperand::createReg(getMemBaseReg()));
+    // Add displacement second (disp16 in encoding)
+    if (const MCConstantExpr *CE = dyn_cast<MCConstantExpr>(getMemDisp()))
+      Inst.addOperand(MCOperand::createImm(CE->getValue()));
+    else
+      Inst.addOperand(MCOperand::createExpr(getMemDisp()));
+  }
 };
 
 } // end anonymous namespace
@@ -364,7 +383,7 @@ ParseStatus V850AsmParser::tryParseRegister(MCRegister &Reg, SMLoc &StartLoc,
 }
 
 ParseStatus V850AsmParser::parseOperand(OperandVector &Operands,
-                                         StringRef Mnemonic) {
+                                        StringRef Mnemonic) {
   // Try to parse as register first
   MCRegister Reg;
   SMLoc StartLoc, EndLoc;
@@ -373,15 +392,54 @@ ParseStatus V850AsmParser::parseOperand(OperandVector &Operands,
     return ParseStatus::Success;
   }
 
-  // Try memory operand: disp[reg] or [reg]
-  if (Parser.getTok().is(AsmToken::LBrac) ||
-      (Parser.getTok().is(AsmToken::Integer) ||
-       Parser.getTok().is(AsmToken::Minus))) {
+  // Check for memory operand starting with '[' (no displacement)
+  if (getLexer().is(AsmToken::LBrac)) {
     return parseMemoryOperand(Operands);
   }
 
-  // Try immediate
-  return parseImmediate(Operands);
+  // Try to parse as an immediate expression
+  StartLoc = Parser.getTok().getLoc();
+  const MCExpr *Expr;
+  if (Parser.parseExpression(Expr))
+    return ParseStatus::Failure;
+
+  EndLoc = Parser.getTok().getLoc();
+
+  // Check if this is a memory operand: disp[reg]
+  // The AsmMatcher expects: Imm(disp), '[' token, Reg, ']' token
+  if (getLexer().is(AsmToken::LBrac)) {
+    // Add the displacement immediate first
+    Operands.push_back(V850Operand::createImm(Expr, StartLoc, EndLoc));
+
+    // Add '[' token
+    SMLoc LBracLoc = Parser.getTok().getLoc();
+    Operands.push_back(V850Operand::createToken("[", LBracLoc));
+    Parser.Lex(); // Consume '['
+
+    // Parse base register
+    MCRegister BaseReg;
+    SMLoc RegStart, RegEnd;
+    if (!tryParseRegister(BaseReg, RegStart, RegEnd).isSuccess()) {
+      Error(Parser.getTok().getLoc(), "expected register");
+      return ParseStatus::Failure;
+    }
+    Operands.push_back(V850Operand::createReg(BaseReg, RegStart, RegEnd));
+
+    // Expect ']'
+    if (Parser.getTok().isNot(AsmToken::RBrac)) {
+      Error(Parser.getTok().getLoc(), "expected ']'");
+      return ParseStatus::Failure;
+    }
+    SMLoc RBracLoc = Parser.getTok().getLoc();
+    Operands.push_back(V850Operand::createToken("]", RBracLoc));
+    Parser.Lex(); // Consume ']'
+
+    return ParseStatus::Success;
+  }
+
+  // Just an immediate
+  Operands.push_back(V850Operand::createImm(Expr, StartLoc, EndLoc));
+  return ParseStatus::Success;
 }
 
 ParseStatus V850AsmParser::parseImmediate(OperandVector &Operands) {
@@ -397,22 +455,16 @@ ParseStatus V850AsmParser::parseImmediate(OperandVector &Operands) {
 }
 
 ParseStatus V850AsmParser::parseMemoryOperand(OperandVector &Operands) {
-  SMLoc StartLoc = Parser.getTok().getLoc();
-  const MCExpr *Disp = nullptr;
-
-  // Parse optional displacement
-  if (Parser.getTok().isNot(AsmToken::LBrac)) {
-    if (Parser.parseExpression(Disp))
-      return ParseStatus::Failure;
-  } else {
-    Disp = MCConstantExpr::create(0, getContext());
-  }
+  // This handles the [reg] case (e.g., for JMP instruction)
+  // The AsmMatcher expects: '[' token, Reg, ']' token
 
   // Expect '['
   if (Parser.getTok().isNot(AsmToken::LBrac)) {
     Error(Parser.getTok().getLoc(), "expected '['");
     return ParseStatus::Failure;
   }
+  SMLoc LBracLoc = Parser.getTok().getLoc();
+  Operands.push_back(V850Operand::createToken("[", LBracLoc));
   Parser.Lex(); // Consume '['
 
   // Parse base register
@@ -422,16 +474,17 @@ ParseStatus V850AsmParser::parseMemoryOperand(OperandVector &Operands) {
     Error(Parser.getTok().getLoc(), "expected register");
     return ParseStatus::Failure;
   }
+  Operands.push_back(V850Operand::createReg(BaseReg, RegStart, RegEnd));
 
   // Expect ']'
   if (Parser.getTok().isNot(AsmToken::RBrac)) {
     Error(Parser.getTok().getLoc(), "expected ']'");
     return ParseStatus::Failure;
   }
-  SMLoc EndLoc = Parser.getTok().getEndLoc();
+  SMLoc RBracLoc = Parser.getTok().getLoc();
+  Operands.push_back(V850Operand::createToken("]", RBracLoc));
   Parser.Lex(); // Consume ']'
 
-  Operands.push_back(V850Operand::createMem(BaseReg, Disp, StartLoc, EndLoc));
   return ParseStatus::Success;
 }
 

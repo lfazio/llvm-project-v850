@@ -249,7 +249,7 @@ def SATADDi : FormatII<0b010001, (outs GPR:$reg2), (ins GPR:$rs, simm5:$imm5),
 // ADD imm5, reg2 - Add sign-extended 5-bit immediate to reg2
 // Opcode: 010010 (0x12)
 let Constraints = "$rs = $reg2" in
-def ADDi : FormatII<0b010010, (outs GPR:$reg2), (ins GPR:$rs, simm5:$imm5),
+def ADDi : FormatII<0b010010, (outs GPR:$reg2), (ins simm5:$imm5, GPR:$rs),
                     "add\t$imm5, $reg2",
                     [(set GPR:$reg2, (add GPR:$rs, simm5:$imm5))]>;
 
@@ -504,6 +504,7 @@ def EI : FormatX<0b111111, 0b100110, (outs), (ins),
 
 // SET1 bit#3, disp16[reg1] - Set bit in memory
 // Opcode: 111110 (0x3E), sub-op: 00
+// Note: Assembly syntax is "set1 bit, disp[reg]" but operand order is bit, reg, disp
 let mayLoad = 1, mayStore = 1 in
 def SET1 : FormatVIII<0b111110, 0b00, (outs),
                       (ins uimm3:$bit3, GPR:$reg1, simm16:$disp16),

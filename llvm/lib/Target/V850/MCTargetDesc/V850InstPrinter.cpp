@@ -83,3 +83,20 @@ void V850InstPrinter::printCondCode(const MCInst *MI, unsigned OpNo,
 
   O << CondNames[CC];
 }
+
+void V850InstPrinter::printMemDisp16(const MCInst *MI, unsigned OpNo,
+                                     const MCSubtargetInfo &STI, raw_ostream &O) {
+  // Memory operand is stored as two operands: reg1 (base) and disp16
+  const MCOperand &BaseReg = MI->getOperand(OpNo);
+  const MCOperand &Disp = MI->getOperand(OpNo + 1);
+
+  // Print as disp16[reg1]
+  if (Disp.isImm()) {
+    O << Disp.getImm();
+  } else if (Disp.isExpr()) {
+    MAI.printExpr(O, *Disp.getExpr());
+  }
+  O << "[";
+  printRegName(O, BaseReg.getReg());
+  O << "]";
+}
