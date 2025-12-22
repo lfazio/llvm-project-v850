@@ -41,6 +41,25 @@ def uimm3 : Operand<i32>, ImmLeaf<i32, [{return isUInt<3>(Imm);}]> {
   let DecoderMethod = "decodeUImmOperand<3>";
 }
 
+// 7-bit unsigned immediate (for short load/store displacement)
+def uimm7 : Operand<i32>, ImmLeaf<i32, [{return isUInt<7>(Imm);}]> {
+  let DecoderMethod = "decodeUImmOperand<7>";
+}
+
+// AsmOperandClass for short load/store displacement with implicit EP base
+def Imm7AsmOperand : AsmOperandClass {
+  let Name = "Imm7EP";
+  let RenderMethod = "addImmOperands";
+}
+
+// 7-bit displacement with implicit EP base (for short load/store)
+// Printed as "disp[ep]" format, but only disp is the actual operand
+def disp7ep : Operand<i32>, ImmLeaf<i32, [{return isUInt<7>(Imm);}]> {
+  let PrintMethod = "printDisp7EP";
+  let DecoderMethod = "decodeUImmOperand<7>";
+  let ParserMatchClass = Imm7AsmOperand;
+}
+
 // 9-bit PC-relative branch target (bit 0 implicitly 0)
 def brtarget9 : Operand<OtherVT> {
   let EncoderMethod = "getBranchTarget9OpValue";
@@ -496,6 +515,112 @@ def EI : FormatX<0b111111, 0b100110, (outs), (ins),
                  "ei",
                  []> {
   let vector = 0;
+}
+
+//===----------------------------------------------------------------------===//
+// Load/Store Instructions - Format VII (32-bit)
+//===----------------------------------------------------------------------===//
+
+// LD.B disp16[reg1], reg2 - Load byte (sign-extended)
+// Opcode: 111000 (0x38)
+let mayLoad = 1 in
+def LDB : FormatVII<0b111000, (outs GPR:$reg2), (ins GPR:$reg1, simm16:$disp16),
+                    "ld.b\t$disp16[$reg1], $reg2",
+                    []>;
+
+// LD.H disp16[reg1], reg2 - Load halfword (sign-extended)
+// Opcode: 111001 (0x39), bit 16 = 0
+let mayLoad = 1 in
+def LDH : FormatVII<0b111001, (outs GPR:$reg2), (ins GPR:$reg1, simm16:$disp16),
+                    "ld.h\t$disp16[$reg1], $reg2",
+                    []> {
+  // Halfword load: bit 16 = 0
+  let Inst{16} = 0;
+}
+
+// LD.W disp16[reg1], reg2 - Load word
+// Opcode: 111001 (0x39), bit 16 = 1
+let mayLoad = 1 in
+def LDW : FormatVII<0b111001, (outs GPR:$reg2), (ins GPR:$reg1, simm16:$disp16),
+                    "ld.w\t$disp16[$reg1], $reg2",
+                    []> {
+  // Word load: bit 16 = 1
+  let Inst{16} = 1;
+}
+
+// ST.B reg2, disp16[reg1] - Store byte
+// Opcode: 111010 (0x3A)
+let mayStore = 1 in
+def STB : FormatVII<0b111010, (outs), (ins GPR:$reg2, GPR:$reg1, simm16:$disp16),
+                    "st.b\t$reg2, $disp16[$reg1]",
+                    []>;
+
+// ST.H reg2, disp16[reg1] - Store halfword
+// Opcode: 111011 (0x3B), bit 16 = 0
+let mayStore = 1 in
+def STH : FormatVII<0b111011, (outs), (ins GPR:$reg2, GPR:$reg1, simm16:$disp16),
+                    "st.h\t$reg2, $disp16[$reg1]",
+                    []> {
+  let Inst{16} = 0;
+}
+
+// ST.W reg2, disp16[reg1] - Store word
+// Opcode: 111011 (0x3B), bit 16 = 1
+let mayStore = 1 in
+def STW : FormatVII<0b111011, (outs), (ins GPR:$reg2, GPR:$reg1, simm16:$disp16),
+                    "st.w\t$reg2, $disp16[$reg1]",
+                    []> {
+  let Inst{16} = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// Short Load/Store Instructions - Format IV (16-bit)
+//===----------------------------------------------------------------------===//
+
+// SLD.B disp7[ep], reg2 - Short load byte (uses EP as base)
+// Opcode: 0110 (0x6)
+let mayLoad = 1, Uses = [EP] in
+def SLDB : FormatIV<0b0110, (outs GPR:$reg2), (ins disp7ep:$disp7),
+                    "sld.b\t$disp7, $reg2",
+                    []>;
+
+// SLD.H disp8[ep], reg2 - Short load halfword (uses EP as base)
+// Opcode: 1000 (0x8)
+let mayLoad = 1, Uses = [EP] in
+def SLDH : FormatIV<0b1000, (outs GPR:$reg2), (ins disp7ep:$disp7),
+                    "sld.h\t$disp7, $reg2",
+                    []>;
+
+// SLD.W disp8[ep], reg2 - Short load word (uses EP as base)
+// Opcode: 1010 (0xA), bit 0 = 1
+let mayLoad = 1, Uses = [EP] in
+def SLDW : FormatIV<0b1010, (outs GPR:$reg2), (ins disp7ep:$disp7),
+                    "sld.w\t$disp7, $reg2",
+                    []> {
+  let Inst{0} = 1;
+}
+
+// SST.B reg2, disp7[ep] - Short store byte (uses EP as base)
+// Opcode: 0111 (0x7)
+let mayStore = 1, Uses = [EP] in
+def SSTB : FormatIV<0b0111, (outs), (ins GPR:$reg2, disp7ep:$disp7),
+                    "sst.b\t$reg2, $disp7",
+                    []>;
+
+// SST.H reg2, disp8[ep] - Short store halfword (uses EP as base)
+// Opcode: 1001 (0x9)
+let mayStore = 1, Uses = [EP] in
+def SSTH : FormatIV<0b1001, (outs), (ins GPR:$reg2, disp7ep:$disp7),
+                    "sst.h\t$reg2, $disp7",
+                    []>;
+
+// SST.W reg2, disp8[ep] - Short store word (uses EP as base)
+// Opcode: 1010 (0xA), bit 0 = 0
+let mayStore = 1, Uses = [EP] in
+def SSTW : FormatIV<0b1010, (outs), (ins GPR:$reg2, disp7ep:$disp7),
+                    "sst.w\t$reg2, $disp7",
+                    []> {
+  let Inst{0} = 0;
 }
 
 //===----------------------------------------------------------------------===//

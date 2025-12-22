@@ -175,6 +175,17 @@ public:
     return true;
   }
 
+  bool isUimm7() const {
+    if (!isImm())
+      return false;
+    if (const MCConstantExpr *CE = dyn_cast<MCConstantExpr>(getImm()))
+      return isUInt<7>(CE->getValue());
+    return true;
+  }
+
+  // For short load/store with implicit EP base
+  bool isImm7EP() const { return isUimm7(); }
+
   bool isBrtarget9() const { return isImm(); }
   bool isBrtarget22() const { return isImm(); }
   bool isCondcode() const { return isImm(); }
