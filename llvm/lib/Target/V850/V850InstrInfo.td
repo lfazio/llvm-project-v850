@@ -102,6 +102,8 @@ def V850Call     : SDNode<"V850ISD::CALL", SDT_V850Call,
 def V850RetGlue  : SDNode<"V850ISD::RET_GLUE", SDTNone,
                           [SDNPHasChain, SDNPOptInGlue, SDNPVariadic]>;
 
+def V850Wrapper  : SDNode<"V850ISD::WRAPPER", SDTIntUnaryOp>;
+
 //===----------------------------------------------------------------------===//
 // Pseudo Instructions
 //===----------------------------------------------------------------------===//
@@ -658,3 +660,4 @@ def TST1 : FormatVIII<0b111110, 0b11, (outs),
                       (ins uimm3:$bit3, GPR:$reg1, simm16:$disp16),
                       "tst1\t$bit3, $disp16[$reg1]",
                       []>;
+

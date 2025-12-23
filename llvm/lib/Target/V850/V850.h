@@ -14,6 +14,7 @@
 #ifndef LLVM_LIB_TARGET_V850_V850_H
 #define LLVM_LIB_TARGET_V850_V850_H
 
+#include "MCTargetDesc/V850MCTargetDesc.h"
 #include "llvm/Target/TargetMachine.h"
 
 namespace llvm {
@@ -28,6 +29,7 @@ FunctionPass *createV850ISelDag(V850TargetMachine &TM,
                                 CodeGenOptLevel OptLevel);
 
 void initializeV850DAGToDAGISelLegacyPass(PassRegistry &);
+void initializeV850AsmPrinterPass(PassRegistry &);
 
 } // namespace llvm
 

@@ -25,6 +25,7 @@ include "llvm/Target/Target.td"
 //===----------------------------------------------------------------------===//
 
 include "V850RegisterInfo.td"
+include "V850CallingConv.td"
 include "V850InstrInfo.td"
 
 def V850InstrInfo : InstrInfo;

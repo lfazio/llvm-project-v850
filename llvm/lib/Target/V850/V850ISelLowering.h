@@ -1,0 +1,95 @@
+//===-- V850ISelLowering.h - V850 DAG Lowering Interface --------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines the interfaces that V850 uses to lower LLVM code into a
+// selection DAG.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef LLVM_LIB_TARGET_V850_V850ISELLOWERING_H
+#define LLVM_LIB_TARGET_V850_V850ISELLOWERING_H
+
+#include "V850.h"
+#include "llvm/CodeGen/SelectionDAG.h"
+#include "llvm/CodeGen/TargetLowering.h"
+
+namespace llvm {
+
+class V850Subtarget;
+
+namespace V850ISD {
+enum NodeType : unsigned {
+  FIRST_NUMBER = ISD::BUILTIN_OP_END,
+  RET_GLUE,    // Return with a glue operand
+  CALL,        // Function call
+  WRAPPER,     // Global address wrapper
+  BR_CC,       // Branch on condition code
+  CMP,         // Compare
+  SELECT_CC,   // Select with condition code
+};
+} // namespace V850ISD
+
+class V850TargetLowering : public TargetLowering {
+public:
+  explicit V850TargetLowering(const TargetMachine &TM,
+                              const V850Subtarget &STI);
+
+  MVT getScalarShiftAmountTy(const DataLayout &, EVT) const override {
+    return MVT::i32;
+  }
+
+  /// LowerOperation - Provide custom lowering hooks for some operations.
+  SDValue LowerOperation(SDValue Op, SelectionDAG &DAG) const override;
+
+  /// getTargetNodeName - Return the name of a target specific DAG node.
+  const char *getTargetNodeName(unsigned Opcode) const override;
+
+  SDValue LowerGlobalAddress(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerExternalSymbol(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerBlockAddress(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerBR_CC(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerRETURNADDR(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerFRAMEADDR(SDValue Op, SelectionDAG &DAG) const;
+
+  Register getRegisterByName(const char *RegName, LLT VT,
+                             const MachineFunction &MF) const override;
+
+private:
+  const V850Subtarget &Subtarget;
+
+  SDValue LowerFormalArguments(SDValue Chain, CallingConv::ID CallConv,
+                               bool isVarArg,
+                               const SmallVectorImpl<ISD::InputArg> &Ins,
+                               const SDLoc &dl, SelectionDAG &DAG,
+                               SmallVectorImpl<SDValue> &InVals) const override;
+
+  SDValue LowerCall(TargetLowering::CallLoweringInfo &CLI,
+                    SmallVectorImpl<SDValue> &InVals) const override;
+
+  bool CanLowerReturn(CallingConv::ID CallConv, MachineFunction &MF,
+                      bool IsVarArg,
+                      const SmallVectorImpl<ISD::OutputArg> &Outs,
+                      LLVMContext &Context,
+                      const Type *RetTy) const override;
+
+  SDValue LowerReturn(SDValue Chain, CallingConv::ID CallConv, bool isVarArg,
+                      const SmallVectorImpl<ISD::OutputArg> &Outs,
+                      const SmallVectorImpl<SDValue> &OutVals, const SDLoc &dl,
+                      SelectionDAG &DAG) const override;
+
+  SDValue LowerCallResult(SDValue Chain, SDValue InGlue,
+                          CallingConv::ID CallConv, bool isVarArg,
+                          const SmallVectorImpl<ISD::InputArg> &Ins,
+                          const SDLoc &dl, SelectionDAG &DAG,
+                          SmallVectorImpl<SDValue> &InVals) const;
+};
+
+} // namespace llvm
+
+#endif // LLVM_LIB_TARGET_V850_V850ISELLOWERING_H

@@ -12,17 +12,24 @@
 
 #include "V850TargetMachine.h"
 #include "V850.h"
+#include "V850Subtarget.h"
 #include "TargetInfo/V850TargetInfo.h"
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/CodeGen/TargetLoweringObjectFileImpl.h"
 #include "llvm/CodeGen/TargetPassConfig.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/MC/TargetRegistry.h"
+#include "llvm/PassRegistry.h"
 
 using namespace llvm;
 
 extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void LLVMInitializeV850Target() {
   // Register the target.
   RegisterTargetMachine<V850TargetMachine> X(getTheV850Target());
+
+  // Initialize passes
+  PassRegistry &PR = *PassRegistry::getPassRegistry();
+  initializeV850DAGToDAGISelLegacyPass(PR);
 }
 
 static std::string computeDataLayout(const Triple &TT) {
@@ -48,6 +55,30 @@ V850TargetMachine::V850TargetMachine(const Target &T, const Triple &TT,
   initAsmInfo();
 }
 
+V850TargetMachine::~V850TargetMachine() = default;
+
+const V850Subtarget *
+V850TargetMachine::getSubtargetImpl(const Function &F) const {
+  Attribute CPUAttr = F.getFnAttribute("target-cpu");
+  Attribute FSAttr = F.getFnAttribute("target-features");
+
+  std::string CPU =
+      CPUAttr.isValid() ? CPUAttr.getValueAsString().str() : TargetCPU;
+  std::string FS =
+      FSAttr.isValid() ? FSAttr.getValueAsString().str() : TargetFS;
+
+  std::string Key = CPU + FS;
+  auto &I = SubtargetMap[Key];
+  if (!I) {
+    // This needs to be done before we create a new subtarget since any
+    // creation will depend on the TM and the code generation flags on the
+    // function that reside in TargetOptions.
+    resetTargetOptions(F);
+    I = std::make_unique<V850Subtarget>(TargetTriple, CPU, FS, *this);
+  }
+  return I.get();
+}
+
 namespace {
 
 class V850PassConfig : public TargetPassConfig {
@@ -58,10 +89,17 @@ public:
   V850TargetMachine &getV850TargetMachine() const {
     return getTM<V850TargetMachine>();
   }
+
+  bool addInstSelector() override;
 };
 
 } // end anonymous namespace
 
 TargetPassConfig *V850TargetMachine::createPassConfig(PassManagerBase &PM) {
   return new V850PassConfig(*this, PM);
+}
+
+bool V850PassConfig::addInstSelector() {
+  addPass(createV850ISelDag(getV850TargetMachine(), getOptLevel()));
+  return false;
 }
