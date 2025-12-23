@@ -431,8 +431,8 @@ def SETF : FormatIX<0b111111, 0b000000, (outs GPR:$reg2), (ins condcode:$cond),
 }
 
 // LDSR reg2, regID - Load to system register
-// Opcode: 111111 (0x3F), sub-op: 000100
-def LDSR : FormatIX<0b111111, 0b000100, (outs), (ins GPR:$reg2, SysReg:$regID),
+// Opcode: 111111 (0x3F), sub-op: 100000 (0x20)
+def LDSR : FormatIX<0b111111, 0b100000, (outs), (ins GPR:$reg2, SysReg:$regID),
                     "ldsr\t$reg2, $regID",
                     []> {
   bits<5> regID;
@@ -440,8 +440,8 @@ def LDSR : FormatIX<0b111111, 0b000100, (outs), (ins GPR:$reg2, SysReg:$regID),
 }
 
 // STSR regID, reg2 - Store from system register
-// Opcode: 111111 (0x3F), sub-op: 001000
-def STSR : FormatIX<0b111111, 0b001000, (outs GPR:$reg2), (ins SysReg:$regID),
+// Opcode: 111111 (0x3F), sub-op: 100100 (0x24)
+def STSR : FormatIX<0b111111, 0b100100, (outs GPR:$reg2), (ins SysReg:$regID),
                     "stsr\t$regID, $reg2",
                     []> {
   bits<5> regID;
@@ -449,17 +449,16 @@ def STSR : FormatIX<0b111111, 0b001000, (outs GPR:$reg2), (ins SysReg:$regID),
 }
 
 // SHR reg1, reg2 - Shift right logical by register
-// Opcode: 111111 (0x3F), sub-op: 000100 (same as LDSR, different context)
-// Note: The V850 uses the same opcode space, distinguished by operands
+// Opcode: 111111 (0x3F), sub-op: 000010 (0x02)
 let Constraints = "$rs = $reg2" in
-def SHR : FormatIX<0b111111, 0b000100, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
+def SHR : FormatIX<0b111111, 0b000010, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
                    "shr\t$reg1, $reg2",
                    [(set GPR:$reg2, (srl GPR:$rs, GPR:$reg1))]>;
 
 // SAR reg1, reg2 - Shift right arithmetic by register
-// Opcode: 111111 (0x3F), sub-op: 000101
+// Opcode: 111111 (0x3F), sub-op: 000100 (0x04)
 let Constraints = "$rs = $reg2" in
-def SAR : FormatIX<0b111111, 0b000101, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
+def SAR : FormatIX<0b111111, 0b000100, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
                    "sar\t$reg1, $reg2",
                    [(set GPR:$reg2, (sra GPR:$rs, GPR:$reg1))]>;
 

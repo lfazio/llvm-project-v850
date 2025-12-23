@@ -1,0 +1,134 @@
+# RUN: llvm-mc -disassemble %s -triple=v850 | FileCheck %s
+
+#------------------------------------------------------------------------------
+# Format II: Immediate-Register (16-bit)
+# Encoding: bits[15-11]=reg2, bits[10-5]=opcode, bits[4-0]=imm5
+#
+# Note: Each 16-bit instruction is paired with NOP to form 4 bytes.
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+# MOV imm5, reg2 - Move immediate (opcode: 0x10)
+# imm5 is sign-extended
+#------------------------------------------------------------------------------
+
+# CHECK: mov 0, r1
+# CHECK: nop
+0x00,0x0a,0x00,0x00
+
+# CHECK: mov 5, r2
+# CHECK: nop
+0x05,0x12,0x00,0x00
+
+# CHECK: mov -16, r3
+# CHECK: nop
+0x10,0x1a,0x00,0x00
+
+# CHECK: mov 15, r4
+# CHECK: nop
+0x0f,0x22,0x00,0x00
+
+#------------------------------------------------------------------------------
+# SATADD imm5, reg2 - Saturated add immediate (opcode: 0x11)
+#------------------------------------------------------------------------------
+
+# CHECK: satadd 5, r12
+# CHECK: nop
+0x25,0x62,0x00,0x00
+
+#------------------------------------------------------------------------------
+# ADD imm5, reg2 - Add immediate (opcode: 0x12)
+# imm5 is sign-extended
+#------------------------------------------------------------------------------
+
+# CHECK: add 0, r5
+# CHECK: nop
+0x40,0x2a,0x00,0x00
+
+# CHECK: add 3, r6
+# CHECK: nop
+0x43,0x32,0x00,0x00
+
+# CHECK: add -1, r7
+# CHECK: nop
+0x5f,0x3a,0x00,0x00
+
+# CHECK: add 15, r8
+# CHECK: nop
+0x4f,0x42,0x00,0x00
+
+#------------------------------------------------------------------------------
+# CMP imm5, reg2 - Compare immediate (opcode: 0x13)
+# imm5 is sign-extended
+#------------------------------------------------------------------------------
+
+# CHECK: cmp 0, r9
+# CHECK: nop
+0x60,0x4a,0x00,0x00
+
+# CHECK: cmp -5, r10
+# CHECK: nop
+0x7b,0x52,0x00,0x00
+
+# CHECK: cmp 10, r11
+# CHECK: nop
+0x6a,0x5a,0x00,0x00
+
+#------------------------------------------------------------------------------
+# SHR imm5, reg2 - Shift right logical immediate (opcode: 0x14)
+# imm5 is zero-extended (0-31)
+#------------------------------------------------------------------------------
+
+# CHECK: shr 0, r13
+# CHECK: nop
+0x80,0x6a,0x00,0x00
+
+# CHECK: shr 5, r14
+# CHECK: nop
+0x85,0x72,0x00,0x00
+
+# CHECK: shr 31, r15
+# CHECK: nop
+0x9f,0x7a,0x00,0x00
+
+#------------------------------------------------------------------------------
+# SAR imm5, reg2 - Shift right arithmetic immediate (opcode: 0x15)
+# imm5 is zero-extended (0-31)
+#------------------------------------------------------------------------------
+
+# CHECK: sar 0, r16
+# CHECK: nop
+0xa0,0x82,0x00,0x00
+
+# CHECK: sar 10, r17
+# CHECK: nop
+0xaa,0x8a,0x00,0x00
+
+# CHECK: sar 31, r18
+# CHECK: nop
+0xbf,0x92,0x00,0x00
+
+#------------------------------------------------------------------------------
+# SHL imm5, reg2 - Shift left logical immediate (opcode: 0x16)
+# imm5 is zero-extended (0-31)
+#------------------------------------------------------------------------------
+
+# CHECK: shl 0, r19
+# CHECK: nop
+0xc0,0x9a,0x00,0x00
+
+# CHECK: shl 8, r20
+# CHECK: nop
+0xc8,0xa2,0x00,0x00
+
+# CHECK: shl 31, r21
+# CHECK: nop
+0xdf,0xaa,0x00,0x00
+
+#------------------------------------------------------------------------------
+# MULH imm5, reg2 - Multiply halfword immediate (opcode: 0x17)
+#------------------------------------------------------------------------------
+
+# CHECK: mulh 5, r22
+# CHECK: nop
+0xe5,0xb2,0x00,0x00
