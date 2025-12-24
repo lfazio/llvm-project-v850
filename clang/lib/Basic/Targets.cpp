@@ -36,6 +36,7 @@
 #include "Targets/Sparc.h"
 #include "Targets/SystemZ.h"
 #include "Targets/TCE.h"
+#include "Targets/V850.h"
 #include "Targets/VE.h"
 #include "Targets/WebAssembly.h"
 #include "Targets/X86.h"
@@ -736,6 +737,9 @@ std::unique_ptr<TargetInfo> AllocateTarget(const llvm::Triple &Triple,
 
   case llvm::Triple::dxil:
     return std::make_unique<DirectXTargetInfo>(Triple, Opts);
+
+  case llvm::Triple::v850:
+    return std::make_unique<V850TargetInfo>(Triple, Opts);
 
   case llvm::Triple::ve:
     return std::make_unique<LinuxTargetInfo<VETargetInfo>>(Triple, Opts);

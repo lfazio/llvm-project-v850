@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "MCTargetDesc/V850InstPrinter.h"
+#include "V850.h"
 #include "V850MCInstLower.h"
 #include "V850TargetMachine.h"
 #include "TargetInfo/V850TargetInfo.h"
@@ -116,6 +117,20 @@ bool V850AsmPrinter::PrintAsmMemoryOperand(const MachineInstr *MI,
 void V850AsmPrinter::emitInstruction(const MachineInstr *MI) {
   V850_MC::verifyInstructionPredicates(MI->getOpcode(),
                                         getSubtargetInfo().getFeatureBits());
+
+  // Handle pseudo-instructions that need expansion
+  switch (MI->getOpcode()) {
+  case V850::RET: {
+    // RET pseudo expands to: jmp [lp]
+    MCInst JmpInst;
+    JmpInst.setOpcode(V850::JMP);
+    JmpInst.addOperand(MCOperand::createReg(V850::LP));
+    EmitToStreamer(*OutStreamer, JmpInst);
+    return;
+  }
+  default:
+    break;
+  }
 
   V850MCInstLower MCInstLowering(OutContext, *this);
 

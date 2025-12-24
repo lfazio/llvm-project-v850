@@ -35,11 +35,14 @@ extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void LLVMInitializeV850Target() {
 static std::string computeDataLayout(const Triple &TT) {
   // V850 is little-endian, 32-bit pointers and integers
   // e = little endian
+  // m:e = ELF mangling
   // p:32:32 = 32-bit pointers with 32-bit alignment
-  // i32:32 = 32-bit integers with 32-bit alignment
+  // i64:32 = 64-bit integers with 32-bit alignment
+  // f64:32 = 64-bit floats with 32-bit alignment
+  // a:0:32 = aggregates with 32-bit alignment
   // n32 = native integer width is 32-bit
   // S32 = stack natural alignment is 32-bit
-  return "e-p:32:32-i32:32-n32-S32";
+  return "e-m:e-p:32:32-i64:32-f64:32-a:0:32-n32-S32";
 }
 
 V850TargetMachine::V850TargetMachine(const Target &T, const Triple &TT,
