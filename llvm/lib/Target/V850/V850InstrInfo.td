@@ -104,6 +104,54 @@ def V850RetGlue  : SDNode<"V850ISD::RET_GLUE", SDTNone,
 
 def V850Wrapper  : SDNode<"V850ISD::WRAPPER", SDTIntUnaryOp>;
 
+// Compare node - produces PSW flags
+def SDT_V850Cmp : SDTypeProfile<0, 2, [SDTCisSameAs<0, 1>]>;
+def V850Cmp     : SDNode<"V850ISD::CMP", SDT_V850Cmp, [SDNPOutGlue]>;
+
+// Branch on condition code
+def SDT_V850BrCC : SDTypeProfile<0, 2, [SDTCisVT<0, OtherVT>,
+                                        SDTCisVT<1, i32>]>;
+def V850BrCC    : SDNode<"V850ISD::BR_CC", SDT_V850BrCC,
+                          [SDNPHasChain, SDNPInGlue]>;
+
+// Select with condition code
+def SDT_V850SelectCC : SDTypeProfile<1, 3, [SDTCisSameAs<0, 1>,
+                                            SDTCisSameAs<1, 2>,
+                                            SDTCisVT<3, i32>]>;
+def V850SelectCC : SDNode<"V850ISD::SELECT_CC", SDT_V850SelectCC,
+                           [SDNPInGlue]>;
+
+//===----------------------------------------------------------------------===//
+// Pattern fragments for instruction selection
+//===----------------------------------------------------------------------===//
+
+// Check if constant fits in 16-bit signed immediate
+def simm16_pred : PatLeaf<(i32 imm), [{
+  return isInt<16>(N->getSExtValue());
+}]>;
+
+// Check if constant is in the range (-32768 to 65535) for combined MOVHI+MOVEA
+def imm32_pred : PatLeaf<(i32 imm), [{
+  return !isInt<16>(N->getSExtValue());
+}]>;
+
+// Extract high 16 bits of a 32-bit constant, adjusted for sign extension of low part
+// When low 16 bits would be sign-extended as negative, add 1 to high part
+def HI16 : SDNodeXForm<imm, [{
+  int64_t Val = N->getSExtValue();
+  int32_t Lo = SignExtend32<16>(Val & 0xFFFF);
+  int32_t Hi = (Val - Lo) >> 16;
+  return CurDAG->getTargetConstant((uint32_t)(Hi & 0xFFFF), SDLoc(N), MVT::i32);
+}]>;
+
+// Extract low 16 bits of a 32-bit constant (as signed 16-bit value)
+// Masked to 32 bits for proper unsigned representation
+def LO16 : SDNodeXForm<imm, [{
+  int64_t Val = N->getSExtValue();
+  int32_t Lo = SignExtend32<16>(Val & 0xFFFF);
+  return CurDAG->getTargetConstant((uint32_t)Lo, SDLoc(N), MVT::i32);
+}]>;
+
 //===----------------------------------------------------------------------===//
 // Pseudo Instructions
 //===----------------------------------------------------------------------===//
@@ -331,6 +379,13 @@ def MOVHI : FormatVI<0b110010, (outs GPR:$reg2), (ins GPR:$reg1, uimm16:$imm16),
                      "movhi\t$imm16, $reg1, $reg2",
                      []>;
 
+//===----------------------------------------------------------------------===//
+// Patterns for constant materialization
+//===----------------------------------------------------------------------===//
+
+// 16-bit signed constant: movea imm16, r0, rd
+def : Pat<(i32 simm16_pred:$imm), (MOVEA R0, simm16:$imm)>;
+
 // SATSUBI imm16, reg1, reg2 - Saturated subtract immediate
 // Opcode: 110011 (0x33)
 def SATSUBI : FormatVI<0b110011, (outs GPR:$reg2), (ins GPR:$reg1, simm16:$imm16),
@@ -413,10 +468,21 @@ def JR : FormatV<0b101111, (outs), (ins brtarget22:$disp22),
 
 // JARL disp22, reg2 - Jump and register link
 // Opcode: 101111 (0x2F)
-let isCall = 1, Defs = [LP] in
+let isCall = 1 in
 def JARL : FormatV<0b101111, (outs GPR:$reg2), (ins brtarget22:$disp22),
                    "jarl\t$disp22, $reg2",
                    []>;
+
+// CALL pseudo-instruction - expands to JARL with LP as link register
+// Used for function calls in code generation
+// Defs: LP (return address), R6-R11 (caller-saved)
+// Uses: SP (stack pointer)
+let isCall = 1,
+    Defs = [LP, R6, R7, R8, R9, R10, R11],
+    Uses = [SP] in
+def CALL : V850Pseudo<(outs), (ins brtarget22:$target),
+                      "jarl\t$target, lp",
+                      []>;
 
 //===----------------------------------------------------------------------===//
 // Extended Instructions - Format IX (32-bit)
@@ -660,4 +726,55 @@ def TST1 : FormatVIII<0b111110, 0b11, (outs),
                       (ins uimm3:$bit3, GPR:$reg1, simm16:$disp16),
                       "tst1\t$bit3, $disp16[$reg1]",
                       []>;
+
+//===----------------------------------------------------------------------===//
+// Additional Patterns
+//===----------------------------------------------------------------------===//
+
+//===----------------------------------------------------------------------===//
+// Large constant materialization patterns
+//===----------------------------------------------------------------------===//
+
+// 32-bit constant requires MOVHI + MOVEA sequence
+// For a 32-bit value V = (Hi << 16) + Lo (signed)
+// We need to account for sign extension of Lo
+def : Pat<(i32 imm32_pred:$imm),
+          (MOVEA (MOVHI R0, (HI16 $imm)), (LO16 $imm))>;
+
+//===----------------------------------------------------------------------===//
+// Load patterns
+//===----------------------------------------------------------------------===//
+
+// Simple register + 0 offset patterns
+def : Pat<(i32 (load GPR:$base)), (LDW GPR:$base, 0)>;
+def : Pat<(i32 (sextloadi8 GPR:$base)), (LDB GPR:$base, 0)>;
+def : Pat<(i32 (sextloadi16 GPR:$base)), (LDH GPR:$base, 0)>;
+def : Pat<(i32 (extloadi8 GPR:$base)), (LDB GPR:$base, 0)>;
+def : Pat<(i32 (extloadi16 GPR:$base)), (LDH GPR:$base, 0)>;
+
+// Register + signed 16-bit offset patterns
+def : Pat<(i32 (load (add GPR:$base, simm16:$off))), (LDW GPR:$base, simm16:$off)>;
+def : Pat<(i32 (sextloadi8 (add GPR:$base, simm16:$off))), (LDB GPR:$base, simm16:$off)>;
+def : Pat<(i32 (sextloadi16 (add GPR:$base, simm16:$off))), (LDH GPR:$base, simm16:$off)>;
+def : Pat<(i32 (extloadi8 (add GPR:$base, simm16:$off))), (LDB GPR:$base, simm16:$off)>;
+def : Pat<(i32 (extloadi16 (add GPR:$base, simm16:$off))), (LDH GPR:$base, simm16:$off)>;
+
+// Zero-extending loads need AND with mask
+def : Pat<(i32 (zextloadi8 GPR:$base)), (ANDI (LDB GPR:$base, 0), 0xFF)>;
+def : Pat<(i32 (zextloadi16 GPR:$base)), (ANDI (LDH GPR:$base, 0), 0xFFFF)>;
+
+//===----------------------------------------------------------------------===//
+// Store patterns
+//===----------------------------------------------------------------------===//
+
+// Simple register + 0 offset patterns
+def : Pat<(store GPR:$src, GPR:$base), (STW GPR:$src, GPR:$base, 0)>;
+def : Pat<(truncstorei8 GPR:$src, GPR:$base), (STB GPR:$src, GPR:$base, 0)>;
+def : Pat<(truncstorei16 GPR:$src, GPR:$base), (STH GPR:$src, GPR:$base, 0)>;
+
+// Register + signed 16-bit offset patterns
+def : Pat<(store GPR:$src, (add GPR:$base, simm16:$off)), (STW GPR:$src, GPR:$base, simm16:$off)>;
+def : Pat<(truncstorei8 GPR:$src, (add GPR:$base, simm16:$off)), (STB GPR:$src, GPR:$base, simm16:$off)>;
+def : Pat<(truncstorei16 GPR:$src, (add GPR:$base, simm16:$off)), (STH GPR:$src, GPR:$base, simm16:$off)>;
+
 

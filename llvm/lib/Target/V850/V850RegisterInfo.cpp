@@ -108,6 +108,12 @@ bool V850RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   return false;
 }
 
+const uint32_t *
+V850RegisterInfo::getCallPreservedMask(const MachineFunction &MF,
+                                       CallingConv::ID CC) const {
+  return CSR_V850_RegMask;
+}
+
 Register V850RegisterInfo::getFrameRegister(const MachineFunction &MF) const {
   const V850FrameLowering *TFI = getFrameLowering(MF);
   return TFI->hasFP(MF) ? V850::R29 : V850::SP;
