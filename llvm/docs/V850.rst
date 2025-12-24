@@ -1,0 +1,260 @@
+==========================
+User Guide for V850 Target
+==========================
+
+.. contents::
+   :local:
+
+Introduction
+============
+
+The V850 target provides code generation for the NEC/Renesas V850 family of
+32-bit embedded microprocessors. It lives in the ``llvm/lib/Target/V850``
+directory.
+
+The V850 is a 32-bit RISC processor designed for embedded automotive and
+industrial applications. It features a load/store architecture with 32
+general-purpose registers and supports both 16-bit and 32-bit instruction
+formats for improved code density.
+
+Specification Documents
+=======================
+
+The V850 architecture is documented in the following references:
+
+* `V850E2M User's Manual: Architecture
+  <https://www.renesas.com/us/en/document/mah/v850e2m-users-manual-architecture>`__
+* `V850E2 User's Manual
+  <https://www.renesas.com/us/en/document/mah/v850e2-users-manual>`__
+
+Target Triple
+=============
+
+The V850 target uses the following triple format:
+
+  .. table:: V850 Target Triples
+
+     ===================== =====================================================
+     Triple                Description
+     ===================== =====================================================
+     ``v850-unknown-elf``  V850 bare-metal ELF target (default)
+     ``v850-none-elf``     V850 bare-metal ELF target (alternative)
+     ===================== =====================================================
+
+Usage with Clang
+================
+
+To compile C/C++ code for the V850 target::
+
+    clang --target=v850-unknown-elf -c source.c -o output.o
+
+To generate assembly::
+
+    clang --target=v850-unknown-elf -S source.c -o output.s
+
+Supported Features
+==================
+
+The V850 backend currently supports:
+
+**Instruction Set**:
+
+* Format I: Register-register operations (16-bit)
+* Format II: Immediate-register operations (16-bit)
+* Format III: Conditional branches (16-bit)
+* Format IV: Short load/store operations (16-bit)
+* Format V: Jump instructions (32-bit)
+* Format VI: 3-operand with immediate (32-bit)
+* Format VII: Load/store with 16-bit displacement (32-bit)
+* Format VIII: Bit manipulation (32-bit)
+* Format IX: Extended register operations (32-bit)
+* Format X: Special instructions (32-bit)
+
+**Arithmetic Operations**:
+
+* ADD, SUB, MUL, MULH, MULHI, DIVH
+* AND, OR, XOR, NOT
+* SHL, SHR, SAR (shift operations)
+* CMP, SETF (comparison and flags)
+
+**Memory Operations**:
+
+* LD.B, LD.H, LD.W (load byte, halfword, word)
+* ST.B, ST.H, ST.W (store byte, halfword, word)
+* SLD, SST (short load/store with EP-relative addressing)
+
+**Control Flow**:
+
+* JR, JARL (jump and link)
+* JMP (indirect jump)
+* Conditional branches (BE, BNE, BLT, BGT, etc.)
+* TRAP, RETI (trap and return from interrupt)
+
+**Special Operations**:
+
+* LDSR, STSR (load/store system register)
+* DI, EI (disable/enable interrupts)
+* HALT, NOP
+
+Register Set
+============
+
+The V850 has 32 general-purpose 32-bit registers:
+
+  .. table:: V850 General Purpose Registers
+
+     ======== ========= =====================================================
+     Register Alias     Description
+     ======== ========= =====================================================
+     r0       zero      Always reads as zero, writes are ignored
+     r1       -         Assembler temporary (reserved)
+     r2       -         Reserved for OS
+     r3       sp        Stack pointer
+     r4       gp        Global pointer
+     r5       tp        Text pointer (reserved for PIC/PID)
+     r6-r9    -         Argument/result registers
+     r10      -         Return value register
+     r11-r19  -         Temporary registers (caller-saved)
+     r20-r29  -         Saved registers (callee-saved)
+     r30      ep        Element pointer (for SLD/SST instructions)
+     r31      lp        Link pointer (return address)
+     ======== ========= =====================================================
+
+**System Registers**:
+
+The V850 also has system registers accessed via LDSR/STSR instructions,
+including PSW (Program Status Word), EIPC, EIPSW, FEPC, FEPSW, ECR, and CTPC.
+
+Calling Convention
+==================
+
+The V850 uses a standard embedded EABI-style calling convention:
+
+**Argument Passing**:
+
+* First four 32-bit arguments: r6, r7, r8, r9
+* Additional arguments: passed on the stack
+* 64-bit arguments: passed in register pairs (r6/r7, r8/r9)
+
+**Return Values**:
+
+* 32-bit values: r10
+* 64-bit values: r10/r11 pair
+
+**Callee-Saved Registers**:
+
+* r20-r29 (must be preserved across function calls)
+* r31 (lp - link pointer)
+* r29 is typically used as frame pointer when needed
+
+**Caller-Saved Registers**:
+
+* r1-r5, r6-r19, r30
+
+**Stack**:
+
+* Stack grows downward (towards lower addresses)
+* Stack pointer (r3/sp) must be 4-byte aligned
+* Frame pointer (r29) used when dynamic stack allocation is needed
+
+Assembly Syntax
+===============
+
+The V850 backend uses the following assembly syntax conventions:
+
+**Operand Order**:
+
+V850 assembly uses destination-last ordering for most instructions::
+
+    add r1, r2      ; r2 = r2 + r1 (reg1, reg2 -> result in reg2)
+    addi 5, r1, r2  ; r2 = r1 + 5 (imm, reg1, reg2 -> result in reg2)
+
+**Memory Operands**:
+
+Memory operands use displacement[base] syntax::
+
+    ld.w 0[r3], r10     ; Load word from address in r3 to r10
+    st.w r10, 4[sp]     ; Store r10 to sp+4
+
+**Branch Targets**:
+
+Branch instructions use PC-relative offsets or labels::
+
+    be .Ltarget         ; Branch if equal to .Ltarget
+    jr .Lfunction       ; Jump relative to .Lfunction
+
+**Condition Codes**:
+
+The V850 supports the following condition codes for SETF and conditional
+branches:
+
+  .. table:: V850 Condition Codes
+
+     ====== ===== ===============================
+     Code   Value Description
+     ====== ===== ===============================
+     V      0     Overflow
+     C/L    1     Carry / Less than (unsigned)
+     Z      2     Zero
+     NH     3     Not higher (unsigned)
+     S/N    4     Sign / Negative
+     T      5     Always true
+     LT     6     Less than (signed)
+     LE     7     Less than or equal (signed)
+     NV     8     No overflow
+     NC/NL  9     No carry / Not less (unsigned)
+     NZ     10    Not zero
+     H      11    Higher (unsigned)
+     NS/P   12    Not sign / Positive
+     SA     13    Saturated
+     GE     14    Greater or equal (signed)
+     GT     15    Greater than (signed)
+     ====== ===== ===============================
+
+Known Limitations
+=================
+
+The V850 backend is under active development. Current limitations include:
+
+**Not Yet Implemented**:
+
+* Floating-point operations (V850E2 FPU)
+* V850E3 and V850E2M specific extensions
+* SIMD instructions
+* Hardware loop support
+* Some system register operations
+
+**Code Generation**:
+
+* No support for position-independent code (PIC) yet
+* Limited optimization passes for V850-specific patterns
+* No automatic EP (element pointer) register utilization
+* Frame pointer is always allocated (no leaf function optimization)
+
+**Toolchain**:
+
+* Linker script templates not provided
+* Limited debugging support (DWARF basics only)
+* No standard library support (bare-metal only)
+
+Data Layout
+===========
+
+The V850 uses the following data layout:
+
+* **Endianness**: Little-endian
+* **Pointer size**: 32 bits
+* **Integer sizes**: char=8, short=16, int=32, long=32, long long=64
+* **Float sizes**: float=32, double=64
+* **Alignment**: All types have 32-bit alignment for optimal performance
+* **Stack alignment**: 32-bit (4 bytes)
+
+The LLVM data layout string is::
+
+    e-m:e-p:32:32-i64:32-f64:32-a:0:32-n32-S32
+
+Related Links
+=============
+
+* `V850 Architecture Wikipedia <https://en.wikipedia.org/wiki/V850>`__
+* `Renesas V850 Product Page <https://www.renesas.com/products/microcontrollers-microprocessors/v850>`__

@@ -71,6 +71,7 @@ intermediate LLVM representation.
    SPIRVUsage
    SandboxIR
    StackSafetyAnalysis
+   V850
    SupportLibrary
    TableGen/index
    TableGenFundamentals
@@ -305,6 +306,9 @@ Additional Topics
 
 :doc:`Sandbox IR <SandboxIR>`
    This document describes the design and usage of Sandbox IR, a transactional layer over LLVM IR.
+
+:doc:`V850`
+   This document describes using the V850 target for NEC/Renesas V850 embedded processors.
 
 :doc:`Telemetry`
    This document describes the Telemetry framework in LLVM.
