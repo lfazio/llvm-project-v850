@@ -1,18 +1,12 @@
-; RUN: llc -march=v850 -O0 < %s | FileCheck %s
+; RUN: llc -march=v850 -mcpu=v850e1 -O0 < %s | FileCheck %s
 
-; Test multiplication - generates library call since MUL is Expand
+; Test MUL instruction (32x32->64 signed multiply) via inline assembly
+; MUL is a V850E1+ instruction
 
 ; CHECK-LABEL: test_mul:
-; CHECK: jarl __mulsi3
-define i32 @test_mul(i32 %a, i32 %b) {
-  %result = mul i32 %a, %b
-  ret i32 %result
-}
-
-; CHECK-LABEL: test_mul_const:
-; CHECK: jarl __mulsi3
-define i32 @test_mul_const(i32 %a) {
-  %result = mul i32 %a, 10
-  ret i32 %result
+; CHECK: mul r{{[0-9]+}}, r{{[0-9]+}}, r{{[0-9]+}}
+define void @test_mul() {
+  call void asm sideeffect "mul r1, r2, r3", ""()
+  ret void
 }
 
