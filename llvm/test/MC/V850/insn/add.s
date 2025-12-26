@@ -1,4 +1,6 @@
 // RUN: llvm-mc -triple=v850 -show-encoding %s | FileCheck %s
+// RUN: llvm-mc -triple=v850 -mcpu=v850e1 -show-encoding %s | FileCheck %s
+// RUN: llvm-mc -triple=v850 -mcpu=v850e2 -show-encoding %s | FileCheck %s
 
 // ADD - Add register to register (Format I)
 // Syntax: add reg1, reg2

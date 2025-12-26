@@ -32,4 +32,58 @@ void V850TargetInfo::getTargetDefines(const LangOptions &Opts,
   Builder.defineMacro("__v850__");
   Builder.defineMacro("__V850__");
   Builder.defineMacro("__v850");
+
+  // Define CPU-specific macros
+  switch (CPU) {
+  case CK_V850E1:
+    Builder.defineMacro("__v850e__");
+    Builder.defineMacro("__v850e1__");
+    break;
+  case CK_V850E2:
+    Builder.defineMacro("__v850e__");
+    Builder.defineMacro("__v850e2__");
+    break;
+  case CK_V850E2M:
+    Builder.defineMacro("__v850e__");
+    Builder.defineMacro("__v850e2__");
+    Builder.defineMacro("__v850e2m__");
+    break;
+  case CK_V850E3:
+    Builder.defineMacro("__v850e__");
+    Builder.defineMacro("__v850e2__");
+    Builder.defineMacro("__v850e3__");
+    break;
+  default:
+    break;
+  }
+}
+
+bool V850TargetInfo::isValidCPUName(StringRef Name) const {
+  return llvm::StringSwitch<bool>(Name)
+      .Case("v850", true)
+      .Case("v850e1", true)
+      .Case("v850e2", true)
+      .Case("v850e2m", true)
+      .Case("v850e3", true)
+      .Default(false);
+}
+
+void V850TargetInfo::fillValidCPUList(
+    SmallVectorImpl<StringRef> &Values) const {
+  Values.emplace_back("v850");
+  Values.emplace_back("v850e1");
+  Values.emplace_back("v850e2");
+  Values.emplace_back("v850e2m");
+  Values.emplace_back("v850e3");
+}
+
+bool V850TargetInfo::setCPU(const std::string &Name) {
+  CPU = llvm::StringSwitch<CPUKind>(Name)
+            .Case("v850", CK_V850)
+            .Case("v850e1", CK_V850E1)
+            .Case("v850e2", CK_V850E2)
+            .Case("v850e2m", CK_V850E2M)
+            .Case("v850e3", CK_V850E3)
+            .Default(CK_NONE);
+  return CPU != CK_NONE;
 }

@@ -32,6 +32,12 @@ class StringRef;
 class V850Subtarget : public V850GenSubtargetInfo {
   virtual void anchor();
 
+  // Subtarget feature flags - set by ParseSubtargetFeatures
+  bool HasV850E1 = false;
+  bool HasV850E2 = false;
+  bool HasV850E2M = false;
+  bool HasV850E3 = false;
+
   V850InstrInfo InstrInfo;
   V850TargetLowering TLInfo;
   V850FrameLowering FrameLowering;
@@ -66,6 +72,12 @@ public:
   const SelectionDAGTargetInfo *getSelectionDAGInfo() const override {
     return &TSInfo;
   }
+
+  // Feature predicates
+  bool hasV850E1() const { return HasV850E1; }
+  bool hasV850E2() const { return HasV850E2; }
+  bool hasV850E2M() const { return HasV850E2M; }
+  bool hasV850E3() const { return HasV850E3; }
 };
 
 } // end namespace llvm

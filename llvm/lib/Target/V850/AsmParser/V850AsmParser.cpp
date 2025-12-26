@@ -63,6 +63,7 @@ class V850AsmParser : public MCTargetAsmParser {
   ParseStatus parseMemoryOperand(OperandVector &Operands);
   ParseStatus parseImmediate(OperandVector &Operands);
   ParseStatus parseBranchTarget(OperandVector &Operands);
+  ParseStatus parseCondCode(OperandVector &Operands);
 
   MCRegister matchRegisterName(StringRef Name);
   MCRegister matchRegisterAltName(StringRef Name);
@@ -186,9 +187,35 @@ public:
   // For short load/store with implicit EP base
   bool isImm7EP() const { return isUimm7(); }
 
+  // For SLD.BU 4-bit displacement
+  bool isImm4() const {
+    if (!isImm())
+      return false;
+    if (const MCConstantExpr *CE = dyn_cast<MCConstantExpr>(getImm()))
+      return isUInt<4>(CE->getValue());
+    return true;
+  }
+
+  // For SLD.HU 5-bit displacement
+  bool isImm5() const {
+    if (!isImm())
+      return false;
+    if (const MCConstantExpr *CE = dyn_cast<MCConstantExpr>(getImm()))
+      return isUInt<5>(CE->getValue());
+    return true;
+  }
+
   bool isBrtarget9() const { return isImm(); }
   bool isBrtarget22() const { return isImm(); }
   bool isCondcode() const { return isImm(); }
+  bool isCmov_cond() const { return isImm(); }
+  bool isUimm6() const {
+    if (!isImm())
+      return false;
+    if (const MCConstantExpr *CE = dyn_cast<MCConstantExpr>(getImm()))
+      return isUInt<6>(CE->getValue());
+    return true;
+  }
 
   // Memory operand predicates for different addressing modes
   bool isMemDisp16() const { return isMem(); }
@@ -324,6 +351,14 @@ public:
     addImmOperands(Inst, N);
   }
 
+  void addCmov_condOperands(MCInst &Inst, unsigned N) const {
+    addImmOperands(Inst, N);
+  }
+
+  void addUimm6Operands(MCInst &Inst, unsigned N) const {
+    addImmOperands(Inst, N);
+  }
+
   // Add memory operand as two separate operands: base register and displacement
   // This is used by Format VIII instructions (SET1, NOT1, CLR1, TST1)
   // The instruction encoding expects (bit3, reg1, disp16) but assembly is
@@ -407,6 +442,10 @@ ParseStatus V850AsmParser::parseOperand(OperandVector &Operands,
   if (getLexer().is(AsmToken::LBrac))
     return parseMemoryOperand(Operands);
 
+  // Try to parse as a condition code (for cmov, setf, sasf, adf, sbf, etc.)
+  if (parseCondCode(Operands).isSuccess())
+    return ParseStatus::Success;
+
   // Try to parse as an immediate expression
   if (parseImmediate(Operands).isSuccess()) {
     // Check for memory base register: disp[reg]
@@ -459,6 +498,51 @@ ParseStatus V850AsmParser::parseMemoryOperand(OperandVector &Operands) {
 
 ParseStatus V850AsmParser::parseBranchTarget(OperandVector &Operands) {
   return parseImmediate(Operands);
+}
+
+ParseStatus V850AsmParser::parseCondCode(OperandVector &Operands) {
+  SMLoc StartLoc = Parser.getTok().getLoc();
+
+  if (Parser.getTok().isNot(AsmToken::Identifier))
+    return ParseStatus::NoMatch;
+
+  StringRef Name = Parser.getTok().getString();
+
+  // Map condition code names to their numeric values
+  // V850 condition codes (4-bit encoding)
+  int CondVal = StringSwitch<int>(Name.lower())
+      .Case("v", 0)      // Overflow
+      .Case("c", 1)      // Carry / Lower
+      .Case("l", 1)      // Lower (alias for c)
+      .Case("z", 2)      // Zero / Equal
+      .Case("e", 2)      // Equal (alias for z)
+      .Case("nh", 3)     // Not higher
+      .Case("n", 4)      // Negative
+      .Case("t", 5)      // Always true (unconditional)
+      .Case("lt", 6)     // Less than (signed)
+      .Case("le", 7)     // Less or equal (signed)
+      .Case("nv", 8)     // No overflow
+      .Case("nc", 9)     // No carry / Not lower
+      .Case("nl", 9)     // Not lower (alias for nc)
+      .Case("nz", 10)    // Not zero / Not equal
+      .Case("ne", 10)    // Not equal (alias for nz)
+      .Case("h", 11)     // Higher
+      .Case("p", 12)     // Positive
+      .Case("sa", 13)    // Saturated
+      .Case("ge", 14)    // Greater or equal (signed)
+      .Case("gt", 15)    // Greater than (signed)
+      .Case("f", 5)      // Always false mapped to always true (same encoding)
+      .Default(-1);
+
+  if (CondVal < 0)
+    return ParseStatus::NoMatch;
+
+  SMLoc EndLoc = Parser.getTok().getEndLoc();
+  Parser.Lex(); // Consume the condition code token
+
+  const MCExpr *Expr = MCConstantExpr::create(CondVal, getContext());
+  Operands.push_back(V850Operand::createImm(Expr, StartLoc, EndLoc));
+  return ParseStatus::Success;
 }
 
 bool V850AsmParser::parseInstruction(ParseInstructionInfo &Info, StringRef Name,

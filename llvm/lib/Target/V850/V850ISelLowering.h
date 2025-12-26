@@ -56,6 +56,10 @@ public:
   SDValue LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerRETURNADDR(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerFRAMEADDR(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerMUL(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerMULHS(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerMULHU(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerDivRem(SDValue Op, SelectionDAG &DAG) const;
 
   Register getRegisterByName(const char *RegName, LLT VT,
                              const MachineFunction &MF) const override;

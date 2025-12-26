@@ -1621,6 +1621,10 @@ void Clang::RenderTargetOptions(const llvm::Triple &EffectiveTriple,
   case llvm::Triple::ve:
     AddVETargetArgs(Args, CmdArgs);
     break;
+
+  case llvm::Triple::v850:
+    AddV850TargetArgs(Args, CmdArgs);
+    break;
   }
 }
 
@@ -2289,6 +2293,15 @@ void Clang::AddVETargetArgs(const ArgList &Args, ArgStringList &CmdArgs) const {
   // Floating point operations and argument passing are hard.
   CmdArgs.push_back("-mfloat-abi");
   CmdArgs.push_back("hard");
+}
+
+void Clang::AddV850TargetArgs(const ArgList &Args,
+                               ArgStringList &CmdArgs) const {
+  if (Arg *A = Args.getLastArg(options::OPT_mcpu_EQ)) {
+    StringRef CPUName = A->getValue();
+    CmdArgs.push_back("-target-cpu");
+    CmdArgs.push_back(Args.MakeArgString(CPUName));
+  }
 }
 
 void Clang::DumpCompilationDatabase(Compilation &C, StringRef Filename,

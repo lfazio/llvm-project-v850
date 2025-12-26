@@ -24,6 +24,15 @@ namespace targets {
 class LLVM_LIBRARY_VISIBILITY V850TargetInfo : public TargetInfo {
   static const char *const GCCRegNames[];
 
+  enum CPUKind {
+    CK_NONE,
+    CK_V850,
+    CK_V850E1,
+    CK_V850E2,
+    CK_V850E2M,
+    CK_V850E3,
+  } CPU = CK_V850;
+
 public:
   V850TargetInfo(const llvm::Triple &Triple, const TargetOptions &)
       : TargetInfo(Triple) {
@@ -64,6 +73,10 @@ public:
   void getTargetDefines(const LangOptions &Opts,
                         MacroBuilder &Builder) const override;
 
+  bool isValidCPUName(StringRef Name) const override;
+  void fillValidCPUList(SmallVectorImpl<StringRef> &Values) const override;
+  bool setCPU(const std::string &Name) override;
+
   llvm::SmallVector<Builtin::InfosShard> getTargetBuiltins() const override {
     return {};
   }
@@ -71,7 +84,14 @@ public:
   bool allowsLargerPreferedTypeAlignment() const override { return false; }
 
   bool hasFeature(StringRef Feature) const override {
-    return Feature == "v850";
+    return llvm::StringSwitch<bool>(Feature)
+        .Case("v850", true)
+        .Case("v850e", CPU >= CK_V850E1)
+        .Case("v850e1", CPU >= CK_V850E1)
+        .Case("v850e2", CPU >= CK_V850E2)
+        .Case("v850e2m", CPU >= CK_V850E2M)
+        .Case("v850e3", CPU >= CK_V850E3)
+        .Default(false);
   }
 
   ArrayRef<const char *> getGCCRegNames() const override;

@@ -113,3 +113,29 @@ void V850InstPrinter::printDisp7EP(const MCInst *MI, unsigned OpNo,
   }
   O << "[ep]";
 }
+
+void V850InstPrinter::printDisp4EP(const MCInst *MI, unsigned OpNo,
+                                   const MCSubtargetInfo &STI, raw_ostream &O) {
+  // SLD.BU 4-bit displacement - printed as "disp[ep]"
+  const MCOperand &Disp = MI->getOperand(OpNo);
+
+  if (Disp.isImm()) {
+    O << Disp.getImm();
+  } else if (Disp.isExpr()) {
+    MAI.printExpr(O, *Disp.getExpr());
+  }
+  O << "[ep]";
+}
+
+void V850InstPrinter::printDisp5EP(const MCInst *MI, unsigned OpNo,
+                                   const MCSubtargetInfo &STI, raw_ostream &O) {
+  // SLD.HU 5-bit displacement - printed as "disp[ep]"
+  const MCOperand &Disp = MI->getOperand(OpNo);
+
+  if (Disp.isImm()) {
+    O << Disp.getImm();
+  } else if (Disp.isExpr()) {
+    MAI.printExpr(O, *Disp.getExpr());
+  }
+  O << "[ep]";
+}

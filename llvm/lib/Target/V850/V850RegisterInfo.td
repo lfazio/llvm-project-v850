@@ -164,8 +164,25 @@ def ECR   : V850SysReg<4, "ecr">;
 // Program Status Word - contains flags (Z, S, OV, CY, SAT) and control bits
 def PSW   : V850SysReg<5, "psw">;
 
+// CALLT caller status saving registers (V850E+)
+// CTPC - CALLT caller PC (return address)
+def CTPC  : V850SysReg<16, "ctpc">;
+
+// CTPSW - CALLT caller PSW
+def CTPSW : V850SysReg<17, "ctpsw">;
+
+// CTBP - CALLT base pointer
+def CTBP  : V850SysReg<20, "ctbp">;
+
+// Debug registers (V850E1+)
+// DBPC - Debug PC (return address from debug trap)
+def DBPC  : V850SysReg<18, "dbpc">;
+
+// DBPSW - Debug PSW
+def DBPSW : V850SysReg<19, "dbpsw">;
+
 // System register class - not allocatable, accessed via LDSR/STSR only
 def SysReg : RegisterClass<"V850", [i32], 32,
-    (add EIPC, EIPSW, FEPC, FEPSW, ECR, PSW)> {
+    (add EIPC, EIPSW, FEPC, FEPSW, ECR, PSW, CTPC, CTPSW, CTBP, DBPC, DBPSW)> {
   let isAllocatable = 0;
 }

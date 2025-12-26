@@ -20,6 +20,27 @@ include "llvm/Target/Target.td"
 // V850 subtarget features and instruction predicates
 //===----------------------------------------------------------------------===//
 
+// V850E1 feature - adds CALLT, DISPOSE, PREPARE, SXB, SXH, ZXB, ZXH, BSH, BSW,
+// HSW, CMOV, 3-op DIV/MUL, SASF, LD.BU, LD.HU, SLD.BU, SLD.HU, DBTRAP/DBRET
+def FeatureV850E1 : SubtargetFeature<"v850e1", "HasV850E1", "true",
+                                      "Enable V850E1 extensions",
+                                      []>;
+
+// V850E2 feature - adds ADF, SBF, 32-bit branches, MAC, MACU, search bit ops
+def FeatureV850E2 : SubtargetFeature<"v850e2", "HasV850E2", "true",
+                                      "Enable V850E2 extensions",
+                                      [FeatureV850E1]>;
+
+// V850E2M feature - adds FPU
+def FeatureV850E2M : SubtargetFeature<"v850e2m", "HasV850E2M", "true",
+                                       "Enable V850E2M extensions (includes FPU)",
+                                       [FeatureV850E2]>;
+
+// V850E3 feature - additional extensions
+def FeatureV850E3 : SubtargetFeature<"v850e3", "HasV850E3", "true",
+                                      "Enable V850E3 extensions",
+                                      [FeatureV850E2M]>;
+
 //===----------------------------------------------------------------------===//
 // Register File, Calling Conv, Instruction Descriptions
 //===----------------------------------------------------------------------===//
@@ -39,8 +60,12 @@ class Proc<string Name, list<SubtargetFeature> Features>
 
 def : Proc<"generic", []>;
 def : Proc<"v850", []>;
-def : Proc<"v850e", []>;
-def : Proc<"v850e2", []>;
+def : Proc<"v850e1", [FeatureV850E1]>;
+def : Proc<"v850e2", [FeatureV850E2]>;
+def : Proc<"v850e2m", [FeatureV850E2M]>;
+def : Proc<"v850e2v3", [FeatureV850E2M]>;
+def : Proc<"v850e3", [FeatureV850E3]>;
+def : Proc<"v850e3v5", [FeatureV850E3]>;
 
 //===----------------------------------------------------------------------===//
 // V850 assembly writer
