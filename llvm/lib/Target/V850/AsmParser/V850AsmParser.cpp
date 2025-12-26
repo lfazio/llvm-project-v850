@@ -207,6 +207,7 @@ public:
 
   bool isBrtarget9() const { return isImm(); }
   bool isBrtarget22() const { return isImm(); }
+  bool isBrtarget32() const { return isImm(); }
   bool isCondcode() const { return isImm(); }
   bool isCmov_cond() const { return isImm(); }
   bool isUimm6() const {
@@ -344,6 +345,10 @@ public:
   }
 
   void addBrtarget22Operands(MCInst &Inst, unsigned N) const {
+    addImmOperands(Inst, N);
+  }
+
+  void addBrtarget32Operands(MCInst &Inst, unsigned N) const {
     addImmOperands(Inst, N);
   }
 

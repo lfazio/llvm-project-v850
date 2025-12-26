@@ -152,6 +152,16 @@ static DecodeStatus decodeBranchTarget22(MCInst &Inst, uint32_t Imm,
   return MCDisassembler::Success;
 }
 
+static DecodeStatus decodeBranchTarget32(MCInst &Inst, uint32_t Imm,
+                                          int64_t Address,
+                                          const MCDisassembler *Decoder) {
+  // 32-bit signed offset, bit 0 is implicitly 0
+  // The encoding stores bits [31:1], so we need to shift left by 1
+  int32_t Offset = Imm << 1;
+  Inst.addOperand(MCOperand::createImm(Offset));
+  return MCDisassembler::Success;
+}
+
 //===----------------------------------------------------------------------===//
 // Decoder Table
 //===----------------------------------------------------------------------===//

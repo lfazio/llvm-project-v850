@@ -1491,29 +1491,33 @@ def HSH : FormatXII<0b111111, 0b011010, (outs GPR:$reg3), (ins GPR:$reg2),
 //===----------------------------------------------------------------------===//
 // 32-bit Displacement Jump Instructions (V850E2)
 // These are 48-bit (6-byte) instructions
+// Use explicit mnemonics (jr32, jarl32) to distinguish from 22-bit forms
 //===----------------------------------------------------------------------===//
 
-// JARL disp32, reg1 - Jump and register link with 32-bit displacement
+// JR32 disp32 - Jump relative with 32-bit displacement
+// Jumps to PC + disp32
+// Use "jr32" mnemonic to explicitly request 32-bit form
+let isBranch = 1, isTerminator = 1, isBarrier = 1 in
+def JR32 : FormatVI_E2<0b010111, (outs), (ins brtarget32:$disp32),
+                       "jr32\t$disp32",
+                       []> {
+  let reg1 = 0;
+}
+
+// JARL32 disp32, reg1 - Jump and register link with 32-bit displacement
 // Links return address to reg1 and jumps to PC + disp32
+// Use "jarl32" mnemonic to explicitly request 32-bit form
 let isCall = 1 in
 def JARL32 : FormatVI_E2<0b010111, (outs GPR:$reg1), (ins brtarget32:$disp32),
-                         "jarl\t$disp32, $reg1",
+                         "jarl32\t$disp32, $reg1",
                          []>;
 
-// JMP disp32[reg1] - Jump with 32-bit displacement
+// JMP32 disp32[reg1] - Jump with 32-bit displacement
 // Jumps to address reg1 + disp32
+// This has unique syntax (disp[reg]) so uses "jmp" mnemonic
 let isBranch = 1, isTerminator = 1, isBarrier = 1, isIndirectBranch = 1 in
 def JMP32 : FormatVI_E2<0b110111, (outs), (ins GPR:$reg1, brtarget32:$disp32),
                         "jmp\t$disp32[$reg1]",
                         []>;
-
-// JR disp32 - Jump relative with 32-bit displacement
-// Jumps to PC + disp32
-let isBranch = 1, isTerminator = 1, isBarrier = 1 in
-def JR32 : FormatVI_E2<0b010111, (outs), (ins brtarget32:$disp32),
-                       "jr\t$disp32",
-                       []> {
-  let reg1 = 0;
-}
 
 } // Predicates = [HasV850E2]
