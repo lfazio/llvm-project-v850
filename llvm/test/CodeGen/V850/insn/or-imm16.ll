@@ -1,0 +1,17 @@
+; RUN: llc -march=v850 -O0 < %s | FileCheck %s
+
+; Test ORI instruction - OR with 16-bit immediate
+
+; CHECK-LABEL: test_ori:
+; CHECK: ori {{[0-9]+}}, r{{[0-9]+}}, r{{[0-9]+}}
+define i32 @test_ori(i32 %a) {
+  %result = or i32 %a, 1000
+  ret i32 %result
+}
+
+; CHECK-LABEL: test_ori_large:
+; CHECK: ori {{[0-9]+}}, r{{[0-9]+}}, r{{[0-9]+}}
+define i32 @test_ori_large(i32 %a) {
+  %result = or i32 %a, 65535
+  ret i32 %result
+}
