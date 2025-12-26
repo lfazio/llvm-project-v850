@@ -46,6 +46,16 @@ def uimm7 : Operand<i32>, ImmLeaf<i32, [{return isUInt<7>(Imm);}]> {
   let DecoderMethod = "decodeUImmOperand<7>";
 }
 
+// 6-bit unsigned immediate (for CALLT)
+def uimm6 : Operand<i32>, ImmLeaf<i32, [{return isUInt<6>(Imm);}]> {
+  let DecoderMethod = "decodeUImmOperand<6>";
+}
+
+// 12-bit unsigned immediate (for PREPARE/DISPOSE register list)
+def uimm12 : Operand<i32>, ImmLeaf<i32, [{return isUInt<12>(Imm);}]> {
+  let DecoderMethod = "decodeUImmOperand<12>";
+}
+
 // AsmOperandClass for short load/store displacement with implicit EP base
 def Imm7AsmOperand : AsmOperandClass {
   let Name = "Imm7EP";
@@ -60,6 +70,30 @@ def disp7ep : Operand<i32>, ImmLeaf<i32, [{return isUInt<7>(Imm);}]> {
   let ParserMatchClass = Imm7AsmOperand;
 }
 
+// 4-bit displacement for SLD.BU (byte offset 0-15)
+def Imm4AsmOperand : AsmOperandClass {
+  let Name = "Imm4";
+  let RenderMethod = "addImmOperands";
+}
+
+def disp4ep : Operand<i32>, ImmLeaf<i32, [{return isUInt<4>(Imm);}]> {
+  let PrintMethod = "printDisp4EP";
+  let DecoderMethod = "decodeUImmOperand<4>";
+  let ParserMatchClass = Imm4AsmOperand;
+}
+
+// 5-bit displacement for SLD.HU (halfword offset 0-30, must be even)
+def Imm5AsmOperand : AsmOperandClass {
+  let Name = "Imm5";
+  let RenderMethod = "addImmOperands";
+}
+
+def disp5ep : Operand<i32>, ImmLeaf<i32, [{return isUInt<5>(Imm) && (Imm & 1) == 0;}]> {
+  let PrintMethod = "printDisp5EP";
+  let DecoderMethod = "decodeUImmOperand<5>";
+  let ParserMatchClass = Imm5AsmOperand;
+}
+
 // 9-bit PC-relative branch target (bit 0 implicitly 0)
 def brtarget9 : Operand<OtherVT> {
   let EncoderMethod = "getBranchTarget9OpValue";
@@ -72,10 +106,42 @@ def brtarget22 : Operand<OtherVT> {
   let DecoderMethod = "decodeBranchTarget22";
 }
 
+// AsmOperandClass for condition codes
+def CondCodeAsmOperand : AsmOperandClass {
+  let Name = "Condcode";
+  let RenderMethod = "addCondcodeOperands";
+}
+
 // Condition code operand for SETF instruction
 def condcode : Operand<i32> {
   let PrintMethod = "printCondCode";
+  let ParserMatchClass = CondCodeAsmOperand;
 }
+
+// AsmOperandClass for cmov condition codes
+def CmovCondAsmOperand : AsmOperandClass {
+  let Name = "Cmov_cond";
+  let RenderMethod = "addCmov_condOperands";
+}
+
+// Condition code operand for CMOV instruction
+def cmov_cond : Operand<i32> {
+  let PrintMethod = "printCondCode";
+  let ParserMatchClass = CmovCondAsmOperand;
+}
+
+//===----------------------------------------------------------------------===//
+// Predicates for CPU variants
+//===----------------------------------------------------------------------===//
+
+def HasV850E1 : Predicate<"Subtarget->hasV850E1()">,
+                AssemblerPredicate<(all_of FeatureV850E1), "V850E1">;
+def HasV850E2 : Predicate<"Subtarget->hasV850E2()">,
+                AssemblerPredicate<(all_of FeatureV850E2), "V850E2">;
+def HasV850E2M : Predicate<"Subtarget->hasV850E2M()">,
+                 AssemblerPredicate<(all_of FeatureV850E2M), "V850E2M">;
+def HasV850E3 : Predicate<"Subtarget->hasV850E3()">,
+                AssemblerPredicate<(all_of FeatureV850E3), "V850E3">;
 
 //===----------------------------------------------------------------------===//
 // Instruction Pattern Stuff
@@ -777,4 +843,411 @@ def : Pat<(store GPR:$src, (add GPR:$base, simm16:$off)), (STW GPR:$src, GPR:$ba
 def : Pat<(truncstorei8 GPR:$src, (add GPR:$base, simm16:$off)), (STB GPR:$src, GPR:$base, simm16:$off)>;
 def : Pat<(truncstorei16 GPR:$src, (add GPR:$base, simm16:$off)), (STH GPR:$src, GPR:$base, simm16:$off)>;
 
+//===----------------------------------------------------------------------===//
+// V850E1 Instructions (require HasV850E1 predicate)
+//===----------------------------------------------------------------------===//
 
+let Predicates = [HasV850E1] in {
+
+//===----------------------------------------------------------------------===//
+// Sign/Zero Extension Instructions (16-bit)
+// Format I variant with reg2 = 0
+//===----------------------------------------------------------------------===//
+
+// SXB reg1 - Sign extend byte
+// Opcode: 000101 with reg2 = 0
+def SXB : FormatI<0b000101, (outs GPR:$reg1), (ins GPR:$rs),
+                  "sxb\t$reg1",
+                  [(set GPR:$reg1, (sext_inreg GPR:$rs, i8))]> {
+  let reg2 = 0;
+  let Constraints = "$rs = $reg1";
+}
+
+// SXH reg1 - Sign extend halfword
+// Opcode: 000111 with reg2 = 0
+def SXH : FormatI<0b000111, (outs GPR:$reg1), (ins GPR:$rs),
+                  "sxh\t$reg1",
+                  [(set GPR:$reg1, (sext_inreg GPR:$rs, i16))]> {
+  let reg2 = 0;
+  let Constraints = "$rs = $reg1";
+}
+
+// ZXB reg1 - Zero extend byte
+// Opcode: 000100 with reg2 = 0
+def ZXB : FormatI<0b000100, (outs GPR:$reg1), (ins GPR:$rs),
+                  "zxb\t$reg1",
+                  [(set GPR:$reg1, (and GPR:$rs, 0xFF))]> {
+  let reg2 = 0;
+  let Constraints = "$rs = $reg1";
+}
+
+// ZXH reg1 - Zero extend halfword
+// Opcode: 000110 with reg2 = 0
+def ZXH : FormatI<0b000110, (outs GPR:$reg1), (ins GPR:$rs),
+                  "zxh\t$reg1",
+                  [(set GPR:$reg1, (and GPR:$rs, 0xFFFF))]> {
+  let reg2 = 0;
+  let Constraints = "$rs = $reg1";
+}
+
+// SWITCH reg1 - Jump with table look up
+// Opcode: 000010 with reg2 = 0
+let isBranch = 1, isTerminator = 1, isBarrier = 1, isIndirectBranch = 1 in
+def SWITCH : FormatI<0b000010, (outs), (ins GPR:$reg1),
+                     "switch\t$reg1",
+                     []> {
+  let reg2 = 0;
+}
+
+//===----------------------------------------------------------------------===//
+// Short Load/Store Instructions - Format IV (16-bit)
+//===----------------------------------------------------------------------===//
+
+// SLD.BU disp4[ep], reg2 - Short load byte unsigned (zero-extended)
+// Uses EP as base, 4-bit displacement (0-15 bytes)
+// Opcode: 0000110
+let mayLoad = 1, Uses = [EP] in
+def SLDBU : FormatIV_E1<0b0000110, (outs GPR:$reg2), (ins disp4ep:$disp4),
+                        "sld.bu\t$disp4, $reg2",
+                        []>;
+
+// SLD.HU disp5[ep], reg2 - Short load halfword unsigned (zero-extended)
+// Uses EP as base, 5-bit displacement (0-30 bytes, halfword aligned)
+// The 4-bit field encodes disp/2 (halfword index), so byte offset = disp4 * 2
+// Opcode: 0000111
+let mayLoad = 1, Uses = [EP] in
+def SLDHU : FormatIV_E1<0b0000111, (outs GPR:$reg2), (ins disp5ep:$disp5),
+                        "sld.hu\t$disp5, $reg2",
+                        []> {
+  bits<5> disp5;
+  let disp4 = disp5{4-1};  // Encode disp5[4:1], bit 0 is always 0
+}
+
+//===----------------------------------------------------------------------===//
+// SASF Instruction
+//===----------------------------------------------------------------------===//
+
+// SASF cccc, reg2 - Shift and set flag condition
+// Shifts reg2 left by 1, sets bit 0 based on condition code
+// Opcode: 111111, sub-op: 001000
+let Constraints = "$rs = $reg2", Uses = [PSW] in
+def SASF : FormatIX<0b111111, 0b001000, (outs GPR:$reg2),
+                    (ins GPR:$rs, condcode:$cond),
+                    "sasf\t$cond, $reg2",
+                    []> {
+  bits<5> cond;
+  let reg1 = cond;
+}
+
+//===----------------------------------------------------------------------===//
+// Unsigned Load Instructions (32-bit) - Format VII variant
+//===----------------------------------------------------------------------===//
+
+// LD.BU disp16[reg1], reg2 - Load byte unsigned (zero-extended)
+// Opcode: 111100 (0x3C) with special bit encoding
+let mayLoad = 1 in
+def LDBU : FormatVII<0b111100, (outs GPR:$reg2), (ins GPR:$reg1, simm16:$disp16),
+                     "ld.bu\t$disp16[$reg1], $reg2",
+                     [(set GPR:$reg2, (zextloadi8 (add GPR:$reg1, simm16:$disp16)))]>;
+
+// LD.HU disp16[reg1], reg2 - Load halfword unsigned (zero-extended)
+// Opcode: 111111 (0x3F) with sub-opcode
+let mayLoad = 1 in
+def LDHU : FormatVII<0b111111, (outs GPR:$reg2), (ins GPR:$reg1, simm16:$disp16),
+                     "ld.hu\t$disp16[$reg1], $reg2",
+                     [(set GPR:$reg2, (zextloadi16 (add GPR:$reg1, simm16:$disp16)))]>;
+
+// Patterns for zero-extending loads with base + 0 offset using LD.BU/LD.HU
+def : Pat<(i32 (zextloadi8 GPR:$base)), (LDBU GPR:$base, 0)>;
+def : Pat<(i32 (zextloadi16 GPR:$base)), (LDHU GPR:$base, 0)>;
+
+//===----------------------------------------------------------------------===//
+// Multiply Instructions (32-bit) - Format XI
+//===----------------------------------------------------------------------===//
+
+// MUL reg1, reg2, reg3 - Multiply word (32x32 -> 64, result in reg2:reg3)
+// Opcode: 111111, sub-op: 010001, sub-id: 00010
+def MUL : FormatXI<0b010001, 0b00010, (outs GPR:$reg3, GPR:$reg2),
+                   (ins GPR:$rs, GPR:$reg1),
+                   "mul\t$reg1, $reg2, $reg3",
+                   []> {
+  let Constraints = "$rs = $reg2";
+}
+
+// MULU reg1, reg2, reg3 - Multiply word unsigned (32x32 -> 64)
+// Opcode: 111111, sub-op: 010001, sub-id: 00100
+def MULU : FormatXI<0b010001, 0b00100, (outs GPR:$reg3, GPR:$reg2),
+                    (ins GPR:$rs, GPR:$reg1),
+                    "mulu\t$reg1, $reg2, $reg3",
+                    []> {
+  let Constraints = "$rs = $reg2";
+}
+
+//===----------------------------------------------------------------------===//
+// Divide Instructions (32-bit) - Format XI
+//===----------------------------------------------------------------------===//
+
+// DIV reg1, reg2, reg3 - Divide word (reg2/reg1 -> quotient in reg2, remainder in reg3)
+// Opcode: 111111, sub-op: 010100, sub-id: 00010
+def DIV : FormatXI<0b010100, 0b00010, (outs GPR:$reg2, GPR:$reg3),
+                   (ins GPR:$rs, GPR:$reg1),
+                   "div\t$reg1, $reg2, $reg3",
+                   []> {
+  let Constraints = "$rs = $reg2";
+}
+
+// DIVU reg1, reg2, reg3 - Divide word unsigned
+// Opcode: 111111, sub-op: 010110, sub-id: 00010
+def DIVU : FormatXI<0b010110, 0b00010, (outs GPR:$reg2, GPR:$reg3),
+                    (ins GPR:$rs, GPR:$reg1),
+                    "divu\t$reg1, $reg2, $reg3",
+                    []> {
+  let Constraints = "$rs = $reg2";
+}
+
+// DIVHU reg1, reg2, reg3 - Divide halfword unsigned
+// Opcode: 111111, sub-op: 010101, sub-id: 00010
+def DIVHU : FormatXI<0b010101, 0b00010, (outs GPR:$reg2, GPR:$reg3),
+                     (ins GPR:$rs, GPR:$reg1),
+                     "divhu\t$reg1, $reg2, $reg3",
+                     []> {
+  let Constraints = "$rs = $reg2";
+}
+
+// TODO: MUL/MULU and DIV/DIVU instruction selection requires custom handling
+// due to tied operand constraints ($rs = $reg2). Simple patterns don't work
+// because the instruction selection framework can't handle the register tying
+// properly. Future work: implement custom instruction selection in
+// V850ISelDAGToDAG.cpp using SelectCode overrides.
+
+//===----------------------------------------------------------------------===//
+// PREPARE/DISPOSE Instructions (Format XIII)
+// Used for function prologue/epilogue optimization
+//===----------------------------------------------------------------------===//
+
+// PREPARE list12, imm5 - Push registers and allocate stack frame
+// list12 is a 12-bit mask for registers r20-r31 (EP=r30, LP=r31)
+// imm5 is multiplied by 4 to get additional stack allocation
+// Note: Full register list parsing requires custom assembly parser support
+// For now, list12 and imm5 are specified as raw immediate operands
+// Note: PREPARE and DISPOSE share the same encoding (opcode 11001 with reg1=0).
+// PREPARE is used for disassembly; DISPOSE is encoding-only.
+let Defs = [SP], Uses = [SP], mayStore = 1 in
+def PREPARE : FormatXIII<(outs), (ins uimm12:$list12, uimm5:$imm5),
+                         "prepare\t$list12, $imm5",
+                         []> {
+  let reg1 = 0;  // No jump register for basic PREPARE
+}
+
+// DISPOSE imm5, list12 - Deallocate stack frame and pop registers
+// Reverse of PREPARE - same encoding as PREPARE, but different semantics
+// Marked as isCodeGenOnly to avoid disassembly conflict with PREPARE
+let Defs = [SP], Uses = [SP], mayLoad = 1, isCodeGenOnly = 1 in
+def DISPOSE : FormatXIII<(outs), (ins uimm5:$imm5, uimm12:$list12),
+                         "dispose\t$imm5, $list12",
+                         []> {
+  let reg1 = 0;  // No jump for basic DISPOSE
+}
+
+// DISPOSE imm5, list12, [reg1] - Dispose with indirect jump
+// Jumps to address in reg1 after restoring registers
+// This has a different encoding (reg1 != 0), so it's unique
+let Defs = [SP], Uses = [SP], mayLoad = 1, isReturn = 1, isTerminator = 1, isBarrier = 1 in
+def DISPOSEr : FormatXIII<(outs), (ins uimm5:$imm5, uimm12:$list12, GPR:$reg1),
+                          "dispose\t$imm5, $list12, [$reg1]",
+                          []>;
+
+//===----------------------------------------------------------------------===//
+// Byte Swap Instructions (32-bit) - Format XI
+//===----------------------------------------------------------------------===//
+
+// BSW reg2, reg3 - Byte swap word
+// Opcode: 111111, sub-op: 011010, sub-id: 00000
+let Defs = [PSW] in
+def BSW : FormatXI<0b011010, 0b00000, (outs GPR:$reg3), (ins GPR:$reg2),
+                   "bsw\t$reg2, $reg3",
+                   [(set GPR:$reg3, (bswap GPR:$reg2))]> {
+  let reg1 = 0;
+}
+
+// BSH reg2, reg3 - Byte swap halfword
+// Opcode: 111111, sub-op: 011010, sub-id: 00010
+let Defs = [PSW] in
+def BSH : FormatXI<0b011010, 0b00010, (outs GPR:$reg3), (ins GPR:$reg2),
+                   "bsh\t$reg2, $reg3",
+                   []> {
+  let reg1 = 0;
+}
+
+// HSW reg2, reg3 - Halfword swap word
+// Opcode: 111111, sub-op: 011010, sub-id: 00100
+let Defs = [PSW] in
+def HSW : FormatXI<0b011010, 0b00100, (outs GPR:$reg3), (ins GPR:$reg2),
+                   "hsw\t$reg2, $reg3",
+                   [(set GPR:$reg3, (rotr GPR:$reg2, (i32 16)))]> {
+  let reg1 = 0;
+}
+
+// HSW patterns for expanded rotate by 16 (since ROTR is Expand)
+def : Pat<(or (shl GPR:$rs, (i32 16)), (srl GPR:$rs, (i32 16))), (HSW GPR:$rs)>;
+def : Pat<(or (srl GPR:$rs, (i32 16)), (shl GPR:$rs, (i32 16))), (HSW GPR:$rs)>;
+
+//===----------------------------------------------------------------------===//
+// Conditional Move Instructions (32-bit) - Format XI/XII
+//===----------------------------------------------------------------------===//
+
+// CMOV cccc, reg1, reg2, reg3 - Conditional move (register form)
+// If condition true: reg3 = reg1, else reg3 = reg2
+// Opcode: 111111, sub-op: 011001, subid: {cond, 0}
+def CMOVr : FormatXI<0b011001, 0b00000, (outs GPR:$reg3),
+                     (ins cmov_cond:$cond, GPR:$reg1, GPR:$reg2),
+                     "cmov\t$cond, $reg1, $reg2, $reg3",
+                     []> {
+  bits<4> cond;
+  let Inst{20-17} = cond;
+  let Inst{16} = 0;
+}
+
+// CMOV cccc, imm5, reg2, reg3 - Conditional move (immediate form)
+// If condition true: reg3 = sign_ext(imm5), else reg3 = reg2
+// Opcode: 111111, sub-op: 011000
+def CMOVi : FormatXII<0b111111, 0b011000, (outs GPR:$reg3),
+                      (ins cmov_cond:$cond, simm5:$imm5, GPR:$reg2),
+                      "cmov\t$cond, $imm5, $reg2, $reg3",
+                      []>;
+
+//===----------------------------------------------------------------------===//
+// CALLT/CTRET Instructions
+//===----------------------------------------------------------------------===//
+
+// CALLT imm6 - Call with table look up
+// Format II variant with 5-bit opcode (01000) and 6-bit immediate
+let isCall = 1, Defs = [CTPC, CTPSW] in
+def CALLT : FormatII_IMM6<0b01000, (outs), (ins uimm6:$imm6),
+                          "callt\t$imm6",
+                          []>;
+
+// CTRET - Return from CALLT
+// Opcode: 111111 (0x3F), sub-op: 010001, vector: 00100
+let isReturn = 1, isTerminator = 1, isBarrier = 1, Uses = [CTPC, CTPSW] in
+def CTRET : FormatX<0b111111, 0b010001, (outs), (ins),
+                    "ctret",
+                    []> {
+  let vector = 0b00100;
+}
+
+// DBTRAP - Debug trap
+// Opcode: 1111100001000000 (16-bit)
+let hasSideEffects = 1, Defs = [DBPC, DBPSW] in
+def DBTRAP : V850Inst16<(outs), (ins),
+                        "dbtrap",
+                        []> {
+  let Inst{15-0} = 0b1111100001000000;
+}
+
+// DBRET - Return from debug trap
+// Opcode: 111111 (0x3F), sub-op: 010001, vector: 00110
+let isReturn = 1, isTerminator = 1, isBarrier = 1,
+    hasSideEffects = 1, Uses = [DBPC, DBPSW] in
+def DBRET : FormatX<0b111111, 0b010001, (outs), (ins),
+                    "dbret",
+                    []> {
+  let vector = 0b00110;
+}
+
+} // Predicates = [HasV850E1]
+
+//===----------------------------------------------------------------------===//
+// V850E2 Instructions (require HasV850E2 predicate)
+//===----------------------------------------------------------------------===//
+
+let Predicates = [HasV850E2] in {
+
+// ADF cccc, reg1, reg2, reg3 - Add on condition flag
+// If condition true: reg3 = reg2 + reg1 + CY, else reg3 = reg2 + CY
+// Opcode: 111111, sub-op: 011101, subid: {cond, 0}
+let Uses = [PSW] in
+def ADF : FormatXI<0b011101, 0b00000, (outs GPR:$reg3),
+                   (ins cmov_cond:$cond, GPR:$reg1, GPR:$reg2),
+                   "adf\t$cond, $reg1, $reg2, $reg3",
+                   []> {
+  bits<4> cond;
+  let Inst{20-17} = cond;
+  let Inst{16} = 0;
+}
+
+// SBF cccc, reg1, reg2, reg3 - Subtract on condition flag
+// If condition true: reg3 = reg2 - reg1 - CY, else reg3 = reg2 - CY
+// Opcode: 111111, sub-op: 011100, subid: {cond, 0}
+let Uses = [PSW] in
+def SBF : FormatXI<0b011100, 0b00000, (outs GPR:$reg3),
+                   (ins cmov_cond:$cond, GPR:$reg1, GPR:$reg2),
+                   "sbf\t$cond, $reg1, $reg2, $reg3",
+                   []> {
+  bits<4> cond;
+  let Inst{20-17} = cond;
+  let Inst{16} = 0;
+}
+
+// MAC reg1, reg2, reg3, reg4 - Multiply-accumulate signed
+// (reg3:reg4) = (reg3:reg4) + (reg1 * reg2)
+// Opcode: 111111, sub-op: 011110, sub-id: 00000
+def MAC : FormatXI<0b011110, 0b00000, (outs GPR:$reg3, GPR:$reg4),
+                   (ins GPR:$reg1, GPR:$reg2, GPR:$reg3_in, GPR:$reg4_in),
+                   "mac\t$reg1, $reg2, $reg3, $reg4",
+                   []> {
+  let Constraints = "$reg3_in = $reg3, $reg4_in = $reg4";
+}
+
+// MACU reg1, reg2, reg3, reg4 - Multiply-accumulate unsigned
+// Opcode: 111111, sub-op: 011111, sub-id: 00000
+def MACU : FormatXI<0b011111, 0b00000, (outs GPR:$reg3, GPR:$reg4),
+                    (ins GPR:$reg1, GPR:$reg2, GPR:$reg3_in, GPR:$reg4_in),
+                    "macu\t$reg1, $reg2, $reg3, $reg4",
+                    []> {
+  let Constraints = "$reg3_in = $reg3, $reg4_in = $reg4";
+}
+
+// SCH0L reg2, reg3 - Search zero from left (count leading ones)
+// Opcode: 111111, sub-op: 011010, sub-id: 01100
+// Returns position of first 0 bit from MSB (= count of leading 1s)
+let Defs = [PSW] in
+def SCH0L : FormatXI<0b011010, 0b01100, (outs GPR:$reg3), (ins GPR:$reg2),
+                     "sch0l\t$reg2, $reg3",
+                     [(set GPR:$reg3, (ctlz (not GPR:$reg2)))]> {
+  let reg1 = 0;
+}
+
+// SCH0R reg2, reg3 - Search zero from right (count trailing ones)
+// Opcode: 111111, sub-op: 011010, sub-id: 01000
+// Returns position of first 0 bit from LSB (= count of trailing 1s)
+let Defs = [PSW] in
+def SCH0R : FormatXI<0b011010, 0b01000, (outs GPR:$reg3), (ins GPR:$reg2),
+                     "sch0r\t$reg2, $reg3",
+                     [(set GPR:$reg3, (cttz (not GPR:$reg2)))]> {
+  let reg1 = 0;
+}
+
+// SCH1L reg2, reg3 - Search one from left (count leading zeros)
+// Opcode: 111111, sub-op: 011010, sub-id: 01110
+// Returns position of first 1 bit from MSB (= count of leading 0s)
+// This is __builtin_clz
+let Defs = [PSW] in
+def SCH1L : FormatXI<0b011010, 0b01110, (outs GPR:$reg3), (ins GPR:$reg2),
+                     "sch1l\t$reg2, $reg3",
+                     [(set GPR:$reg3, (ctlz GPR:$reg2))]> {
+  let reg1 = 0;
+}
+
+// SCH1R reg2, reg3 - Search one from right (count trailing zeros)
+// Opcode: 111111, sub-op: 011010, sub-id: 01010
+// Returns position of first 1 bit from LSB (= count of trailing 0s)
+// This is __builtin_ctz
+let Defs = [PSW] in
+def SCH1R : FormatXI<0b011010, 0b01010, (outs GPR:$reg3), (ins GPR:$reg2),
+                     "sch1r\t$reg2, $reg3",
+                     [(set GPR:$reg3, (cttz GPR:$reg2))]> {
+  let reg1 = 0;
+}
+
+} // Predicates = [HasV850E2]
