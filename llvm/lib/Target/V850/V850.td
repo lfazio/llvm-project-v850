@@ -61,6 +61,7 @@ class Proc<string Name, list<SubtargetFeature> Features>
 def : Proc<"generic", []>;
 def : Proc<"v850", []>;
 def : Proc<"v850e1", [FeatureV850E1]>;
+def : Proc<"v850es", [FeatureV850E1]>;  // V850ES has same ISA as V850E1
 def : Proc<"v850e2", [FeatureV850E2]>;
 def : Proc<"v850e2m", [FeatureV850E2M]>;
 def : Proc<"v850e2v3", [FeatureV850E2M]>;
