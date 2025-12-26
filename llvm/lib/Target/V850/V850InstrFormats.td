@@ -43,6 +43,23 @@ class V850Inst32<dag outs, dag ins, string asmstr, list<dag> pattern>
   let Size = 4;
 }
 
+// 48-bit instruction base class (V850E2+)
+// These instructions use 32-bit displacements and require a separate
+// Inst field size since the base class only has 32 bits.
+class V850Inst48<dag outs, dag ins, string asmstr, list<dag> pattern>
+    : Instruction {
+  field bits<48> Inst;
+  field bits<48> SoftFail = 0;
+
+  let Namespace = "V850";
+  let Size = 6;
+
+  dag OutOperandList = outs;
+  dag InOperandList = ins;
+  let AsmString = asmstr;
+  let Pattern = pattern;
+}
+
 // Pseudo instruction class
 class V850Pseudo<dag outs, dag ins, string asmstr, list<dag> pattern>
     : V850Inst<outs, ins, asmstr, pattern> {
@@ -368,29 +385,24 @@ class FormatXIII<bits<5> opcode, dag outs, dag ins, string asmstr, list<dag> pat
 // Note: For PREPARE/DISPOSE without jump register, use FormatXIII with
 // "let reg1 = 0" constraint instead of a separate class.
 
-// TODO: 48-bit instruction support requires extending V850Inst to use bits<48>
-// and proper disassembler support. Commented out for now.
-//
-// //===----------------------------------------------------------------------===//
-// // Format VI-E2: 48-bit Jump with 32-bit displacement (V850E2+)
-// // Used for: JARL disp32, JMP disp32, JR disp32
-// // First halfword: 15-11 = 00000, 10-6 = 00001, 5-0 = reg1
-// // Second halfword: 31-17 = disp32[15:1], 16 = disp32[0]
-// // Third halfword: 47-32 = disp32[32:16]
-// //===----------------------------------------------------------------------===//
-//
-// class FormatVI_E2<bits<6>opcode, dag outs, dag ins, string asmstr, list<dag> pattern>
-//     : V850Inst<outs, ins, asmstr, pattern> {
-//   bits<5> reg1;
-//   bits<32> disp32;
-//
-//   let Size = 6;  // 48-bit instruction
-//
-//   let Inst{15-11} = 0;
-//   let Inst{10-5} = opcode;
-//   let Inst{4-0} = reg1;
-//   let Inst{16}    = disp32{0};       // disp32 bit 0
-//   let Inst{31-17} = disp32{15-1};    // disp32[15:1]
-//   let Inst{47-32} = disp32{31-16};   // disp32[31:16]
-// }
+//===----------------------------------------------------------------------===//
+// Format VI-E2: 48-bit Jump with 32-bit displacement (V850E2+)
+// Used for: JARL disp32, JMP disp32, JR disp32
+// First halfword:  15-11 = reg2 (unused, set to 0), 10-5 = opcode, 4-0 = reg1
+// Second halfword: 31-17 = disp32[15:1], 16 = disp32[0]
+// Third halfword:  47-32 = disp32[31:16]
+//===----------------------------------------------------------------------===//
+
+class FormatVI_E2<bits<6> opcode, dag outs, dag ins, string asmstr, list<dag> pattern>
+    : V850Inst48<outs, ins, asmstr, pattern> {
+  bits<5> reg1;
+  bits<32> disp32;
+
+  let Inst{15-11} = 0;                // reg2 field (unused)
+  let Inst{10-5}  = opcode;
+  let Inst{4-0}   = reg1;
+  let Inst{16}    = disp32{0};        // disp32 bit 0
+  let Inst{31-17} = disp32{15-1};     // disp32[15:1]
+  let Inst{47-32} = disp32{31-16};    // disp32[31:16]
+}
 

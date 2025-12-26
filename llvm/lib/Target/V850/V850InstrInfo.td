@@ -1488,31 +1488,32 @@ def HSH : FormatXII<0b111111, 0b011010, (outs GPR:$reg3), (ins GPR:$reg2),
   let cond = 0b0011;
 }
 
-// TODO: 32-bit Displacement Jump Instructions (V850E2)
-// These require proper 48-bit instruction support in the disassembler
-// //===----------------------------------------------------------------------===//
-// // 32-bit Displacement Jump Instructions (V850E2)
-// // These are 48-bit (6-byte) instructions
-// //===----------------------------------------------------------------------===//
-//
-// // JARL disp32, reg1 - Jump and register link with 32-bit displacement
-// let isCall = 1 in
-// def JARL32 : FormatVI_E2<0b010111, (outs GPR:$reg1), (ins brtarget32:$disp32),
-//                          "jarl\t$disp32, $reg1",
-//                          []>;
-//
-// // JMP disp32[reg1] - Jump with 32-bit displacement
-// let isBranch = 1, isTerminator = 1, isBarrier = 1, isIndirectBranch = 1 in
-// def JMP32 : FormatVI_E2<0b110111, (outs), (ins GPR:$reg1, brtarget32:$disp32),
-//                      "jmp\t$disp32[$reg1]",
-//                      []>;
-//
-// // JR disp32 - Jump relative with 32-bit displacement
-// let isBranch = 1, isTerminator = 1, isBarrier = 1 in
-// def JR32 : FormatVI_E2<0b010111, (outs), (ins brtarget32:$disp32),
-//                        "jr\t$disp32",
-//                        []> {
-//   let reg1 = 0;
-// }
+//===----------------------------------------------------------------------===//
+// 32-bit Displacement Jump Instructions (V850E2)
+// These are 48-bit (6-byte) instructions
+//===----------------------------------------------------------------------===//
+
+// JARL disp32, reg1 - Jump and register link with 32-bit displacement
+// Links return address to reg1 and jumps to PC + disp32
+let isCall = 1 in
+def JARL32 : FormatVI_E2<0b010111, (outs GPR:$reg1), (ins brtarget32:$disp32),
+                         "jarl\t$disp32, $reg1",
+                         []>;
+
+// JMP disp32[reg1] - Jump with 32-bit displacement
+// Jumps to address reg1 + disp32
+let isBranch = 1, isTerminator = 1, isBarrier = 1, isIndirectBranch = 1 in
+def JMP32 : FormatVI_E2<0b110111, (outs), (ins GPR:$reg1, brtarget32:$disp32),
+                        "jmp\t$disp32[$reg1]",
+                        []>;
+
+// JR disp32 - Jump relative with 32-bit displacement
+// Jumps to PC + disp32
+let isBranch = 1, isTerminator = 1, isBarrier = 1 in
+def JR32 : FormatVI_E2<0b010111, (outs), (ins brtarget32:$disp32),
+                       "jr\t$disp32",
+                       []> {
+  let reg1 = 0;
+}
 
 } // Predicates = [HasV850E2]

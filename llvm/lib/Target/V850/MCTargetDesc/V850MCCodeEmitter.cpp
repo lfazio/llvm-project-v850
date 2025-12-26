@@ -63,6 +63,11 @@ public:
   unsigned getBranchTarget22OpValue(const MCInst &MI, unsigned OpNo,
                                     SmallVectorImpl<MCFixup> &Fixups,
                                     const MCSubtargetInfo &STI) const;
+
+  // Get encoding for 32-bit branch target (V850E2+)
+  unsigned getBranchTarget32OpValue(const MCInst &MI, unsigned OpNo,
+                                    SmallVectorImpl<MCFixup> &Fixups,
+                                    const MCSubtargetInfo &STI) const;
 };
 
 } // end anonymous namespace
@@ -83,6 +88,11 @@ void V850MCCodeEmitter::encodeInstruction(const MCInst &MI,
     // 32-bit instructions: emit first halfword, then second halfword
     support::endian::write<uint16_t>(CB, Binary & 0xFFFF, llvm::endianness::little);
     support::endian::write<uint16_t>(CB, (Binary >> 16) & 0xFFFF, llvm::endianness::little);
+  } else if (Size == 6) {
+    // 48-bit instructions: emit three halfwords
+    support::endian::write<uint16_t>(CB, Binary & 0xFFFF, llvm::endianness::little);
+    support::endian::write<uint16_t>(CB, (Binary >> 16) & 0xFFFF, llvm::endianness::little);
+    support::endian::write<uint16_t>(CB, (Binary >> 32) & 0xFFFF, llvm::endianness::little);
   }
 }
 
@@ -112,6 +122,17 @@ unsigned V850MCCodeEmitter::getBranchTarget9OpValue(
 }
 
 unsigned V850MCCodeEmitter::getBranchTarget22OpValue(
+    const MCInst &MI, unsigned OpNo, SmallVectorImpl<MCFixup> &Fixups,
+    const MCSubtargetInfo &STI) const {
+  const MCOperand &MO = MI.getOperand(OpNo);
+  if (MO.isImm())
+    return MO.getImm() >> 1; // Shift right by 1 (bit 0 is implicit 0)
+
+  // TODO: Handle fixups for symbolic operands
+  return 0;
+}
+
+unsigned V850MCCodeEmitter::getBranchTarget32OpValue(
     const MCInst &MI, unsigned OpNo, SmallVectorImpl<MCFixup> &Fixups,
     const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpNo);
