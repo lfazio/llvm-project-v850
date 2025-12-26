@@ -21,3 +21,10 @@
 // CHECK-DAG: AND
 // CHECK-DAG: TST
 
+// Format I with reg2=0 constraint (V850E1+)
+// CHECK-DAG: SXB
+// CHECK-DAG: SXH
+// CHECK-DAG: ZXB
+// CHECK-DAG: ZXH
+// CHECK-DAG: SWITCH
+
