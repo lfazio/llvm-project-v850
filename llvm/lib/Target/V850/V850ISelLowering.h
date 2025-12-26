@@ -31,6 +31,18 @@ enum NodeType : unsigned {
   BR_CC,       // Branch on condition code
   CMP,         // Compare
   SELECT_CC,   // Select with condition code
+
+  // Multiply operations (V850E1+)
+  // SMUL: Signed 32x32->64 multiply, returns (low, high)
+  SMUL,
+  // UMUL: Unsigned 32x32->64 multiply, returns (low, high)
+  UMUL,
+
+  // Division operations (V850E1+)
+  // SDIVREM: Signed divide, returns (quotient, remainder)
+  SDIVREM,
+  // UDIVREM: Unsigned divide, returns (quotient, remainder)
+  UDIVREM,
 };
 } // namespace V850ISD
 

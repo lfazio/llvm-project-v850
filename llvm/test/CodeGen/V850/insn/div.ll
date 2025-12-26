@@ -1,12 +1,12 @@
 ; RUN: llc -march=v850 -mcpu=v850e1 -O0 < %s | FileCheck %s
 
-; Test DIV instruction (signed 32-bit divide) via inline assembly
-; DIV is a V850E1+ instruction that produces quotient and remainder
+; Test DIV instruction code generation
+; DIV is a V850E1+ instruction for signed 32-bit divide
 
-; CHECK-LABEL: test_div:
+; CHECK-LABEL: test_sdiv:
 ; CHECK: div r{{[0-9]+}}, r{{[0-9]+}}, r{{[0-9]+}}
-define void @test_div() {
-  call void asm sideeffect "div r1, r2, r3", ""()
-  ret void
+define i32 @test_sdiv(i32 %a, i32 %b) {
+  %result = sdiv i32 %a, %b
+  ret i32 %result
 }
 

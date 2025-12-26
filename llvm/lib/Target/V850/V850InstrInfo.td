@@ -187,6 +187,23 @@ def SDT_V850SelectCC : SDTypeProfile<1, 3, [SDTCisSameAs<0, 1>,
 def V850SelectCC : SDNode<"V850ISD::SELECT_CC", SDT_V850SelectCC,
                            [SDNPInGlue]>;
 
+// Multiply node - returns (low, high) pair
+// SDTypeProfile<2 results, 2 operands, [constraints]>
+def SDT_V850Mul : SDTypeProfile<2, 2, [SDTCisSameAs<0, 1>,
+                                        SDTCisSameAs<0, 2>,
+                                        SDTCisSameAs<0, 3>,
+                                        SDTCisVT<0, i32>]>;
+def V850smul : SDNode<"V850ISD::SMUL", SDT_V850Mul>;
+def V850umul : SDNode<"V850ISD::UMUL", SDT_V850Mul>;
+
+// Divide-remainder node - returns (quotient, remainder) pair
+def SDT_V850DivRem : SDTypeProfile<2, 2, [SDTCisSameAs<0, 1>,
+                                          SDTCisSameAs<0, 2>,
+                                          SDTCisSameAs<0, 3>,
+                                          SDTCisVT<0, i32>]>;
+def V850sdivrem : SDNode<"V850ISD::SDIVREM", SDT_V850DivRem>;
+def V850udivrem : SDNode<"V850ISD::UDIVREM", SDT_V850DivRem>;
+
 //===----------------------------------------------------------------------===//
 // Pattern fragments for instruction selection
 //===----------------------------------------------------------------------===//
@@ -965,21 +982,27 @@ def : Pat<(i32 (zextloadi16 GPR:$base)), (LDHU GPR:$base, 0)>;
 // Multiply Instructions (32-bit) - Format XI
 //===----------------------------------------------------------------------===//
 
-// MUL reg1, reg2, reg3 - Multiply word (32x32 -> 64, result in reg2:reg3)
+// MUL reg1, reg2, reg3 - Multiply word (32x32 -> 64)
+// reg2 (input/output): multiplicand, receives low 32 bits of result
+// reg3 (output): receives high 32 bits of result
 // Opcode: 111111, sub-op: 010001, sub-id: 00010
-def MUL : FormatXI<0b010001, 0b00010, (outs GPR:$reg3, GPR:$reg2),
+def MUL : FormatXI<0b010001, 0b00010, (outs GPR:$reg2, GPR:$reg3),
                    (ins GPR:$rs, GPR:$reg1),
                    "mul\t$reg1, $reg2, $reg3",
-                   []> {
+                   [(set GPR:$reg2, GPR:$reg3, (V850smul GPR:$rs, GPR:$reg1))]>,
+          Requires<[HasV850E1]> {
   let Constraints = "$rs = $reg2";
 }
 
 // MULU reg1, reg2, reg3 - Multiply word unsigned (32x32 -> 64)
+// reg2 (input/output): multiplicand, receives low 32 bits of result
+// reg3 (output): receives high 32 bits of result
 // Opcode: 111111, sub-op: 010001, sub-id: 00100
-def MULU : FormatXI<0b010001, 0b00100, (outs GPR:$reg3, GPR:$reg2),
+def MULU : FormatXI<0b010001, 0b00100, (outs GPR:$reg2, GPR:$reg3),
                     (ins GPR:$rs, GPR:$reg1),
                     "mulu\t$reg1, $reg2, $reg3",
-                    []> {
+                    [(set GPR:$reg2, GPR:$reg3, (V850umul GPR:$rs, GPR:$reg1))]>,
+          Requires<[HasV850E1]> {
   let Constraints = "$rs = $reg2";
 }
 
@@ -987,21 +1010,27 @@ def MULU : FormatXI<0b010001, 0b00100, (outs GPR:$reg3, GPR:$reg2),
 // Divide Instructions (32-bit) - Format XI
 //===----------------------------------------------------------------------===//
 
-// DIV reg1, reg2, reg3 - Divide word (reg2/reg1 -> quotient in reg2, remainder in reg3)
+// DIV reg1, reg2, reg3 - Divide word signed
+// reg2 (input/output): dividend, receives quotient
+// reg3 (output): receives remainder
 // Opcode: 111111, sub-op: 010100, sub-id: 00010
 def DIV : FormatXI<0b010100, 0b00010, (outs GPR:$reg2, GPR:$reg3),
                    (ins GPR:$rs, GPR:$reg1),
                    "div\t$reg1, $reg2, $reg3",
-                   []> {
+                   [(set GPR:$reg2, GPR:$reg3, (V850sdivrem GPR:$rs, GPR:$reg1))]>,
+          Requires<[HasV850E1]> {
   let Constraints = "$rs = $reg2";
 }
 
 // DIVU reg1, reg2, reg3 - Divide word unsigned
+// reg2 (input/output): dividend, receives quotient
+// reg3 (output): receives remainder
 // Opcode: 111111, sub-op: 010110, sub-id: 00010
 def DIVU : FormatXI<0b010110, 0b00010, (outs GPR:$reg2, GPR:$reg3),
                     (ins GPR:$rs, GPR:$reg1),
                     "divu\t$reg1, $reg2, $reg3",
-                    []> {
+                    [(set GPR:$reg2, GPR:$reg3, (V850udivrem GPR:$rs, GPR:$reg1))]>,
+          Requires<[HasV850E1]> {
   let Constraints = "$rs = $reg2";
 }
 
@@ -1013,12 +1042,6 @@ def DIVHU : FormatXI<0b010101, 0b00010, (outs GPR:$reg2, GPR:$reg3),
                      []> {
   let Constraints = "$rs = $reg2";
 }
-
-// TODO: MUL/MULU and DIV/DIVU instruction selection requires custom handling
-// due to tied operand constraints ($rs = $reg2). Simple patterns don't work
-// because the instruction selection framework can't handle the register tying
-// properly. Future work: implement custom instruction selection in
-// V850ISelDAGToDAG.cpp using SelectCode overrides.
 
 //===----------------------------------------------------------------------===//
 // PREPARE/DISPOSE Instructions (Format XIII)

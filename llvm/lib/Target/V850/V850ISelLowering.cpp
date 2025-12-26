@@ -55,24 +55,41 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
 
   // Set up operation actions
 
-  // Division and remainder - expand to libcalls for now
-  // TODO: V850 has hardware DIV/DIVU but they have tied operand constraints
-  // that require custom instruction selection (not just patterns)
-  setOperationAction(ISD::SDIV, MVT::i32, Expand);
-  setOperationAction(ISD::UDIV, MVT::i32, Expand);
-  setOperationAction(ISD::SREM, MVT::i32, Expand);
-  setOperationAction(ISD::UREM, MVT::i32, Expand);
-  setOperationAction(ISD::SDIVREM, MVT::i32, Expand);
-  setOperationAction(ISD::UDIVREM, MVT::i32, Expand);
+  // Division and remainder
+  if (STI.hasV850E1()) {
+    // V850E1+ has hardware DIV/DIVU instructions
+    setOperationAction(ISD::SDIV, MVT::i32, Custom);
+    setOperationAction(ISD::UDIV, MVT::i32, Custom);
+    setOperationAction(ISD::SREM, MVT::i32, Custom);
+    setOperationAction(ISD::UREM, MVT::i32, Custom);
+    setOperationAction(ISD::SDIVREM, MVT::i32, Custom);
+    setOperationAction(ISD::UDIVREM, MVT::i32, Custom);
+  } else {
+    // Base V850 uses library calls
+    setOperationAction(ISD::SDIV, MVT::i32, Expand);
+    setOperationAction(ISD::UDIV, MVT::i32, Expand);
+    setOperationAction(ISD::SREM, MVT::i32, Expand);
+    setOperationAction(ISD::UREM, MVT::i32, Expand);
+    setOperationAction(ISD::SDIVREM, MVT::i32, Expand);
+    setOperationAction(ISD::UDIVREM, MVT::i32, Expand);
+  }
 
-  // Multiplication - expand to libcalls for now
-  // TODO: V850 has hardware MUL/MULU but they have tied operand constraints
-  // that require custom instruction selection (not just patterns)
-  setOperationAction(ISD::MUL, MVT::i32, Expand);
-  setOperationAction(ISD::MULHS, MVT::i32, Expand);
-  setOperationAction(ISD::MULHU, MVT::i32, Expand);
-  setOperationAction(ISD::SMUL_LOHI, MVT::i32, Expand);
-  setOperationAction(ISD::UMUL_LOHI, MVT::i32, Expand);
+  // Multiplication
+  if (STI.hasV850E1()) {
+    // V850E1+ has hardware MUL/MULU instructions
+    setOperationAction(ISD::MUL, MVT::i32, Custom);
+    setOperationAction(ISD::MULHS, MVT::i32, Custom);
+    setOperationAction(ISD::MULHU, MVT::i32, Custom);
+    setOperationAction(ISD::SMUL_LOHI, MVT::i32, Expand);
+    setOperationAction(ISD::UMUL_LOHI, MVT::i32, Expand);
+  } else {
+    // Base V850 uses library calls
+    setOperationAction(ISD::MUL, MVT::i32, Expand);
+    setOperationAction(ISD::MULHS, MVT::i32, Expand);
+    setOperationAction(ISD::MULHU, MVT::i32, Expand);
+    setOperationAction(ISD::SMUL_LOHI, MVT::i32, Expand);
+    setOperationAction(ISD::UMUL_LOHI, MVT::i32, Expand);
+  }
 
   // Rotates - expand
   setOperationAction(ISD::ROTL, MVT::i32, Expand);
@@ -153,6 +170,19 @@ SDValue V850TargetLowering::LowerOperation(SDValue Op,
     return LowerFRAMEADDR(Op, DAG);
   case ISD::RETURNADDR:
     return LowerRETURNADDR(Op, DAG);
+  case ISD::MUL:
+    return LowerMUL(Op, DAG);
+  case ISD::MULHS:
+    return LowerMULHS(Op, DAG);
+  case ISD::MULHU:
+    return LowerMULHU(Op, DAG);
+  case ISD::SDIV:
+  case ISD::UDIV:
+  case ISD::SREM:
+  case ISD::UREM:
+  case ISD::SDIVREM:
+  case ISD::UDIVREM:
+    return LowerDivRem(Op, DAG);
   }
 }
 
@@ -172,6 +202,14 @@ const char *V850TargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "V850ISD::CMP";
   case V850ISD::SELECT_CC:
     return "V850ISD::SELECT_CC";
+  case V850ISD::SMUL:
+    return "V850ISD::SMUL";
+  case V850ISD::UMUL:
+    return "V850ISD::UMUL";
+  case V850ISD::SDIVREM:
+    return "V850ISD::SDIVREM";
+  case V850ISD::UDIVREM:
+    return "V850ISD::UDIVREM";
   }
   return nullptr;
 }
@@ -235,13 +273,14 @@ SDValue V850TargetLowering::LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const 
 
 SDValue V850TargetLowering::LowerMUL(SDValue Op, SelectionDAG &DAG) const {
   // V850's MUL instruction produces a 64-bit result in two registers.
-  // For simple 32-bit multiply, we use SMUL_LOHI and take only the low part.
+  // For simple 32-bit multiply, we use V850ISD::SMUL and take only the low part.
   SDLoc DL(Op);
   SDValue LHS = Op.getOperand(0);
   SDValue RHS = Op.getOperand(1);
 
+  // V850ISD::SMUL returns (low, high)
   SDValue MulLoHi =
-      DAG.getNode(ISD::SMUL_LOHI, DL, DAG.getVTList(MVT::i32, MVT::i32), LHS, RHS);
+      DAG.getNode(V850ISD::SMUL, DL, DAG.getVTList(MVT::i32, MVT::i32), LHS, RHS);
   return MulLoHi.getValue(0); // Return the low 32 bits
 }
 
@@ -251,8 +290,9 @@ SDValue V850TargetLowering::LowerMULHS(SDValue Op, SelectionDAG &DAG) const {
   SDValue LHS = Op.getOperand(0);
   SDValue RHS = Op.getOperand(1);
 
+  // V850ISD::SMUL returns (low, high)
   SDValue MulLoHi =
-      DAG.getNode(ISD::SMUL_LOHI, DL, DAG.getVTList(MVT::i32, MVT::i32), LHS, RHS);
+      DAG.getNode(V850ISD::SMUL, DL, DAG.getVTList(MVT::i32, MVT::i32), LHS, RHS);
   return MulLoHi.getValue(1); // Return the high 32 bits
 }
 
@@ -262,28 +302,36 @@ SDValue V850TargetLowering::LowerMULHU(SDValue Op, SelectionDAG &DAG) const {
   SDValue LHS = Op.getOperand(0);
   SDValue RHS = Op.getOperand(1);
 
+  // V850ISD::UMUL returns (low, high)
   SDValue MulLoHi =
-      DAG.getNode(ISD::UMUL_LOHI, DL, DAG.getVTList(MVT::i32, MVT::i32), LHS, RHS);
+      DAG.getNode(V850ISD::UMUL, DL, DAG.getVTList(MVT::i32, MVT::i32), LHS, RHS);
   return MulLoHi.getValue(1); // Return the high 32 bits
 }
 
 SDValue V850TargetLowering::LowerDivRem(SDValue Op, SelectionDAG &DAG) const {
   // V850's DIV/DIVU instructions produce both quotient and remainder.
-  // Convert SDIV/UDIV/SREM/UREM to SDIVREM/UDIVREM and extract the needed part.
+  // Convert SDIV/UDIV/SREM/UREM to V850ISD::SDIVREM/UDIVREM and extract the needed part.
   SDLoc DL(Op);
   unsigned Opcode = Op.getOpcode();
   SDValue LHS = Op.getOperand(0);
   SDValue RHS = Op.getOperand(1);
 
-  bool IsSigned = (Opcode == ISD::SDIV || Opcode == ISD::SREM);
+  bool IsSigned = (Opcode == ISD::SDIV || Opcode == ISD::SREM ||
+                   Opcode == ISD::SDIVREM);
   bool WantsQuotient = (Opcode == ISD::SDIV || Opcode == ISD::UDIV);
+  bool WantsRemainder = (Opcode == ISD::SREM || Opcode == ISD::UREM);
 
-  unsigned DivRemOpc = IsSigned ? ISD::SDIVREM : ISD::UDIVREM;
+  // V850ISD::SDIVREM and UDIVREM return (quotient, remainder)
+  unsigned DivRemOpc = IsSigned ? V850ISD::SDIVREM : V850ISD::UDIVREM;
   SDValue DivRem =
       DAG.getNode(DivRemOpc, DL, DAG.getVTList(MVT::i32, MVT::i32), LHS, RHS);
 
+  // For SDIVREM/UDIVREM, we need to return both values
+  if (Opcode == ISD::SDIVREM || Opcode == ISD::UDIVREM)
+    return DivRem;
+
   // Return quotient (result 0) or remainder (result 1)
-  return DivRem.getValue(WantsQuotient ? 0 : 1);
+  return DivRem.getValue(WantsRemainder ? 1 : 0);
 }
 
 SDValue V850TargetLowering::LowerRETURNADDR(SDValue Op,
