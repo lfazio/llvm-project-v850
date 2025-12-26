@@ -1,7 +1,7 @@
 // RUN: llvm-mc -triple=v850 -mcpu=v850e1 -show-encoding %s | FileCheck %s
 // RUN: llvm-mc -triple=v850 -mcpu=v850e2 -show-encoding %s | FileCheck %s
 
-// BSH - Byte swap halfword (Format XI, 32-bit)
+// BSH - Byte swap halfword (Format XII, 32-bit)
 // Syntax: bsh reg2, reg3
 // Operation: reg3 <- byte_swap_halfwords(reg2)
 // Swaps bytes within each halfword: ABCD -> BADC

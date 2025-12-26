@@ -1,7 +1,7 @@
 // RUN: llvm-mc -triple=v850 -mcpu=v850e1 -show-encoding %s | FileCheck %s
 // RUN: llvm-mc -triple=v850 -mcpu=v850e2 -show-encoding %s | FileCheck %s
 
-// BSW - Byte swap word (Format XI, 32-bit)
+// BSW - Byte swap word (Format XII, 32-bit)
 // Syntax: bsw reg2, reg3
 // Operation: reg3 <- byte_swap(reg2)
 // Reverses all 4 bytes: ABCD -> DCBA

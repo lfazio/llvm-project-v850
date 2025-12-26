@@ -279,7 +279,7 @@ class FormatX<bits<6> opcode, bits<6> subop, dag outs, dag ins,
 // - For conditional operations (CMOV, ADF, SBF): subid encodes {cond, 0}
 //===----------------------------------------------------------------------===//
 
-class FormatXI<bits<6> subop, bits<5> subid, dag outs, dag ins,
+class FormatXI<bits<6> opcode, bits<6> subop, bits<5> subid, dag outs, dag ins,
                string asmstr, list<dag> pattern>
     : V850Inst32<outs, ins, asmstr, pattern> {
   bits<5> reg1;
@@ -287,11 +287,34 @@ class FormatXI<bits<6> subop, bits<5> subid, dag outs, dag ins,
   bits<5> reg3;
 
   let Inst{15-11} = reg2;
-  let Inst{10-5}  = 0b111111;       // Extended opcode
+  let Inst{10-5}  = opcode;       // Extended opcode
   let Inst{4-0}   = reg1;
   let Inst{31-27} = reg3;
   let Inst{26-21} = subop;
   let Inst{20-16} = subid;
+}
+
+//===----------------------------------------------------------------------===//
+// Format XI-IMM: Extended 3-operand with 9-bit immediate (32-bit)
+// First halfword: 15-11 = reg2, 10-5 = 111111, 4-0 = imm9[4:0]
+// Second halfword: 31-27 = reg3, 26-21 = sub-op, 20-17 = imm9[8:5], 16 = 0
+// Used for: MUL imm9, MULU imm9
+//===----------------------------------------------------------------------===//
+
+class FormatXI_IMM9<bits<6> opcode, bits<6> subop, dag outs, dag ins,
+                    string asmstr, list<dag> pattern>
+    : V850Inst32<outs, ins, asmstr, pattern> {
+  bits<9> imm9;
+  bits<5> reg2;
+  bits<5> reg3;
+
+  let Inst{15-11} = reg2;
+  let Inst{10-5}  = opcode;       // Extended opcode
+  let Inst{4-0}   = imm9{4-0};      // imm9[4:0]
+  let Inst{31-27} = reg3;
+  let Inst{26-21} = subop;
+  let Inst{20-17} = imm9{8-5};      // imm9[8:5]
+  let Inst{16}    = 0;
 }
 
 //===----------------------------------------------------------------------===//
@@ -328,14 +351,14 @@ class FormatXII<bits<6> opcode, bits<6> subop, dag outs, dag ins, string asmstr,
 // Used for: PREPARE, DISPOSE
 //===----------------------------------------------------------------------===//
 
-class FormatXIII<dag outs, dag ins, string asmstr, list<dag> pattern>
+class FormatXIII<bits<5> opcode, dag outs, dag ins, string asmstr, list<dag> pattern>
     : V850Inst32<outs, ins, asmstr, pattern> {
   bits<5> imm5;
   bits<12> list12;
   bits<5> reg1;
 
   let Inst{15-11} = 0;              // Fixed
-  let Inst{10-6}  = 0b11001;        // PREPARE/DISPOSE opcode
+  let Inst{10-6}  = opcode;        // PREPARE/DISPOSE opcode
   let Inst{5-1}   = imm5;
   let Inst{0}     = list12{0};      // list12 bit 0 (r30)
   let Inst{31-21} = list12{11-1};   // list12 bits 11:1
@@ -344,4 +367,30 @@ class FormatXIII<dag outs, dag ins, string asmstr, list<dag> pattern>
 
 // Note: For PREPARE/DISPOSE without jump register, use FormatXIII with
 // "let reg1 = 0" constraint instead of a separate class.
+
+// TODO: 48-bit instruction support requires extending V850Inst to use bits<48>
+// and proper disassembler support. Commented out for now.
+//
+// //===----------------------------------------------------------------------===//
+// // Format VI-E2: 48-bit Jump with 32-bit displacement (V850E2+)
+// // Used for: JARL disp32, JMP disp32, JR disp32
+// // First halfword: 15-11 = 00000, 10-6 = 00001, 5-0 = reg1
+// // Second halfword: 31-17 = disp32[15:1], 16 = disp32[0]
+// // Third halfword: 47-32 = disp32[32:16]
+// //===----------------------------------------------------------------------===//
+//
+// class FormatVI_E2<bits<6>opcode, dag outs, dag ins, string asmstr, list<dag> pattern>
+//     : V850Inst<outs, ins, asmstr, pattern> {
+//   bits<5> reg1;
+//   bits<32> disp32;
+//
+//   let Size = 6;  // 48-bit instruction
+//
+//   let Inst{15-11} = 0;
+//   let Inst{10-5} = opcode;
+//   let Inst{4-0} = reg1;
+//   let Inst{16}    = disp32{0};       // disp32 bit 0
+//   let Inst{31-17} = disp32{15-1};    // disp32[15:1]
+//   let Inst{47-32} = disp32{31-16};   // disp32[31:16]
+// }
 

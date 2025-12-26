@@ -20,3 +20,9 @@
 // Shift and add (V850E1+)
 // CHECK-DAG: SASF
 
+// Bit manipulation register form (V850E1+)
+// CHECK-DAG: SET1r
+// CHECK-DAG: CLR1r
+// CHECK-DAG: NOT1r
+// CHECK-DAG: TST1r
+

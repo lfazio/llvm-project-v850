@@ -1,7 +1,7 @@
 // RUN: llvm-mc -triple=v850 -mcpu=v850e1 -show-encoding %s | FileCheck %s
 // RUN: llvm-mc -triple=v850 -mcpu=v850e2 -show-encoding %s | FileCheck %s
 
-// HSW - Halfword swap word (Format XI, 32-bit)
+// HSW - Halfword swap word (Format XII, 32-bit)
 // Syntax: hsw reg2, reg3
 // Operation: reg3 <- halfword_swap(reg2)
 // Swaps two halfwords: ABCD -> CDAB (rotate by 16)

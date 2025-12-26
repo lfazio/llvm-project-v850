@@ -56,6 +56,16 @@ def uimm12 : Operand<i32>, ImmLeaf<i32, [{return isUInt<12>(Imm);}]> {
   let DecoderMethod = "decodeUImmOperand<12>";
 }
 
+// Signed 9-bit immediate (for MUL/MULU immediate)
+def simm9 : Operand<i32>, ImmLeaf<i32, [{return isInt<9>(Imm);}]> {
+  let DecoderMethod = "decodeSImm<9>";
+}
+
+// Unsigned 9-bit immediate (for MUL/MULU unsigned immediate)
+def uimm9 : Operand<i32>, ImmLeaf<i32, [{return isUInt<9>(Imm);}]> {
+  let DecoderMethod = "decodeUImmOperand<9>";
+}
+
 // AsmOperandClass for short load/store displacement with implicit EP base
 def Imm7AsmOperand : AsmOperandClass {
   let Name = "Imm7EP";
@@ -104,6 +114,12 @@ def brtarget9 : Operand<OtherVT> {
 def brtarget22 : Operand<OtherVT> {
   let EncoderMethod = "getBranchTarget22OpValue";
   let DecoderMethod = "decodeBranchTarget22";
+}
+
+// 32-bit PC-relative branch target (bit 0 implicitly 0, V850E2+)
+def brtarget32 : Operand<OtherVT> {
+  let EncoderMethod = "getBranchTarget32OpValue";
+  let DecoderMethod = "decodeBranchTarget32";
 }
 
 // AsmOperandClass for condition codes
@@ -271,21 +287,24 @@ def RET : V850Pseudo<(outs), (ins), "jmp\t[lp]", [(V850RetGlue)]>;
 
 // ADD reg1, reg2 - Add reg1 to reg2, store in reg2
 // Opcode: 001110 (0x0E)
-let Constraints = "$rs = $reg2" in
+// Flags: CY, OV, S, Z modified
+let Constraints = "$rs = $reg2", Defs = [PSW] in
 def ADD : FormatI<0b001110, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
                   "add\t$reg1, $reg2",
                   [(set GPR:$reg2, (add GPR:$rs, GPR:$reg1))]>;
 
 // SUB reg1, reg2 - Subtract reg1 from reg2, store in reg2
 // Opcode: 001101 (0x0D)
-let Constraints = "$rs = $reg2" in
+// Flags: CY, OV, S, Z modified
+let Constraints = "$rs = $reg2", Defs = [PSW] in
 def SUB : FormatI<0b001101, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
                   "sub\t$reg1, $reg2",
                   [(set GPR:$reg2, (sub GPR:$rs, GPR:$reg1))]>;
 
 // SUBR reg1, reg2 - Subtract reg2 from reg1, store in reg2 (reverse subtract)
 // Opcode: 001100 (0x0C)
-let Constraints = "$rs = $reg2" in
+// Flags: CY, OV, S, Z modified
+let Constraints = "$rs = $reg2", Defs = [PSW] in
 def SUBR : FormatI<0b001100, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
                    "subr\t$reg1, $reg2",
                    []>;
@@ -305,13 +324,16 @@ def MOV : FormatI<0b000000, (outs GPR:$reg2), (ins GPR:$reg1),
 
 // NOT reg1, reg2 - Bitwise NOT of reg1, store in reg2
 // Opcode: 000001 (0x01)
+// Flags: OV=0, S, Z modified
+let Defs = [PSW] in
 def NOT : FormatI<0b000001, (outs GPR:$reg2), (ins GPR:$reg1),
                   "not\t$reg1, $reg2",
                   [(set GPR:$reg2, (not GPR:$reg1))]>;
 
 // DIVH reg1, reg2 - Divide halfword (reg2/reg1 -> reg2)
 // Opcode: 000010 (0x02)
-let Constraints = "$rs = $reg2" in
+// Flags: OV, S, Z modified
+let Constraints = "$rs = $reg2", Defs = [PSW] in
 def DIVH : FormatI<0b000010, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
                    "divh\t$reg1, $reg2",
                    []>;
@@ -327,21 +349,24 @@ def JMP : FormatI<0b000011, (outs), (ins GPR:$reg1),
 
 // SATSUBR reg1, reg2 - Saturated subtract reverse
 // Opcode: 000100 (0x04)
-let Constraints = "$rs = $reg2" in
+// Flags: CY, OV, S, Z, SAT modified
+let Constraints = "$rs = $reg2", Defs = [PSW] in
 def SATSUBR : FormatI<0b000100, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
                       "satsubr\t$reg1, $reg2",
                       []>;
 
 // SATSUB reg1, reg2 - Saturated subtract
 // Opcode: 000101 (0x05)
-let Constraints = "$rs = $reg2" in
+// Flags: CY, OV, S, Z, SAT modified
+let Constraints = "$rs = $reg2", Defs = [PSW] in
 def SATSUB : FormatI<0b000101, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
                      "satsub\t$reg1, $reg2",
                      []>;
 
 // SATADD reg1, reg2 - Saturated add
 // Opcode: 000110 (0x06)
-let Constraints = "$rs = $reg2" in
+// Flags: CY, OV, S, Z, SAT modified
+let Constraints = "$rs = $reg2", Defs = [PSW] in
 def SATADD : FormatI<0b000110, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
                      "satadd\t$reg1, $reg2",
                      []>;
@@ -355,21 +380,24 @@ def MULH : FormatI<0b000111, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
 
 // OR reg1, reg2 - Bitwise OR
 // Opcode: 001000 (0x08)
-let Constraints = "$rs = $reg2" in
+// Flags: OV=0, S, Z modified
+let Constraints = "$rs = $reg2", Defs = [PSW] in
 def OR : FormatI<0b001000, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
                  "or\t$reg1, $reg2",
                  [(set GPR:$reg2, (or GPR:$rs, GPR:$reg1))]>;
 
 // XOR reg1, reg2 - Bitwise XOR
 // Opcode: 001001 (0x09)
-let Constraints = "$rs = $reg2" in
+// Flags: OV=0, S, Z modified
+let Constraints = "$rs = $reg2", Defs = [PSW] in
 def XOR : FormatI<0b001001, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
                   "xor\t$reg1, $reg2",
                   [(set GPR:$reg2, (xor GPR:$rs, GPR:$reg1))]>;
 
 // AND reg1, reg2 - Bitwise AND
 // Opcode: 001010 (0x0A)
-let Constraints = "$rs = $reg2" in
+// Flags: OV=0, S, Z modified
+let Constraints = "$rs = $reg2", Defs = [PSW] in
 def AND : FormatI<0b001010, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
                   "and\t$reg1, $reg2",
                   [(set GPR:$reg2, (and GPR:$rs, GPR:$reg1))]>;
@@ -393,14 +421,16 @@ def MOVi : FormatII<0b010000, (outs GPR:$reg2), (ins simm5:$imm5),
 
 // SATADD imm5, reg2 - Saturated add immediate
 // Opcode: 010001 (0x11)
-let Constraints = "$rs = $reg2" in
+// Flags: CY, OV, S, Z, SAT modified
+let Constraints = "$rs = $reg2", Defs = [PSW] in
 def SATADDi : FormatII<0b010001, (outs GPR:$reg2), (ins GPR:$rs, simm5:$imm5),
                        "satadd\t$imm5, $reg2",
                        []>;
 
 // ADD imm5, reg2 - Add sign-extended 5-bit immediate to reg2
 // Opcode: 010010 (0x12)
-let Constraints = "$rs = $reg2" in
+// Flags: CY, OV, S, Z modified
+let Constraints = "$rs = $reg2", Defs = [PSW] in
 def ADDi : FormatII<0b010010, (outs GPR:$reg2), (ins simm5:$imm5, GPR:$rs),
                     "add\t$imm5, $reg2",
                     [(set GPR:$reg2, (add GPR:$rs, simm5:$imm5))]>;
@@ -414,21 +444,24 @@ def CMPi : FormatII<0b010011, (outs), (ins GPR:$reg2, simm5:$imm5),
 
 // SHR imm5, reg2 - Shift right logical by immediate
 // Opcode: 010100 (0x14)
-let Constraints = "$rs = $reg2" in
+// Flags: CY, OV=0, S, Z modified
+let Constraints = "$rs = $reg2", Defs = [PSW] in
 def SHRi : FormatII<0b010100, (outs GPR:$reg2), (ins GPR:$rs, uimm5:$imm5),
                     "shr\t$imm5, $reg2",
                     [(set GPR:$reg2, (srl GPR:$rs, uimm5:$imm5))]>;
 
 // SAR imm5, reg2 - Shift right arithmetic by immediate
 // Opcode: 010101 (0x15)
-let Constraints = "$rs = $reg2" in
+// Flags: CY, OV=0, S, Z modified
+let Constraints = "$rs = $reg2", Defs = [PSW] in
 def SARi : FormatII<0b010101, (outs GPR:$reg2), (ins GPR:$rs, uimm5:$imm5),
                     "sar\t$imm5, $reg2",
                     [(set GPR:$reg2, (sra GPR:$rs, uimm5:$imm5))]>;
 
 // SHL imm5, reg2 - Shift left logical by immediate
 // Opcode: 010110 (0x16)
-let Constraints = "$rs = $reg2" in
+// Flags: CY, OV=0, S, Z modified
+let Constraints = "$rs = $reg2", Defs = [PSW] in
 def SHLi : FormatII<0b010110, (outs GPR:$reg2), (ins GPR:$rs, uimm5:$imm5),
                     "shl\t$imm5, $reg2",
                     [(set GPR:$reg2, (shl GPR:$rs, uimm5:$imm5))]>;
@@ -446,6 +479,8 @@ def MULHi : FormatII<0b010111, (outs GPR:$reg2), (ins GPR:$rs, simm5:$imm5),
 
 // ADDI imm16, reg1, reg2 - Add 16-bit immediate to reg1, store in reg2
 // Opcode: 110000 (0x30)
+// Flags: CY, OV, S, Z modified
+let Defs = [PSW] in
 def ADDI : FormatVI<0b110000, (outs GPR:$reg2), (ins GPR:$reg1, simm16:$imm16),
                     "addi\t$imm16, $reg1, $reg2",
                     [(set GPR:$reg2, (add GPR:$reg1, simm16:$imm16))]>;
@@ -471,24 +506,32 @@ def : Pat<(i32 simm16_pred:$imm), (MOVEA R0, simm16:$imm)>;
 
 // SATSUBI imm16, reg1, reg2 - Saturated subtract immediate
 // Opcode: 110011 (0x33)
+// Flags: CY, OV, S, Z, SAT modified
+let Defs = [PSW] in
 def SATSUBI : FormatVI<0b110011, (outs GPR:$reg2), (ins GPR:$reg1, simm16:$imm16),
                        "satsubi\t$imm16, $reg1, $reg2",
                        []>;
 
 // ORI imm16, reg1, reg2 - OR with zero-extended immediate
 // Opcode: 110100 (0x34)
+// Flags: OV=0, S, Z modified
+let Defs = [PSW] in
 def ORI : FormatVI<0b110100, (outs GPR:$reg2), (ins GPR:$reg1, uimm16:$imm16),
                    "ori\t$imm16, $reg1, $reg2",
                    [(set GPR:$reg2, (or GPR:$reg1, uimm16:$imm16))]>;
 
 // XORI imm16, reg1, reg2 - XOR with zero-extended immediate
 // Opcode: 110101 (0x35)
+// Flags: OV=0, S, Z modified
+let Defs = [PSW] in
 def XORI : FormatVI<0b110101, (outs GPR:$reg2), (ins GPR:$reg1, uimm16:$imm16),
                     "xori\t$imm16, $reg1, $reg2",
                     [(set GPR:$reg2, (xor GPR:$reg1, uimm16:$imm16))]>;
 
 // ANDI imm16, reg1, reg2 - AND with zero-extended immediate
 // Opcode: 110110 (0x36)
+// Flags: OV=0, S, Z modified
+let Defs = [PSW] in
 def ANDI : FormatVI<0b110110, (outs GPR:$reg2), (ins GPR:$reg1, uimm16:$imm16),
                     "andi\t$imm16, $reg1, $reg2",
                     [(set GPR:$reg2, (and GPR:$reg1, uimm16:$imm16))]>;
@@ -601,21 +644,24 @@ def STSR : FormatIX<0b111111, 0b100100, (outs GPR:$reg2), (ins SysReg:$regID),
 
 // SHR reg1, reg2 - Shift right logical by register
 // Opcode: 111111 (0x3F), sub-op: 000010 (0x02)
-let Constraints = "$rs = $reg2" in
+// Flags: CY, OV=0, S, Z modified
+let Constraints = "$rs = $reg2", Defs = [PSW] in
 def SHR : FormatIX<0b111111, 0b000010, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
                    "shr\t$reg1, $reg2",
                    [(set GPR:$reg2, (srl GPR:$rs, GPR:$reg1))]>;
 
 // SAR reg1, reg2 - Shift right arithmetic by register
 // Opcode: 111111 (0x3F), sub-op: 000100 (0x04)
-let Constraints = "$rs = $reg2" in
+// Flags: CY, OV=0, S, Z modified
+let Constraints = "$rs = $reg2", Defs = [PSW] in
 def SAR : FormatIX<0b111111, 0b000100, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
                    "sar\t$reg1, $reg2",
                    [(set GPR:$reg2, (sra GPR:$rs, GPR:$reg1))]>;
 
 // SHL reg1, reg2 - Shift left logical by register
 // Opcode: 111111 (0x3F), sub-op: 000110
-let Constraints = "$rs = $reg2" in
+// Flags: CY, OV=0, S, Z modified
+let Constraints = "$rs = $reg2", Defs = [PSW] in
 def SHL : FormatIX<0b111111, 0b000110, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
                    "shl\t$reg1, $reg2",
                    [(set GPR:$reg2, (shl GPR:$rs, GPR:$reg1))]>;
@@ -811,6 +857,56 @@ def TST1 : FormatVIII<0b111110, 0b11, (outs),
                       []>;
 
 //===----------------------------------------------------------------------===//
+// Bit Manipulation Instructions - Format IX (32-bit, register variant)
+// These use reg2[2:0] to specify the bit number dynamically
+// Encoding: rrrrr111111RRRRR 00000000111000vv (vv = variant)
+//===----------------------------------------------------------------------===//
+
+// SET1 reg2, [reg1] - Set bit in memory (bit number from reg2[2:0])
+// Opcode: 111111, sub-op: 000111, variant bits[18:17]: 00
+let mayLoad = 1, mayStore = 1 in
+def SET1r : FormatIX<0b111111, 0b000111, (outs),
+                     (ins GPR:$reg2, GPR:$reg1),
+                     "set1\t$reg2, [$reg1]",
+                     []>,
+            Requires<[HasV850E1]> {
+  let Inst{18-17} = 0b00;
+}
+
+// NOT1 reg2, [reg1] - Toggle bit in memory (bit number from reg2[2:0])
+// Opcode: 111111, sub-op: 000111, variant bits[18:17]: 01
+let mayLoad = 1, mayStore = 1 in
+def NOT1r : FormatIX<0b111111, 0b000111, (outs),
+                     (ins GPR:$reg2, GPR:$reg1),
+                     "not1\t$reg2, [$reg1]",
+                     []>,
+            Requires<[HasV850E1]> {
+  let Inst{18-17} = 0b01;
+}
+
+// CLR1 reg2, [reg1] - Clear bit in memory (bit number from reg2[2:0])
+// Opcode: 111111, sub-op: 000111, variant bits[18:17]: 10
+let mayLoad = 1, mayStore = 1 in
+def CLR1r : FormatIX<0b111111, 0b000111, (outs),
+                     (ins GPR:$reg2, GPR:$reg1),
+                     "clr1\t$reg2, [$reg1]",
+                     []>,
+            Requires<[HasV850E1]> {
+  let Inst{18-17} = 0b10;
+}
+
+// TST1 reg2, [reg1] - Test bit in memory (bit number from reg2[2:0])
+// Opcode: 111111, sub-op: 000111, variant bits[18:17]: 11
+let mayLoad = 1, Defs = [PSW] in
+def TST1r : FormatIX<0b111111, 0b000111, (outs),
+                     (ins GPR:$reg2, GPR:$reg1),
+                     "tst1\t$reg2, [$reg1]",
+                     []>,
+            Requires<[HasV850E1]> {
+  let Inst{18-17} = 0b11;
+}
+
+//===----------------------------------------------------------------------===//
 // Additional Patterns
 //===----------------------------------------------------------------------===//
 
@@ -986,7 +1082,7 @@ def : Pat<(i32 (zextloadi16 GPR:$base)), (LDHU GPR:$base, 0)>;
 // reg2 (input/output): multiplicand, receives low 32 bits of result
 // reg3 (output): receives high 32 bits of result
 // Opcode: 111111, sub-op: 010001, sub-id: 00010
-def MUL : FormatXI<0b010001, 0b00010, (outs GPR:$reg2, GPR:$reg3),
+def MUL : FormatXI<0b111111, 0b010001, 0b00010, (outs GPR:$reg2, GPR:$reg3),
                    (ins GPR:$rs, GPR:$reg1),
                    "mul\t$reg1, $reg2, $reg3",
                    [(set GPR:$reg2, GPR:$reg3, (V850smul GPR:$rs, GPR:$reg1))]>,
@@ -998,12 +1094,37 @@ def MUL : FormatXI<0b010001, 0b00010, (outs GPR:$reg2, GPR:$reg3),
 // reg2 (input/output): multiplicand, receives low 32 bits of result
 // reg3 (output): receives high 32 bits of result
 // Opcode: 111111, sub-op: 010001, sub-id: 00100
-def MULU : FormatXI<0b010001, 0b00100, (outs GPR:$reg2, GPR:$reg3),
+def MULU : FormatXI<0b111111, 0b010001, 0b00100, (outs GPR:$reg2, GPR:$reg3),
                     (ins GPR:$rs, GPR:$reg1),
                     "mulu\t$reg1, $reg2, $reg3",
                     [(set GPR:$reg2, GPR:$reg3, (V850umul GPR:$rs, GPR:$reg1))]>,
           Requires<[HasV850E1]> {
   let Constraints = "$rs = $reg2";
+}
+
+// MUL imm9, reg2, reg3 - Multiply with signed 9-bit immediate
+// reg2 (input/output): multiplicand, receives low 32 bits of result
+// reg3 (output): receives high 32 bits of result
+// Opcode: 111111, sub-op: 010010
+def MULi : FormatXI_IMM9<0b111111, 0b010010, (outs GPR:$reg2, GPR:$reg3),
+                         (ins GPR:$rs, simm9:$imm9),
+                         "mul\t$imm9, $reg2, $reg3",
+                         []>,
+           Requires<[HasV850E1]> {
+  let Constraints = "$rs = $reg2";
+}
+
+// MULU imm9, reg2, reg3 - Multiply with unsigned 9-bit immediate
+// reg2 (input/output): multiplicand, receives low 32 bits of result
+// reg3 (output): receives high 32 bits of result
+// Opcode: 111111, sub-op: 010010
+def MULUi : FormatXI_IMM9<0b111111, 0b010010, (outs GPR:$reg2, GPR:$reg3),
+                          (ins GPR:$rs, uimm9:$imm9),
+                          "mulu\t$imm9, $reg2, $reg3",
+                          []>,
+            Requires<[HasV850E1]> {
+  let Constraints = "$rs = $reg2";
+  let Inst{16} = 1;  // Unsigned flag
 }
 
 //===----------------------------------------------------------------------===//
@@ -1014,7 +1135,9 @@ def MULU : FormatXI<0b010001, 0b00100, (outs GPR:$reg2, GPR:$reg3),
 // reg2 (input/output): dividend, receives quotient
 // reg3 (output): receives remainder
 // Opcode: 111111, sub-op: 010100, sub-id: 00010
-def DIV : FormatXI<0b010100, 0b00010, (outs GPR:$reg2, GPR:$reg3),
+// Flags: OV, S, Z modified
+let Defs = [PSW] in
+def DIV : FormatXI<0b111111, 0b010100, 0b00010, (outs GPR:$reg2, GPR:$reg3),
                    (ins GPR:$rs, GPR:$reg1),
                    "div\t$reg1, $reg2, $reg3",
                    [(set GPR:$reg2, GPR:$reg3, (V850sdivrem GPR:$rs, GPR:$reg1))]>,
@@ -1026,7 +1149,9 @@ def DIV : FormatXI<0b010100, 0b00010, (outs GPR:$reg2, GPR:$reg3),
 // reg2 (input/output): dividend, receives quotient
 // reg3 (output): receives remainder
 // Opcode: 111111, sub-op: 010110, sub-id: 00010
-def DIVU : FormatXI<0b010110, 0b00010, (outs GPR:$reg2, GPR:$reg3),
+// Flags: OV, S, Z modified
+let Defs = [PSW] in
+def DIVU : FormatXI<0b111111, 0b010110, 0b00010, (outs GPR:$reg2, GPR:$reg3),
                     (ins GPR:$rs, GPR:$reg1),
                     "divu\t$reg1, $reg2, $reg3",
                     [(set GPR:$reg2, GPR:$reg3, (V850udivrem GPR:$rs, GPR:$reg1))]>,
@@ -1036,10 +1161,26 @@ def DIVU : FormatXI<0b010110, 0b00010, (outs GPR:$reg2, GPR:$reg3),
 
 // DIVHU reg1, reg2, reg3 - Divide halfword unsigned
 // Opcode: 111111, sub-op: 010101, sub-id: 00010
-def DIVHU : FormatXI<0b010101, 0b00010, (outs GPR:$reg2, GPR:$reg3),
+// Flags: OV, S, Z modified
+let Defs = [PSW] in
+def DIVHU : FormatXI<0b111111, 0b010101, 0b00010, (outs GPR:$reg2, GPR:$reg3),
                      (ins GPR:$rs, GPR:$reg1),
                      "divhu\t$reg1, $reg2, $reg3",
                      []> {
+  let Constraints = "$rs = $reg2";
+}
+
+// DIVH reg1, reg2, reg3 - Divide halfword signed (3-operand form)
+// reg2 (input/output): dividend, receives quotient
+// reg3 (output): receives remainder
+// Opcode: 111111, sub-op: 010100, sub-id: 00000
+// Flags: OV, S, Z modified
+let Defs = [PSW] in
+def DIVH_3 : FormatXI<0b111111, 0b010100, 0b00000, (outs GPR:$reg2, GPR:$reg3),
+                      (ins GPR:$rs, GPR:$reg1),
+                      "divh\t$reg1, $reg2, $reg3",
+                      []>,
+             Requires<[HasV850E1]> {
   let Constraints = "$rs = $reg2";
 }
 
@@ -1056,7 +1197,7 @@ def DIVHU : FormatXI<0b010101, 0b00010, (outs GPR:$reg2, GPR:$reg3),
 // Note: PREPARE and DISPOSE share the same encoding (opcode 11001 with reg1=0).
 // PREPARE is used for disassembly; DISPOSE is encoding-only.
 let Defs = [SP], Uses = [SP], mayStore = 1 in
-def PREPARE : FormatXIII<(outs), (ins uimm12:$list12, uimm5:$imm5),
+def PREPARE : FormatXIII<0b11001, (outs), (ins uimm12:$list12, uimm5:$imm5),
                          "prepare\t$list12, $imm5",
                          []> {
   let reg1 = 0;  // No jump register for basic PREPARE
@@ -1066,7 +1207,7 @@ def PREPARE : FormatXIII<(outs), (ins uimm12:$list12, uimm5:$imm5),
 // Reverse of PREPARE - same encoding as PREPARE, but different semantics
 // Marked as isCodeGenOnly to avoid disassembly conflict with PREPARE
 let Defs = [SP], Uses = [SP], mayLoad = 1, isCodeGenOnly = 1 in
-def DISPOSE : FormatXIII<(outs), (ins uimm5:$imm5, uimm12:$list12),
+def DISPOSE : FormatXIII<0b11001, (outs), (ins uimm5:$imm5, uimm12:$list12),
                          "dispose\t$imm5, $list12",
                          []> {
   let reg1 = 0;  // No jump for basic DISPOSE
@@ -1076,39 +1217,44 @@ def DISPOSE : FormatXIII<(outs), (ins uimm5:$imm5, uimm12:$list12),
 // Jumps to address in reg1 after restoring registers
 // This has a different encoding (reg1 != 0), so it's unique
 let Defs = [SP], Uses = [SP], mayLoad = 1, isReturn = 1, isTerminator = 1, isBarrier = 1 in
-def DISPOSEr : FormatXIII<(outs), (ins uimm5:$imm5, uimm12:$list12, GPR:$reg1),
+def DISPOSEr : FormatXIII<0b11001, (outs), (ins uimm5:$imm5, uimm12:$list12, GPR:$reg1),
                           "dispose\t$imm5, $list12, [$reg1]",
                           []>;
 
 //===----------------------------------------------------------------------===//
-// Byte Swap Instructions (32-bit) - Format XI
+// Byte Swap Instructions (32-bit) - Format XII
+// Encoding: rrrrr11111100000 wwwww011010cccc0
+// These use Format XII with imm5=0 and cond field for variant
 //===----------------------------------------------------------------------===//
 
 // BSW reg2, reg3 - Byte swap word
-// Opcode: 111111, sub-op: 011010, sub-id: 00000
+// Opcode: 111111, sub-op: 011010, cond: 0000
 let Defs = [PSW] in
-def BSW : FormatXI<0b011010, 0b00000, (outs GPR:$reg3), (ins GPR:$reg2),
-                   "bsw\t$reg2, $reg3",
-                   [(set GPR:$reg3, (bswap GPR:$reg2))]> {
-  let reg1 = 0;
+def BSW : FormatXII<0b111111, 0b011010, (outs GPR:$reg3), (ins GPR:$reg2),
+                    "bsw\t$reg2, $reg3",
+                    [(set GPR:$reg3, (bswap GPR:$reg2))]> {
+  let imm5 = 0;
+  let cond = 0b0000;
 }
 
 // BSH reg2, reg3 - Byte swap halfword
-// Opcode: 111111, sub-op: 011010, sub-id: 00010
+// Opcode: 111111, sub-op: 011010, cond: 0001
 let Defs = [PSW] in
-def BSH : FormatXI<0b011010, 0b00010, (outs GPR:$reg3), (ins GPR:$reg2),
-                   "bsh\t$reg2, $reg3",
-                   []> {
-  let reg1 = 0;
+def BSH : FormatXII<0b111111, 0b011010, (outs GPR:$reg3), (ins GPR:$reg2),
+                    "bsh\t$reg2, $reg3",
+                    []> {
+  let imm5 = 0;
+  let cond = 0b0001;
 }
 
 // HSW reg2, reg3 - Halfword swap word
-// Opcode: 111111, sub-op: 011010, sub-id: 00100
+// Opcode: 111111, sub-op: 011010, cond: 0010
 let Defs = [PSW] in
-def HSW : FormatXI<0b011010, 0b00100, (outs GPR:$reg3), (ins GPR:$reg2),
-                   "hsw\t$reg2, $reg3",
-                   [(set GPR:$reg3, (rotr GPR:$reg2, (i32 16)))]> {
-  let reg1 = 0;
+def HSW : FormatXII<0b111111, 0b011010, (outs GPR:$reg3), (ins GPR:$reg2),
+                    "hsw\t$reg2, $reg3",
+                    [(set GPR:$reg3, (rotr GPR:$reg2, (i32 16)))]> {
+  let imm5 = 0;
+  let cond = 0b0010;
 }
 
 // HSW patterns for expanded rotate by 16 (since ROTR is Expand)
@@ -1122,7 +1268,7 @@ def : Pat<(or (srl GPR:$rs, (i32 16)), (shl GPR:$rs, (i32 16))), (HSW GPR:$rs)>;
 // CMOV cccc, reg1, reg2, reg3 - Conditional move (register form)
 // If condition true: reg3 = reg1, else reg3 = reg2
 // Opcode: 111111, sub-op: 011001, subid: {cond, 0}
-def CMOVr : FormatXI<0b011001, 0b00000, (outs GPR:$reg3),
+def CMOVr : FormatXI<0b111111, 0b011001, 0b00000, (outs GPR:$reg3),
                      (ins cmov_cond:$cond, GPR:$reg1, GPR:$reg2),
                      "cmov\t$cond, $reg1, $reg2, $reg3",
                      []> {
@@ -1190,7 +1336,7 @@ let Predicates = [HasV850E2] in {
 // If condition true: reg3 = reg2 + reg1 + CY, else reg3 = reg2 + CY
 // Opcode: 111111, sub-op: 011101, subid: {cond, 0}
 let Uses = [PSW] in
-def ADF : FormatXI<0b011101, 0b00000, (outs GPR:$reg3),
+def ADF : FormatXI<0b111111, 0b011101, 0b00000, (outs GPR:$reg3),
                    (ins cmov_cond:$cond, GPR:$reg1, GPR:$reg2),
                    "adf\t$cond, $reg1, $reg2, $reg3",
                    []> {
@@ -1203,7 +1349,7 @@ def ADF : FormatXI<0b011101, 0b00000, (outs GPR:$reg3),
 // If condition true: reg3 = reg2 - reg1 - CY, else reg3 = reg2 - CY
 // Opcode: 111111, sub-op: 011100, subid: {cond, 0}
 let Uses = [PSW] in
-def SBF : FormatXI<0b011100, 0b00000, (outs GPR:$reg3),
+def SBF : FormatXI<0b111111, 0b011100, 0b00000, (outs GPR:$reg3),
                    (ins cmov_cond:$cond, GPR:$reg1, GPR:$reg2),
                    "sbf\t$cond, $reg1, $reg2, $reg3",
                    []> {
@@ -1215,7 +1361,7 @@ def SBF : FormatXI<0b011100, 0b00000, (outs GPR:$reg3),
 // MAC reg1, reg2, reg3, reg4 - Multiply-accumulate signed
 // (reg3:reg4) = (reg3:reg4) + (reg1 * reg2)
 // Opcode: 111111, sub-op: 011110, sub-id: 00000
-def MAC : FormatXI<0b011110, 0b00000, (outs GPR:$reg3, GPR:$reg4),
+def MAC : FormatXI<0b111111, 0b011110, 0b00000, (outs GPR:$reg3, GPR:$reg4),
                    (ins GPR:$reg1, GPR:$reg2, GPR:$reg3_in, GPR:$reg4_in),
                    "mac\t$reg1, $reg2, $reg3, $reg4",
                    []> {
@@ -1224,7 +1370,7 @@ def MAC : FormatXI<0b011110, 0b00000, (outs GPR:$reg3, GPR:$reg4),
 
 // MACU reg1, reg2, reg3, reg4 - Multiply-accumulate unsigned
 // Opcode: 111111, sub-op: 011111, sub-id: 00000
-def MACU : FormatXI<0b011111, 0b00000, (outs GPR:$reg3, GPR:$reg4),
+def MACU : FormatXI<0b111111, 0b011111, 0b00000, (outs GPR:$reg3, GPR:$reg4),
                     (ins GPR:$reg1, GPR:$reg2, GPR:$reg3_in, GPR:$reg4_in),
                     "macu\t$reg1, $reg2, $reg3, $reg4",
                     []> {
@@ -1235,7 +1381,7 @@ def MACU : FormatXI<0b011111, 0b00000, (outs GPR:$reg3, GPR:$reg4),
 // Opcode: 111111, sub-op: 011010, sub-id: 01100
 // Returns position of first 0 bit from MSB (= count of leading 1s)
 let Defs = [PSW] in
-def SCH0L : FormatXI<0b011010, 0b01100, (outs GPR:$reg3), (ins GPR:$reg2),
+def SCH0L : FormatXI<0b111111, 0b011010, 0b01100, (outs GPR:$reg3), (ins GPR:$reg2),
                      "sch0l\t$reg2, $reg3",
                      [(set GPR:$reg3, (ctlz (not GPR:$reg2)))]> {
   let reg1 = 0;
@@ -1245,7 +1391,7 @@ def SCH0L : FormatXI<0b011010, 0b01100, (outs GPR:$reg3), (ins GPR:$reg2),
 // Opcode: 111111, sub-op: 011010, sub-id: 01000
 // Returns position of first 0 bit from LSB (= count of trailing 1s)
 let Defs = [PSW] in
-def SCH0R : FormatXI<0b011010, 0b01000, (outs GPR:$reg3), (ins GPR:$reg2),
+def SCH0R : FormatXI<0b111111, 0b011010, 0b01000, (outs GPR:$reg3), (ins GPR:$reg2),
                      "sch0r\t$reg2, $reg3",
                      [(set GPR:$reg3, (cttz (not GPR:$reg2)))]> {
   let reg1 = 0;
@@ -1256,7 +1402,7 @@ def SCH0R : FormatXI<0b011010, 0b01000, (outs GPR:$reg3), (ins GPR:$reg2),
 // Returns position of first 1 bit from MSB (= count of leading 0s)
 // This is __builtin_clz
 let Defs = [PSW] in
-def SCH1L : FormatXI<0b011010, 0b01110, (outs GPR:$reg3), (ins GPR:$reg2),
+def SCH1L : FormatXI<0b111111, 0b011010, 0b01110, (outs GPR:$reg3), (ins GPR:$reg2),
                      "sch1l\t$reg2, $reg3",
                      [(set GPR:$reg3, (ctlz GPR:$reg2))]> {
   let reg1 = 0;
@@ -1267,10 +1413,106 @@ def SCH1L : FormatXI<0b011010, 0b01110, (outs GPR:$reg3), (ins GPR:$reg2),
 // Returns position of first 1 bit from LSB (= count of trailing 0s)
 // This is __builtin_ctz
 let Defs = [PSW] in
-def SCH1R : FormatXI<0b011010, 0b01010, (outs GPR:$reg3), (ins GPR:$reg2),
+def SCH1R : FormatXI<0b111111, 0b011010, 0b01010, (outs GPR:$reg3), (ins GPR:$reg2),
                      "sch1r\t$reg2, $reg3",
                      [(set GPR:$reg3, (cttz GPR:$reg2))]> {
   let reg1 = 0;
 }
+
+//===----------------------------------------------------------------------===//
+// 3-operand Shift Instructions (V850E2)
+//===----------------------------------------------------------------------===//
+
+// SHR reg1, reg2, reg3 - Shift right logical 3-operand
+// Opcode: 111111, sub-op: 000010, sub-id: 00010
+// Flags: CY, OV=0, S, Z modified
+let Defs = [PSW] in
+def SHR_3 : FormatXI<0b111111, 0b000010, 0b00010, (outs GPR:$reg3),
+                     (ins GPR:$reg2, GPR:$reg1),
+                     "shr\t$reg1, $reg2, $reg3",
+                     []>;
+
+// SAR reg1, reg2, reg3 - Shift right arithmetic 3-operand
+// Opcode: 111111, sub-op: 000100, sub-id: 00010
+// Flags: CY, OV=0, S, Z modified
+let Defs = [PSW] in
+def SAR_3 : FormatXI<0b111111, 0b000100, 0b00010, (outs GPR:$reg3),
+                     (ins GPR:$reg2, GPR:$reg1),
+                     "sar\t$reg1, $reg2, $reg3",
+                     []>;
+
+// SHL reg1, reg2, reg3 - Shift left logical 3-operand
+// Opcode: 111111, sub-op: 000110, sub-id: 00010
+// Flags: CY, OV=0, S, Z modified
+let Defs = [PSW] in
+def SHL_3 : FormatXI<0b111111, 0b000110, 0b00010, (outs GPR:$reg3),
+                     (ins GPR:$reg2, GPR:$reg1),
+                     "shl\t$reg1, $reg2, $reg3",
+                     []>;
+
+//===----------------------------------------------------------------------===//
+// 3-operand Saturated Arithmetic Instructions (V850E2)
+//===----------------------------------------------------------------------===//
+
+// SATADD reg1, reg2, reg3 - Saturating add 3-operand
+// Opcode: 111111, sub-op: 011101, sub-id: 00010
+// Flags: CY, OV, S, Z, SAT modified
+let Defs = [PSW] in
+def SATADD_3 : FormatXI<0b111111, 0b011101, 0b00010, (outs GPR:$reg3),
+                        (ins GPR:$reg2, GPR:$reg1),
+                        "satadd\t$reg1, $reg2, $reg3",
+                        []>;
+
+// SATSUB reg1, reg2, reg3 - Saturating subtract 3-operand
+// Opcode: 111111, sub-op: 011100, sub-id: 00010
+// Flags: CY, OV, S, Z, SAT modified
+let Defs = [PSW] in
+def SATSUB_3 : FormatXI<0b111111, 0b011100, 0b00010, (outs GPR:$reg3),
+                        (ins GPR:$reg2, GPR:$reg1),
+                        "satsub\t$reg1, $reg2, $reg3",
+                        []>;
+
+//===----------------------------------------------------------------------===//
+// HSH Instruction
+//===----------------------------------------------------------------------===//
+
+// HSH reg2, reg3 - Halfword swap halfword
+// Swaps the two bytes in each halfword independently
+// Opcode: 111111, sub-op: 011010, cond: 0011
+// Flags: CY, S, Z modified (OV = 0)
+let Defs = [PSW] in
+def HSH : FormatXII<0b111111, 0b011010, (outs GPR:$reg3), (ins GPR:$reg2),
+                    "hsh\t$reg2, $reg3",
+                    []> {
+  let imm5 = 0;
+  let cond = 0b0011;
+}
+
+// TODO: 32-bit Displacement Jump Instructions (V850E2)
+// These require proper 48-bit instruction support in the disassembler
+// //===----------------------------------------------------------------------===//
+// // 32-bit Displacement Jump Instructions (V850E2)
+// // These are 48-bit (6-byte) instructions
+// //===----------------------------------------------------------------------===//
+//
+// // JARL disp32, reg1 - Jump and register link with 32-bit displacement
+// let isCall = 1 in
+// def JARL32 : FormatVI_E2<0b010111, (outs GPR:$reg1), (ins brtarget32:$disp32),
+//                          "jarl\t$disp32, $reg1",
+//                          []>;
+//
+// // JMP disp32[reg1] - Jump with 32-bit displacement
+// let isBranch = 1, isTerminator = 1, isBarrier = 1, isIndirectBranch = 1 in
+// def JMP32 : FormatVI_E2<0b110111, (outs), (ins GPR:$reg1, brtarget32:$disp32),
+//                      "jmp\t$disp32[$reg1]",
+//                      []>;
+//
+// // JR disp32 - Jump relative with 32-bit displacement
+// let isBranch = 1, isTerminator = 1, isBarrier = 1 in
+// def JR32 : FormatVI_E2<0b010111, (outs), (ins brtarget32:$disp32),
+//                        "jr\t$disp32",
+//                        []> {
+//   let reg1 = 0;
+// }
 
 } // Predicates = [HasV850E2]
