@@ -2242,4 +2242,137 @@ def CVTFDUL : FormatFPU_CVT<0b10100, 0b000, 0b10, 0b1010,
                             (outs GPR:$reg3), (ins GPR:$reg2),
                             "cvtf.dul\t$reg2, $reg3", []>;
 
+//===----------------------------------------------------------------------===//
+// FPU Rounding Instructions - V850E2M
+// TRNCF - Truncate (round toward zero)
+// CEILF - Ceiling (round toward +infinity)
+// FLOORF - Floor (round toward -infinity)
+//===----------------------------------------------------------------------===//
+
+// --- TRNCF (Truncate) - Signed ---
+// TRNCF.SW reg2, reg3 - Truncate Single to Word (subop2=1, cat=0, type=2, subop=0)
+def TRNCFSW : FormatFPU_CVT<0b00001, 0b000, 0b10, 0b0000,
+                            (outs GPR:$reg3), (ins GPR:$reg2),
+                            "trncf.sw\t$reg2, $reg3", []>;
+
+// TRNCF.DW reg2, reg3 - Truncate Double to Word (subop2=1, cat=0, type=2, subop=8)
+def TRNCFDW : FormatFPU_CVT<0b00001, 0b000, 0b10, 0b1000,
+                            (outs GPR:$reg3), (ins GPR:$reg2),
+                            "trncf.dw\t$reg2, $reg3", []>;
+
+// TRNCF.SL reg2, reg3 - Truncate Single to Long (subop2=1, cat=0, type=2, subop=2)
+def TRNCFSL : FormatFPU_CVT<0b00001, 0b000, 0b10, 0b0010,
+                            (outs GPR:$reg3), (ins GPR:$reg2),
+                            "trncf.sl\t$reg2, $reg3", []>;
+
+// TRNCF.DL reg2, reg3 - Truncate Double to Long (subop2=1, cat=0, type=2, subop=10)
+def TRNCFDL : FormatFPU_CVT<0b00001, 0b000, 0b10, 0b1010,
+                            (outs GPR:$reg3), (ins GPR:$reg2),
+                            "trncf.dl\t$reg2, $reg3", []>;
+
+// --- TRNCF (Truncate) - Unsigned ---
+// TRNCF.SUW reg2, reg3 - Truncate Single to Unsigned Word (subop2=17, cat=0, type=2, subop=0)
+def TRNCFSUW : FormatFPU_CVT<0b10001, 0b000, 0b10, 0b0000,
+                             (outs GPR:$reg3), (ins GPR:$reg2),
+                             "trncf.suw\t$reg2, $reg3", []>;
+
+// TRNCF.DUW reg2, reg3 - Truncate Double to Unsigned Word (subop2=17, cat=0, type=2, subop=8)
+def TRNCFDUW : FormatFPU_CVT<0b10001, 0b000, 0b10, 0b1000,
+                             (outs GPR:$reg3), (ins GPR:$reg2),
+                             "trncf.duw\t$reg2, $reg3", []>;
+
+// TRNCF.SUL reg2, reg3 - Truncate Single to Unsigned Long (subop2=17, cat=0, type=2, subop=2)
+def TRNCFSUL : FormatFPU_CVT<0b10001, 0b000, 0b10, 0b0010,
+                             (outs GPR:$reg3), (ins GPR:$reg2),
+                             "trncf.sul\t$reg2, $reg3", []>;
+
+// TRNCF.DUL reg2, reg3 - Truncate Double to Unsigned Long (subop2=17, cat=0, type=2, subop=10)
+def TRNCFDUL : FormatFPU_CVT<0b10001, 0b000, 0b10, 0b1010,
+                             (outs GPR:$reg3), (ins GPR:$reg2),
+                             "trncf.dul\t$reg2, $reg3", []>;
+
+// --- CEILF (Ceiling) - Signed ---
+// CEILF.SW reg2, reg3 - Ceiling Single to Word (subop2=2, cat=0, type=2, subop=0)
+def CEILFSW : FormatFPU_CVT<0b00010, 0b000, 0b10, 0b0000,
+                            (outs GPR:$reg3), (ins GPR:$reg2),
+                            "ceilf.sw\t$reg2, $reg3", []>;
+
+// CEILF.DW reg2, reg3 - Ceiling Double to Word (subop2=2, cat=0, type=2, subop=8)
+def CEILFDW : FormatFPU_CVT<0b00010, 0b000, 0b10, 0b1000,
+                            (outs GPR:$reg3), (ins GPR:$reg2),
+                            "ceilf.dw\t$reg2, $reg3", []>;
+
+// CEILF.SL reg2, reg3 - Ceiling Single to Long (subop2=2, cat=0, type=2, subop=2)
+def CEILFSL : FormatFPU_CVT<0b00010, 0b000, 0b10, 0b0010,
+                            (outs GPR:$reg3), (ins GPR:$reg2),
+                            "ceilf.sl\t$reg2, $reg3", []>;
+
+// CEILF.DL reg2, reg3 - Ceiling Double to Long (subop2=2, cat=0, type=2, subop=10)
+def CEILFDL : FormatFPU_CVT<0b00010, 0b000, 0b10, 0b1010,
+                            (outs GPR:$reg3), (ins GPR:$reg2),
+                            "ceilf.dl\t$reg2, $reg3", []>;
+
+// --- CEILF (Ceiling) - Unsigned ---
+// CEILF.SUW reg2, reg3 - Ceiling Single to Unsigned Word (subop2=18, cat=0, type=2, subop=0)
+def CEILFSUW : FormatFPU_CVT<0b10010, 0b000, 0b10, 0b0000,
+                             (outs GPR:$reg3), (ins GPR:$reg2),
+                             "ceilf.suw\t$reg2, $reg3", []>;
+
+// CEILF.DUW reg2, reg3 - Ceiling Double to Unsigned Word (subop2=18, cat=0, type=2, subop=8)
+def CEILFDUW : FormatFPU_CVT<0b10010, 0b000, 0b10, 0b1000,
+                             (outs GPR:$reg3), (ins GPR:$reg2),
+                             "ceilf.duw\t$reg2, $reg3", []>;
+
+// CEILF.SUL reg2, reg3 - Ceiling Single to Unsigned Long (subop2=18, cat=0, type=2, subop=2)
+def CEILFSUL : FormatFPU_CVT<0b10010, 0b000, 0b10, 0b0010,
+                             (outs GPR:$reg3), (ins GPR:$reg2),
+                             "ceilf.sul\t$reg2, $reg3", []>;
+
+// CEILF.DUL reg2, reg3 - Ceiling Double to Unsigned Long (subop2=18, cat=0, type=2, subop=10)
+def CELIFDUL : FormatFPU_CVT<0b10010, 0b000, 0b10, 0b1010,
+                             (outs GPR:$reg3), (ins GPR:$reg2),
+                             "ceilf.dul\t$reg2, $reg3", []>;
+
+// --- FLOORF (Floor) - Signed ---
+// FLOORF.SW reg2, reg3 - Floor Single to Word (subop2=3, cat=0, type=2, subop=0)
+def FLOORFSW : FormatFPU_CVT<0b00011, 0b000, 0b10, 0b0000,
+                             (outs GPR:$reg3), (ins GPR:$reg2),
+                             "floorf.sw\t$reg2, $reg3", []>;
+
+// FLOORF.DW reg2, reg3 - Floor Double to Word (subop2=3, cat=0, type=2, subop=8)
+def FLOORFDW : FormatFPU_CVT<0b00011, 0b000, 0b10, 0b1000,
+                             (outs GPR:$reg3), (ins GPR:$reg2),
+                             "floorf.dw\t$reg2, $reg3", []>;
+
+// FLOORF.SL reg2, reg3 - Floor Single to Long (subop2=3, cat=0, type=2, subop=2)
+def FLOORFSL : FormatFPU_CVT<0b00011, 0b000, 0b10, 0b0010,
+                             (outs GPR:$reg3), (ins GPR:$reg2),
+                             "floorf.sl\t$reg2, $reg3", []>;
+
+// FLOORF.DL reg2, reg3 - Floor Double to Long (subop2=3, cat=0, type=2, subop=10)
+def FLOORFDL : FormatFPU_CVT<0b00011, 0b000, 0b10, 0b1010,
+                             (outs GPR:$reg3), (ins GPR:$reg2),
+                             "floorf.dl\t$reg2, $reg3", []>;
+
+// --- FLOORF (Floor) - Unsigned ---
+// FLOORF.SUW reg2, reg3 - Floor Single to Unsigned Word (subop2=19, cat=0, type=2, subop=0)
+def FLOORFSUW : FormatFPU_CVT<0b10011, 0b000, 0b10, 0b0000,
+                              (outs GPR:$reg3), (ins GPR:$reg2),
+                              "floorf.suw\t$reg2, $reg3", []>;
+
+// FLOORF.DUW reg2, reg3 - Floor Double to Unsigned Word (subop2=19, cat=0, type=2, subop=8)
+def FLOORFDUW : FormatFPU_CVT<0b10011, 0b000, 0b10, 0b1000,
+                              (outs GPR:$reg3), (ins GPR:$reg2),
+                              "floorf.duw\t$reg2, $reg3", []>;
+
+// FLOORF.SUL reg2, reg3 - Floor Single to Unsigned Long (subop2=19, cat=0, type=2, subop=2)
+def FLOORFSUL : FormatFPU_CVT<0b10011, 0b000, 0b10, 0b0010,
+                              (outs GPR:$reg3), (ins GPR:$reg2),
+                              "floorf.sul\t$reg2, $reg3", []>;
+
+// FLOORF.DUL reg2, reg3 - Floor Double to Unsigned Long (subop2=19, cat=0, type=2, subop=10)
+def FLOORFDUL : FormatFPU_CVT<0b10011, 0b000, 0b10, 0b1010,
+                              (outs GPR:$reg3), (ins GPR:$reg2),
+                              "floorf.dul\t$reg2, $reg3", []>;
+
 } // Predicates = [HasV850E2M]
