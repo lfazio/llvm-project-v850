@@ -423,6 +423,7 @@ class FormatVI_E2<bits<6> opcode, dag outs, dag ins, string asmstr, list<dag> pa
 // - Conversion: various category/type combinations
 //===----------------------------------------------------------------------===//
 
+
 // Base class for FPU 3-operand instructions: reg3 = reg2 op reg1
 // Used for: ADDF, SUBF, MULF, DIVF, MAXF, MINF
 class FormatFPU_RRR<bits<4> subop, dag outs, dag ins, string asmstr,
@@ -490,7 +491,8 @@ class FormatFPU_RRRR<bits<2> subop, dag outs, dag ins, string asmstr,
 
 // Base class for FPU conversion instructions: reg3 = convert(reg2)
 // The category and type bits vary based on source/dest types
-class FormatFPU_CVT<bits<5> subop2, bits<3> category, bits<2> type,
+// subop2 encodes source type, subop encodes destination type
+class FormatFPU_CVT<bits<5> subop2, bits<3> category, bits<2> type, bits<4> subop,
                     dag outs, dag ins, string asmstr, list<dag> pattern>
     : V850Inst32<outs, ins, asmstr, pattern> {
   bits<5> reg2;
@@ -498,12 +500,12 @@ class FormatFPU_CVT<bits<5> subop2, bits<3> category, bits<2> type,
 
   let Inst{15-11} = reg2;
   let Inst{10-5}  = 0b111111;         // FPU opcode
-  let Inst{4-0}   = subop2;           // Additional sub-opcode or 0
+  let Inst{4-0}   = subop2;           // Additional sub-opcode
   let Inst{31-27} = reg3;
   let Inst{26}    = 1;
   let Inst{25-23} = category;
   let Inst{22-21} = type;
-  let Inst{20-17} = 0;                // Usually 0 for conversions
+  let Inst{20-17} = subop;            // Sub-operation code
   let Inst{16}    = 0;
 }
 

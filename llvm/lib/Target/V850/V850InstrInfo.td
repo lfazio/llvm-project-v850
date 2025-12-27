@@ -2131,4 +2131,115 @@ def CMPFD : FormatFPU_CMP<1, (outs), (ins uimm4:$fcond, GPR:$reg1, GPR:$reg2, ui
                           "cmpf.d\t$fcond, $reg1, $reg2, $fcbit",
                           []>;
 
+//===----------------------------------------------------------------------===//
+// V850E2M FPU Instructions - Conversion
+//
+// Conversion between floating-point formats and integer formats.
+// Register requirements:
+// - Single-precision (S): any GPR
+// - Double-precision (D): even GPR (specifies lower register of pair)
+// - Word (W): any GPR (32-bit integer)
+// - Long (L): even GPR (specifies lower register of 64-bit pair)
+//===----------------------------------------------------------------------===//
+
+//--- Floating-point to floating-point conversions ---
+
+// CVTF.DS reg2, reg3 - Double to Single (subop2=3, cat=0, type=2, subop=9)
+def CVTFDS : FormatFPU_CVT<0b00011, 0b000, 0b10, 0b1001,
+                           (outs GPR:$reg3), (ins GPR:$reg2),
+                           "cvtf.ds\t$reg2, $reg3", []>;
+
+// CVTF.SD reg2, reg3 - Single to Double (subop2=2, cat=0, type=2, subop=9)
+def CVTFSD : FormatFPU_CVT<0b00010, 0b000, 0b10, 0b1001,
+                           (outs GPR:$reg3), (ins GPR:$reg2),
+                           "cvtf.sd\t$reg2, $reg3", []>;
+
+//--- Signed integer to floating-point conversions ---
+
+// CVTF.WS reg2, reg3 - Word (int32) to Single (subop2=0, cat=0, type=2, subop=1)
+def CVTFWS : FormatFPU_CVT<0b00000, 0b000, 0b10, 0b0001,
+                           (outs GPR:$reg3), (ins GPR:$reg2),
+                           "cvtf.ws\t$reg2, $reg3", []>;
+
+// CVTF.WD reg2, reg3 - Word (int32) to Double (subop2=0, cat=0, type=2, subop=9)
+def CVTFWD : FormatFPU_CVT<0b00000, 0b000, 0b10, 0b1001,
+                           (outs GPR:$reg3), (ins GPR:$reg2),
+                           "cvtf.wd\t$reg2, $reg3", []>;
+
+// CVTF.LS reg2, reg3 - Long (int64) to Single (subop2=1, cat=0, type=2, subop=1)
+def CVTFLS : FormatFPU_CVT<0b00001, 0b000, 0b10, 0b0001,
+                           (outs GPR:$reg3), (ins GPR:$reg2),
+                           "cvtf.ls\t$reg2, $reg3", []>;
+
+// CVTF.LD reg2, reg3 - Long (int64) to Double (subop2=1, cat=0, type=2, subop=9)
+def CVTFLD : FormatFPU_CVT<0b00001, 0b000, 0b10, 0b1001,
+                           (outs GPR:$reg3), (ins GPR:$reg2),
+                           "cvtf.ld\t$reg2, $reg3", []>;
+
+//--- Floating-point to signed integer conversions ---
+
+// CVTF.SW reg2, reg3 - Single to Word (subop2=4, cat=0, type=2, subop=0)
+def CVTFSW : FormatFPU_CVT<0b00100, 0b000, 0b10, 0b0000,
+                           (outs GPR:$reg3), (ins GPR:$reg2),
+                           "cvtf.sw\t$reg2, $reg3", []>;
+
+// CVTF.DW reg2, reg3 - Double to Word (subop2=4, cat=0, type=2, subop=8)
+def CVTFDW : FormatFPU_CVT<0b00100, 0b000, 0b10, 0b1000,
+                           (outs GPR:$reg3), (ins GPR:$reg2),
+                           "cvtf.dw\t$reg2, $reg3", []>;
+
+// CVTF.SL reg2, reg3 - Single to Long (subop2=4, cat=0, type=2, subop=2)
+def CVTFSL : FormatFPU_CVT<0b00100, 0b000, 0b10, 0b0010,
+                           (outs GPR:$reg3), (ins GPR:$reg2),
+                           "cvtf.sl\t$reg2, $reg3", []>;
+
+// CVTF.DL reg2, reg3 - Double to Long (subop2=4, cat=0, type=2, subop=10)
+def CVTFDL : FormatFPU_CVT<0b00100, 0b000, 0b10, 0b1010,
+                           (outs GPR:$reg3), (ins GPR:$reg2),
+                           "cvtf.dl\t$reg2, $reg3", []>;
+
+//--- Unsigned integer to floating-point conversions ---
+
+// CVTF.UWS reg2, reg3 - Unsigned Word to Single (subop2=16, cat=0, type=2, subop=1)
+def CVTFUWS : FormatFPU_CVT<0b10000, 0b000, 0b10, 0b0001,
+                            (outs GPR:$reg3), (ins GPR:$reg2),
+                            "cvtf.uws\t$reg2, $reg3", []>;
+
+// CVTF.UWD reg2, reg3 - Unsigned Word to Double (subop2=16, cat=0, type=2, subop=9)
+def CVTFUWD : FormatFPU_CVT<0b10000, 0b000, 0b10, 0b1001,
+                            (outs GPR:$reg3), (ins GPR:$reg2),
+                            "cvtf.uwd\t$reg2, $reg3", []>;
+
+// CVTF.ULS reg2, reg3 - Unsigned Long to Single (subop2=17, cat=0, type=2, subop=1)
+def CVTFULS : FormatFPU_CVT<0b10001, 0b000, 0b10, 0b0001,
+                            (outs GPR:$reg3), (ins GPR:$reg2),
+                            "cvtf.uls\t$reg2, $reg3", []>;
+
+// CVTF.ULD reg2, reg3 - Unsigned Long to Double (subop2=17, cat=0, type=2, subop=9)
+def CVTFULD : FormatFPU_CVT<0b10001, 0b000, 0b10, 0b1001,
+                            (outs GPR:$reg3), (ins GPR:$reg2),
+                            "cvtf.uld\t$reg2, $reg3", []>;
+
+//--- Floating-point to unsigned integer conversions ---
+
+// CVTF.SUW reg2, reg3 - Single to Unsigned Word (subop2=20, cat=0, type=2, subop=0)
+def CVTFSUW : FormatFPU_CVT<0b10100, 0b000, 0b10, 0b0000,
+                            (outs GPR:$reg3), (ins GPR:$reg2),
+                            "cvtf.suw\t$reg2, $reg3", []>;
+
+// CVTF.DUW reg2, reg3 - Double to Unsigned Word (subop2=20, cat=0, type=2, subop=8)
+def CVTFDUW : FormatFPU_CVT<0b10100, 0b000, 0b10, 0b1000,
+                            (outs GPR:$reg3), (ins GPR:$reg2),
+                            "cvtf.duw\t$reg2, $reg3", []>;
+
+// CVTF.SUL reg2, reg3 - Single to Unsigned Long (subop2=20, cat=0, type=2, subop=2)
+def CVTFSUL : FormatFPU_CVT<0b10100, 0b000, 0b10, 0b0010,
+                            (outs GPR:$reg3), (ins GPR:$reg2),
+                            "cvtf.sul\t$reg2, $reg3", []>;
+
+// CVTF.DUL reg2, reg3 - Double to Unsigned Long (subop2=20, cat=0, type=2, subop=10)
+def CVTFDUL : FormatFPU_CVT<0b10100, 0b000, 0b10, 0b1010,
+                            (outs GPR:$reg3), (ins GPR:$reg2),
+                            "cvtf.dul\t$reg2, $reg3", []>;
+
 } // Predicates = [HasV850E2M]
