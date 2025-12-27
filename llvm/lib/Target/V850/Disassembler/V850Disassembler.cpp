@@ -164,6 +164,7 @@ static DecodeStatus decodeBranchTarget32(MCInst &Inst, uint32_t Imm,
 
 //===----------------------------------------------------------------------===//
 // Decoder Table
+// Note: V850MCTargetDesc.h already includes GET_SUBTARGETINFO_ENUM
 //===----------------------------------------------------------------------===//
 
 #include "V850GenDisassemblerTables.inc"
@@ -187,18 +188,43 @@ DecodeStatus V850Disassembler::getInstruction(MCInst &MI, uint64_t &Size,
   // Read the first 16-bit halfword
   uint16_t Insn16 = support::endian::read16le(Bytes.data());
 
+  // Check if we have V850E2M features for extended instructions
+  bool HasV850E2M = STI.hasFeature(V850::FeatureV850E2M);
+
   // Try to decode as a 32-bit instruction first if we have enough bytes
   // V850 32-bit instructions are determined by specific opcode patterns
   if (Bytes.size() >= 4) {
     // Read the full 32-bit instruction
     uint32_t Insn32 = support::endian::read32le(Bytes.data());
 
-    // Try 32-bit decoder table
+    // Try V850E2M 32-bit decoder table first if we have V850E2M features
+    if (HasV850E2M) {
+      MI.clear();
+      DecodeStatus Result = decodeInstruction(DecoderTableV850E2M32, MI, Insn32,
+                                              Address, this, STI);
+      if (Result != MCDisassembler::Fail) {
+        Size = 4;
+        return Result;
+      }
+    }
+
+    // Try base 32-bit decoder table
     MI.clear();
     DecodeStatus Result = decodeInstruction(DecoderTable32, MI, Insn32,
                                             Address, this, STI);
     if (Result != MCDisassembler::Fail) {
       Size = 4;
+      return Result;
+    }
+  }
+
+  // Try V850E2M 16-bit decoder table first if we have V850E2M features
+  if (HasV850E2M) {
+    MI.clear();
+    DecodeStatus Result = decodeInstruction(DecoderTableV850E2M16, MI, Insn16,
+                                            Address, this, STI);
+    if (Result != MCDisassembler::Fail) {
+      Size = 2;
       return Result;
     }
   }

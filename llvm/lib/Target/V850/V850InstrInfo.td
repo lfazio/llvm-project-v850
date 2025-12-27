@@ -1521,3 +1521,155 @@ def JMP32 : FormatVI_E2<0b110111, (outs), (ins GPR:$reg1, brtarget32:$disp32),
                         []>;
 
 } // Predicates = [HasV850E2]
+
+//===----------------------------------------------------------------------===//
+// V850E2M Instructions (require HasV850E2M predicate)
+//===----------------------------------------------------------------------===//
+
+// 4-bit unsigned immediate for FETRAP vector (1-15)
+def uimm4_nz : Operand<i32>, ImmLeaf<i32, [{return Imm >= 1 && Imm <= 15;}]> {
+  let DecoderMethod = "decodeUImmOperand<4>";
+}
+
+// 8-bit unsigned immediate for SYSCALL vector
+def uimm8 : Operand<i32>, ImmLeaf<i32, [{return isUInt<8>(Imm);}]> {
+  let DecoderMethod = "decodeUImmOperand<8>";
+}
+
+let Predicates = [HasV850E2M], DecoderNamespace = "V850E2M" in {
+
+//===----------------------------------------------------------------------===//
+// Synchronization Instructions (16-bit)
+// These are Format I-like instructions with fixed encodings
+//===----------------------------------------------------------------------===//
+
+// SYNCE - Synchronize exceptions
+// Waits for all preceding exceptions to be acknowledged before continuing
+// Opcode: 0000000000011101
+let hasSideEffects = 1 in
+def SYNCE : V850Inst16<(outs), (ins),
+                       "synce",
+                       []> {
+  let Inst{15-0} = 0b0000000000011101;
+}
+
+// SYNCM - Synchronize memory
+// Waits for all preceding memory accesses to complete
+// Opcode: 0000000000011110
+let hasSideEffects = 1 in
+def SYNCM : V850Inst16<(outs), (ins),
+                       "syncm",
+                       []> {
+  let Inst{15-0} = 0b0000000000011110;
+}
+
+// SYNCP - Synchronize pipeline
+// Waits for all preceding instructions to complete execution
+// Opcode: 0000000000011111
+let hasSideEffects = 1 in
+def SYNCP : V850Inst16<(outs), (ins),
+                       "syncp",
+                       []> {
+  let Inst{15-0} = 0b0000000000011111;
+}
+
+//===----------------------------------------------------------------------===//
+// RIE - Reserved Instruction Exception (16-bit)
+// Triggers a reserved instruction exception
+// Opcode: 0000000001000000
+//===----------------------------------------------------------------------===//
+
+let hasSideEffects = 1 in
+def RIE : V850Inst16<(outs), (ins),
+                     "rie",
+                     []> {
+  let Inst{15-0} = 0b0000000001000000;
+}
+
+//===----------------------------------------------------------------------===//
+// FETRAP - FE Level Software Trap (16-bit)
+// Triggers an FE-level software exception
+// Opcode: 0vvvv00001000000 where vvvv is vector4 (1-15, 0 is reserved)
+//===----------------------------------------------------------------------===//
+
+let hasSideEffects = 1 in
+def FETRAP : V850Inst16<(outs), (ins uimm4_nz:$vector4),
+                        "fetrap\t$vector4",
+                        []> {
+  bits<4> vector4;
+
+  let Inst{15} = 0;
+  let Inst{14-11} = vector4;
+  let Inst{10-5} = 0b000010;
+  let Inst{4-0} = 0b00000;
+}
+
+//===----------------------------------------------------------------------===//
+// EIRET - Return from EI Level Exception (32-bit)
+// Restores PC and PSW from EIPC and EIPSW
+// Opcode: 0000011111100000 0000000101001000
+//===----------------------------------------------------------------------===//
+
+let isReturn = 1, isTerminator = 1, isBarrier = 1, hasSideEffects = 1,
+    Uses = [EIPC, EIPSW], Defs = [PSW] in
+def EIRET : V850Inst32<(outs), (ins),
+                       "eiret",
+                       []> {
+  let Inst{15-0} = 0b0000011111100000;
+  let Inst{31-16} = 0b0000000101001000;
+}
+
+//===----------------------------------------------------------------------===//
+// FERET - Return from FE Level Exception (32-bit)
+// Restores PC and PSW from FEPC and FEPSW
+// Opcode: 0000011111100000 0000000101001010
+//===----------------------------------------------------------------------===//
+
+let isReturn = 1, isTerminator = 1, isBarrier = 1, hasSideEffects = 1,
+    Uses = [FEPC, FEPSW], Defs = [PSW] in
+def FERET : V850Inst32<(outs), (ins),
+                       "feret",
+                       []> {
+  let Inst{15-0} = 0b0000011111100000;
+  let Inst{31-16} = 0b0000000101001010;
+}
+
+//===----------------------------------------------------------------------===//
+// SYSCALL - System Call (32-bit)
+// Calls OS system service via table lookup
+// Opcode: 11010111111vvvvv 00VVV00101100000
+// where vvvvv = vector8[4:0], VVV = vector8[7:5]
+//===----------------------------------------------------------------------===//
+
+let isCall = 1, hasSideEffects = 1,
+    Defs = [EIPC, EIPSW, PSW] in
+def SYSCALL : V850Inst32<(outs), (ins uimm8:$vector8),
+                         "syscall\t$vector8",
+                         []> {
+  bits<8> vector8;
+
+  // First halfword: 11010111111vvvvv
+  let Inst{15-11} = 0b11010;
+  let Inst{10-5} = 0b111111;
+  let Inst{4-0} = vector8{4-0};
+
+  // Second halfword: 00VVV00101100000
+  let Inst{31-29} = 0b000;
+  let Inst{28-26} = vector8{7-5};
+  let Inst{25-16} = 0b0010110000;
+}
+
+//===----------------------------------------------------------------------===//
+// CAXI - Compare and Exchange for Interlock (32-bit)
+// Atomic compare-and-swap operation
+// Opcode: rrrrr111111RRRRR wwwww00011101110
+// reg2 = rrrrr, reg1 = RRRRR, reg3 = wwwww
+//===----------------------------------------------------------------------===//
+
+let mayLoad = 1, mayStore = 1, Defs = [PSW] in
+def CAXI : FormatXI<0b111111, 0b000111, 0b01110, (outs GPR:$reg3),
+                    (ins GPR:$reg1, GPR:$reg2),
+                    "caxi\t[$reg1], $reg2, $reg3",
+                    []>;
+
+} // Predicates = [HasV850E2M]
