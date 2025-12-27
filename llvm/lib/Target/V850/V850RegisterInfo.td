@@ -137,6 +137,22 @@ def GPR : RegisterClass<"V850", [i32], 32,
 def GPRnoR0 : RegisterClass<"V850", [i32], 32,
     (sub GPR, R0)>;
 
+// FPR - Floating-point register class (uses same physical registers as GPR)
+// V850 uses GPRs for single-precision FP operations
+def FPR : RegisterClass<"V850", [f32], 32,
+    (add
+     // Caller-saved temporaries (preferred for allocation)
+     R10, R11, R12, R13, R14, R15, R16, R17, R18, R19,
+     // Argument registers
+     R6, R7, R8, R9,
+     // Callee-saved registers
+     R20, R21, R22, R23, R24, R25, R26, R27, R28, R29,
+     // Special-purpose registers (less preferred)
+     R1, R2, EP, LP, SP, GP, TP,
+     // Zero register
+     R0
+    )>;
+
 //===----------------------------------------------------------------------===//
 // System Registers
 //===----------------------------------------------------------------------===//

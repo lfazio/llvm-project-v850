@@ -27,9 +27,21 @@ def CC_V850 : CallingConv<[
   // The first 4 words (16 bytes) are passed in r6-r9
   CCIfType<[i32], CCAssignToReg<[R6, R7, R8, R9]>>,
 
+  // f32 values are passed in r6-r9 (same as i32, using GPRs)
+  CCIfType<[f32], CCAssignToReg<[R6, R7, R8, R9]>>,
+
+  // f64 values are passed in register pairs r6:r7, r8:r9 (even:odd pairs)
+  CCIfType<[f64], CCAssignToRegWithShadow<[R6, R8], [R7, R9]>>,
+
   // Integer values get stored in stack slots that are 4 bytes in size and
   // 4-byte aligned
-  CCIfType<[i32], CCAssignToStack<4, 4>>
+  CCIfType<[i32], CCAssignToStack<4, 4>>,
+
+  // f32 values on stack are 4-byte aligned
+  CCIfType<[f32], CCAssignToStack<4, 4>>,
+
+  // f64 values on stack are 8-byte aligned
+  CCIfType<[f64], CCAssignToStack<8, 8>>
 ]>;
 
 //===----------------------------------------------------------------------===//
@@ -43,8 +55,14 @@ def RetCC_V850 : CallingConv<[
   // i32 values are returned in r10
   CCIfType<[i32], CCAssignToReg<[R10]>>,
 
+  // f32 values are returned in r10 (using GPR)
+  CCIfType<[f32], CCAssignToReg<[R10]>>,
+
   // i64 values are returned in r10:r11 (low:high)
-  CCIfType<[i64], CCAssignToRegWithShadow<[R10], [R11]>>
+  CCIfType<[i64], CCAssignToRegWithShadow<[R10], [R11]>>,
+
+  // f64 values are returned in r10:r11 (low:high pair)
+  CCIfType<[f64], CCAssignToRegWithShadow<[R10], [R11]>>
 ]>;
 
 //===----------------------------------------------------------------------===//

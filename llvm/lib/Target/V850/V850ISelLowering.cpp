@@ -41,6 +41,13 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
   // Set up the register classes
   addRegisterClass(MVT::i32, &V850::GPRRegClass);
 
+  // V850E2M has FPU - use FPR class for floating-point
+  // (FPR uses same physical registers as GPR but for f32 type)
+  if (STI.hasV850E2M()) {
+    addRegisterClass(MVT::f32, &V850::FPRRegClass);
+    // f64 uses register pairs, will be expanded to library calls
+  }
+
   // Compute derived properties from the register classes
   computeRegisterProperties(STI.getRegisterInfo());
 
@@ -146,6 +153,57 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
 
   // Atomics - not supported, expand
   setMaxAtomicSizeInBitsSupported(0);
+
+  // FPU operations for V850E2M
+  if (STI.hasV850E2M()) {
+    // Single-precision floating-point operations - Legal
+    // V850E2M has hardware support for these
+    setOperationAction(ISD::FADD, MVT::f32, Legal);
+    setOperationAction(ISD::FSUB, MVT::f32, Legal);
+    setOperationAction(ISD::FMUL, MVT::f32, Legal);
+    setOperationAction(ISD::FDIV, MVT::f32, Legal);
+    setOperationAction(ISD::FABS, MVT::f32, Legal);
+    setOperationAction(ISD::FNEG, MVT::f32, Legal);
+    setOperationAction(ISD::FSQRT, MVT::f32, Legal);
+    setOperationAction(ISD::FMINNUM, MVT::f32, Legal);
+    setOperationAction(ISD::FMAXNUM, MVT::f32, Legal);
+
+    // FMA operations - V850E2M has MADDF.S/MSUBF.S
+    setOperationAction(ISD::FMA, MVT::f32, Legal);
+
+    // Rounding operations - use library calls for now
+    setOperationAction(ISD::FCEIL, MVT::f32, Expand);
+    setOperationAction(ISD::FFLOOR, MVT::f32, Expand);
+    setOperationAction(ISD::FTRUNC, MVT::f32, Expand);
+    setOperationAction(ISD::FROUND, MVT::f32, Expand);
+
+    // Conversions
+    setOperationAction(ISD::SINT_TO_FP, MVT::i32, Legal);
+    setOperationAction(ISD::UINT_TO_FP, MVT::i32, Legal);
+    setOperationAction(ISD::FP_TO_SINT, MVT::i32, Legal);
+    setOperationAction(ISD::FP_TO_UINT, MVT::i32, Legal);
+
+    // Comparisons - expand to library calls (complex FP compare status handling)
+    setOperationAction(ISD::SETCC, MVT::f32, Expand);
+    setOperationAction(ISD::SELECT_CC, MVT::f32, Expand);
+    setOperationAction(ISD::BR_CC, MVT::f32, Expand);
+
+    // Double-precision - expand to library calls for now
+    // (would need register pair handling for hardware support)
+    setOperationAction(ISD::FADD, MVT::f64, Expand);
+    setOperationAction(ISD::FSUB, MVT::f64, Expand);
+    setOperationAction(ISD::FMUL, MVT::f64, Expand);
+    setOperationAction(ISD::FDIV, MVT::f64, Expand);
+    setOperationAction(ISD::FABS, MVT::f64, Expand);
+    setOperationAction(ISD::FNEG, MVT::f64, Expand);
+    setOperationAction(ISD::FSQRT, MVT::f64, Expand);
+    setOperationAction(ISD::FP_EXTEND, MVT::f64, Expand);
+    setOperationAction(ISD::FP_ROUND, MVT::f32, Expand);
+
+    // Bitcast between i32 and f32
+    setOperationAction(ISD::BITCAST, MVT::i32, Legal);
+    setOperationAction(ISD::BITCAST, MVT::f32, Legal);
+  }
 
   // Set minimum function alignment
   setMinFunctionAlignment(Align(2));

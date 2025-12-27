@@ -1686,50 +1686,50 @@ def CAXI : FormatXI<0b111111, 0b000111, 0b01110, (outs GPR:$reg3),
 // ADDF.S reg1, reg2, reg3 - Single-precision floating-point add
 // reg3 = reg2 + reg1
 // Encoding: rrrrr111111RRRRR wwwww1000110000 0
-def ADDFS : FormatFPU_RRR<0b0000, (outs GPR:$reg3),
-                          (ins GPR:$reg2, GPR:$reg1),
+def ADDFS : FormatFPU_RRR<0b0000, (outs FPR:$reg3),
+                          (ins FPR:$reg2, FPR:$reg1),
                           "addf.s\t$reg1, $reg2, $reg3",
-                          []>;
+                          [(set FPR:$reg3, (fadd FPR:$reg2, FPR:$reg1))]>;
 
 // SUBF.S reg1, reg2, reg3 - Single-precision floating-point subtract
 // reg3 = reg2 - reg1
 // Encoding: rrrrr111111RRRRR wwwww1000110001 0
-def SUBFS : FormatFPU_RRR<0b0001, (outs GPR:$reg3),
-                          (ins GPR:$reg2, GPR:$reg1),
+def SUBFS : FormatFPU_RRR<0b0001, (outs FPR:$reg3),
+                          (ins FPR:$reg2, FPR:$reg1),
                           "subf.s\t$reg1, $reg2, $reg3",
-                          []>;
+                          [(set FPR:$reg3, (fsub FPR:$reg2, FPR:$reg1))]>;
 
 // MULF.S reg1, reg2, reg3 - Single-precision floating-point multiply
 // reg3 = reg2 * reg1
 // Encoding: rrrrr111111RRRRR wwwww1000110010 0
-def MULFS : FormatFPU_RRR<0b0010, (outs GPR:$reg3),
-                          (ins GPR:$reg2, GPR:$reg1),
+def MULFS : FormatFPU_RRR<0b0010, (outs FPR:$reg3),
+                          (ins FPR:$reg2, FPR:$reg1),
                           "mulf.s\t$reg1, $reg2, $reg3",
-                          []>;
+                          [(set FPR:$reg3, (fmul FPR:$reg2, FPR:$reg1))]>;
 
 // DIVF.S reg1, reg2, reg3 - Single-precision floating-point divide
 // reg3 = reg2 / reg1
 // Encoding: rrrrr111111RRRRR wwwww1000110111 0
-def DIVFS : FormatFPU_RRR<0b0111, (outs GPR:$reg3),
-                          (ins GPR:$reg2, GPR:$reg1),
+def DIVFS : FormatFPU_RRR<0b0111, (outs FPR:$reg3),
+                          (ins FPR:$reg2, FPR:$reg1),
                           "divf.s\t$reg1, $reg2, $reg3",
-                          []>;
+                          [(set FPR:$reg3, (fdiv FPR:$reg2, FPR:$reg1))]>;
 
 // MAXF.S reg1, reg2, reg3 - Single-precision floating-point maximum
 // reg3 = max(reg2, reg1)
 // Encoding: rrrrr111111RRRRR wwwww1000110100 0
-def MAXFS : FormatFPU_RRR<0b0100, (outs GPR:$reg3),
-                          (ins GPR:$reg2, GPR:$reg1),
+def MAXFS : FormatFPU_RRR<0b0100, (outs FPR:$reg3),
+                          (ins FPR:$reg2, FPR:$reg1),
                           "maxf.s\t$reg1, $reg2, $reg3",
-                          []>;
+                          [(set FPR:$reg3, (fmaxnum FPR:$reg2, FPR:$reg1))]>;
 
 // MINF.S reg1, reg2, reg3 - Single-precision floating-point minimum
 // reg3 = min(reg2, reg1)
 // Encoding: rrrrr111111RRRRR wwwww1000110101 0
-def MINFS : FormatFPU_RRR<0b0101, (outs GPR:$reg3),
-                          (ins GPR:$reg2, GPR:$reg1),
+def MINFS : FormatFPU_RRR<0b0101, (outs FPR:$reg3),
+                          (ins FPR:$reg2, FPR:$reg1),
                           "minf.s\t$reg1, $reg2, $reg3",
-                          []>;
+                          [(set FPR:$reg3, (fminnum FPR:$reg2, FPR:$reg1))]>;
 
 //===----------------------------------------------------------------------===//
 // V850E2M FPU Instructions - Single Precision 2-Operand
@@ -1739,26 +1739,26 @@ def MINFS : FormatFPU_RRR<0b0101, (outs GPR:$reg3),
 // ABSF.S reg2, reg3 - Single-precision floating-point absolute value
 // reg3 = |reg2|
 // Encoding: rrrrr111111 00000 wwwww1000100100 0
-def ABSFS : FormatFPU_RR<0b0100, (outs GPR:$reg3),
-                         (ins GPR:$reg2),
+def ABSFS : FormatFPU_RR<0b0100, (outs FPR:$reg3),
+                         (ins FPR:$reg2),
                          "absf.s\t$reg2, $reg3",
-                         []>;
+                         [(set FPR:$reg3, (fabs FPR:$reg2))]>;
 
 // NEGF.S reg2, reg3 - Single-precision floating-point negate
 // reg3 = -reg2
 // Encoding: rrrrr111111 00000 wwwww1000101000 0
-def NEGFS : FormatFPU_RR<0b1000, (outs GPR:$reg3),
-                         (ins GPR:$reg2),
+def NEGFS : FormatFPU_RR<0b1000, (outs FPR:$reg3),
+                         (ins FPR:$reg2),
                          "negf.s\t$reg2, $reg3",
-                         []>;
+                         [(set FPR:$reg3, (fneg FPR:$reg2))]>;
 
 // SQRTF.S reg2, reg3 - Single-precision floating-point square root
 // reg3 = sqrt(reg2)
 // Encoding: rrrrr111111 00000 wwwww1000101110 0
-def SQRTFS : FormatFPU_RR<0b1110, (outs GPR:$reg3),
-                          (ins GPR:$reg2),
+def SQRTFS : FormatFPU_RR<0b1110, (outs FPR:$reg3),
+                          (ins FPR:$reg2),
                           "sqrtf.s\t$reg2, $reg3",
-                          []>;
+                          [(set FPR:$reg3, (fsqrt FPR:$reg2))]>;
 
 // RECIPF.S reg2, reg3 - Single-precision floating-point reciprocal
 // reg3 = 1 / reg2
