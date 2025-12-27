@@ -38,6 +38,9 @@ class LLVM_LIBRARY_VISIBILITY V850TargetInfo : public TargetInfo {
   // FPU feature tracking - V850E2M and later have FPU
   bool HasFPU = false;
 
+  // Soft-float ABI - uses integer registers for FP arguments
+  bool SoftFloat = false;
+
 public:
   V850TargetInfo(const llvm::Triple &Triple, const TargetOptions &)
       : TargetInfo(Triple) {
@@ -85,6 +88,7 @@ public:
   bool isValidFeatureName(StringRef Feature) const override {
     return llvm::StringSwitch<bool>(Feature)
         .Case("fpu", true)
+        .Case("soft-float", true)
         .Default(false);
   }
 
@@ -107,7 +111,8 @@ public:
         .Case("v850e2m", CPU >= CK_V850E2M)
         .Case("v850e2v3", CPU >= CK_V850E2V3)
         .Case("v850e3", CPU >= CK_V850E3)
-        .Case("fpu", HasFPU)
+        .Case("fpu", HasFPU && !SoftFloat)
+        .Case("soft-float", SoftFloat)
         .Default(false);
   }
 

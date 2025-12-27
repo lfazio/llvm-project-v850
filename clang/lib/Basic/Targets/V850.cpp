@@ -68,9 +68,29 @@ void V850TargetInfo::getTargetDefines(const LangOptions &Opts,
     break;
   }
 
-  // Define FPU macro when FPU is available
-  if (HasFPU)
+  // Define FPU macros when hardware FPU is used (not soft-float)
+  if (HasFPU && !SoftFloat) {
     Builder.defineMacro("__V850_FPU__");
+
+    // __V850_FP__ indicates floating-point hardware support
+    // Bit 1 = single precision (32-bit)
+    // Bit 2 = double precision (64-bit)
+    // V850E2M FPU supports both single and double precision
+    Builder.defineMacro("__V850_FP__", "0x6");  // SP + DP
+
+    // FMA support - V850E2M has MADDF.S/MSUBF.S instructions
+    Builder.defineMacro("__V850_FEATURE_FMA__", "1");
+
+    // Hardware square root - V850E2M has SQRTF.S/SQRTF.D
+    Builder.defineMacro("__V850_FEATURE_SQRT__", "1");
+
+    // Hardware min/max - V850E2M has MINF.S/MAXF.S
+    Builder.defineMacro("__V850_FEATURE_MINMAX__", "1");
+  }
+
+  // Indicate soft-float mode
+  if (SoftFloat)
+    Builder.defineMacro("__V850_SOFT_FLOAT__");
 }
 
 bool V850TargetInfo::isValidCPUName(StringRef Name) const {
@@ -120,6 +140,10 @@ bool V850TargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
       HasFPU = true;
     else if (Feature == "-fpu")
       HasFPU = false;
+    else if (Feature == "+soft-float")
+      SoftFloat = true;
+    else if (Feature == "-soft-float")
+      SoftFloat = false;
   }
   return true;
 }

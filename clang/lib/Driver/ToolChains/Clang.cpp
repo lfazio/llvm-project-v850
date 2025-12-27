@@ -2314,6 +2314,18 @@ void Clang::AddV850TargetArgs(const ArgList &Args,
       CmdArgs.push_back("-fpu");
     }
   }
+
+  // Handle V850 soft-float feature
+  if (Arg *A = Args.getLastArg(options::OPT_mv850_soft_float,
+                                options::OPT_mno_v850_soft_float)) {
+    if (A->getOption().matches(options::OPT_mv850_soft_float)) {
+      CmdArgs.push_back("-target-feature");
+      CmdArgs.push_back("+soft-float");
+    } else {
+      CmdArgs.push_back("-target-feature");
+      CmdArgs.push_back("-soft-float");
+    }
+  }
 }
 
 void Clang::DumpCompilationDatabase(Compilation &C, StringRef Filename,
