@@ -510,6 +510,8 @@ class FormatFPU_CVT<bits<5> subop2, bits<3> category, bits<2> type, bits<4> subo
 }
 
 // TRFSR - Transfer floating-point status to PSW.Z
+// Encoding: 00000 111111 00000 | 00000 1 000 00 0fff 0
+// Where fff = fcbit (3 bits) in bits 19-17, bit 20 = 0
 class FormatFPU_TRFSR<dag outs, dag ins, string asmstr, list<dag> pattern>
     : V850Inst32<outs, ins, asmstr, pattern> {
   bits<3> fcbit;
@@ -521,7 +523,8 @@ class FormatFPU_TRFSR<dag outs, dag ins, string asmstr, list<dag> pattern>
   let Inst{26}    = 1;
   let Inst{25-23} = 0b000;
   let Inst{22-21} = 0b00;
-  let Inst{20-17} = {fcbit, 0};
+  let Inst{20}    = 0;
+  let Inst{19-17} = fcbit;
   let Inst{16}    = 0;
 }
 
