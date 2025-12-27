@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "V850.h"
+#include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/MacroBuilder.h"
 
 using namespace clang;
@@ -52,6 +53,12 @@ void V850TargetInfo::getTargetDefines(const LangOptions &Opts,
     Builder.defineMacro("__v850e2__");
     Builder.defineMacro("__v850e2m__");
     break;
+  case CK_V850E2V3:
+    Builder.defineMacro("__v850e__");
+    Builder.defineMacro("__v850e2__");
+    Builder.defineMacro("__v850e2v3__");
+    Builder.defineMacro("__v850e3__");
+    break;
   case CK_V850E3:
     Builder.defineMacro("__v850e__");
     Builder.defineMacro("__v850e2__");
@@ -60,6 +67,10 @@ void V850TargetInfo::getTargetDefines(const LangOptions &Opts,
   default:
     break;
   }
+
+  // Define FPU macro when FPU is available
+  if (HasFPU)
+    Builder.defineMacro("__V850_FPU__");
 }
 
 bool V850TargetInfo::isValidCPUName(StringRef Name) const {
@@ -69,6 +80,7 @@ bool V850TargetInfo::isValidCPUName(StringRef Name) const {
       .Case("v850es", true)
       .Case("v850e2", true)
       .Case("v850e2m", true)
+      .Case("v850e2v3", true)
       .Case("v850e3", true)
       .Default(false);
 }
@@ -80,6 +92,7 @@ void V850TargetInfo::fillValidCPUList(
   Values.emplace_back("v850es");
   Values.emplace_back("v850e2");
   Values.emplace_back("v850e2m");
+  Values.emplace_back("v850e2v3");
   Values.emplace_back("v850e3");
 }
 
@@ -90,7 +103,23 @@ bool V850TargetInfo::setCPU(const std::string &Name) {
             .Case("v850es", CK_V850ES)
             .Case("v850e2", CK_V850E2)
             .Case("v850e2m", CK_V850E2M)
+            .Case("v850e2v3", CK_V850E2V3)
             .Case("v850e3", CK_V850E3)
             .Default(CK_NONE);
+
+  // V850E2M and later have FPU by default
+  HasFPU = (CPU >= CK_V850E2M);
+
   return CPU != CK_NONE;
+}
+
+bool V850TargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
+                                           DiagnosticsEngine &Diags) {
+  for (const auto &Feature : Features) {
+    if (Feature == "+fpu")
+      HasFPU = true;
+    else if (Feature == "-fpu")
+      HasFPU = false;
+  }
+  return true;
 }

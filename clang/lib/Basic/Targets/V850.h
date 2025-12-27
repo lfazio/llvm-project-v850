@@ -31,8 +31,12 @@ class LLVM_LIBRARY_VISIBILITY V850TargetInfo : public TargetInfo {
     CK_V850ES,  // V850ES has same ISA as V850E1
     CK_V850E2,
     CK_V850E2M,
+    CK_V850E2V3,  // V850E2V3 is an alias for V850E3 with some enhancements
     CK_V850E3,
   } CPU = CK_V850;
+
+  // FPU feature tracking - V850E2M and later have FPU
+  bool HasFPU = false;
 
 public:
   V850TargetInfo(const llvm::Triple &Triple, const TargetOptions &)
@@ -78,6 +82,15 @@ public:
   void fillValidCPUList(SmallVectorImpl<StringRef> &Values) const override;
   bool setCPU(const std::string &Name) override;
 
+  bool isValidFeatureName(StringRef Feature) const override {
+    return llvm::StringSwitch<bool>(Feature)
+        .Case("fpu", true)
+        .Default(false);
+  }
+
+  bool handleTargetFeatures(std::vector<std::string> &Features,
+                            DiagnosticsEngine &Diags) override;
+
   llvm::SmallVector<Builtin::InfosShard> getTargetBuiltins() const override {
     return {};
   }
@@ -92,7 +105,9 @@ public:
         .Case("v850es", CPU >= CK_V850E1)  // V850ES has same ISA as V850E1
         .Case("v850e2", CPU >= CK_V850E2)
         .Case("v850e2m", CPU >= CK_V850E2M)
+        .Case("v850e2v3", CPU >= CK_V850E2V3)
         .Case("v850e3", CPU >= CK_V850E3)
+        .Case("fpu", HasFPU)
         .Default(false);
   }
 

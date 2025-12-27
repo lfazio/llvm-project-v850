@@ -240,6 +240,8 @@ def m_riscv_Features_Group : OptionGroup<"<riscv features group>">,
                              Group<m_Group>, DocName<"RISC-V">;
 def m_ve_Features_Group : OptionGroup<"<ve features group>">,
                           Group<m_Group>, DocName<"VE">;
+def m_v850_Features_Group : OptionGroup<"<v850 features group>">,
+                            Group<m_Group>, DocName<"V850">;
 def m_loongarch_Features_Group : OptionGroup<"<loongarch features group>">,
                                  Group<m_Group>, DocName<"LoongArch">,
                                  Visibility<[ClangOption, CLOption, FlangOption]>;
@@ -6523,6 +6525,14 @@ foreach i = 0 ... 7 in
 foreach i = 0 ... 5 in
   def ffixed_i#i : Flag<["-"], "ffixed-i"#i>, Group<m_sparc_Features_Group>,
     HelpText<"Reserve the I"#i#" register (SPARC only)">;
+} // let Flags = [TargetSpecific]
+
+// V850 feature flags
+let Flags = [TargetSpecific] in {
+def mv850_fpu : Flag<["-"], "mv850-fpu">, Group<m_v850_Features_Group>,
+  HelpText<"Enable V850 floating-point unit">;
+def mno_v850_fpu : Flag<["-"], "mno-v850-fpu">, Group<m_v850_Features_Group>,
+  HelpText<"Disable V850 floating-point unit">;
 } // let Flags = [TargetSpecific]
 
 // M68k features flags

@@ -80,6 +80,18 @@ static DecodeStatus DecodeGPRRegisterClass(MCInst &Inst, uint32_t RegNo,
   return MCDisassembler::Success;
 }
 
+// FPR uses the same physical registers as GPR
+static DecodeStatus DecodeFPRRegisterClass(MCInst &Inst, uint32_t RegNo,
+                                            uint64_t Address,
+                                            const MCDisassembler *Decoder) {
+  if (RegNo >= 32)
+    return MCDisassembler::Fail;
+
+  MCRegister Reg = GPRDecoderTable[RegNo];
+  Inst.addOperand(MCOperand::createReg(Reg));
+  return MCDisassembler::Success;
+}
+
 static DecodeStatus DecodeGPRnoR0RegisterClass(MCInst &Inst, uint32_t RegNo,
                                                 uint64_t Address,
                                                 const MCDisassembler *Decoder) {

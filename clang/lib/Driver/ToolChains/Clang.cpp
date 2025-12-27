@@ -2302,6 +2302,18 @@ void Clang::AddV850TargetArgs(const ArgList &Args,
     CmdArgs.push_back("-target-cpu");
     CmdArgs.push_back(Args.MakeArgString(CPUName));
   }
+
+  // Handle V850 FPU feature
+  if (Arg *A = Args.getLastArg(options::OPT_mv850_fpu,
+                                options::OPT_mno_v850_fpu)) {
+    if (A->getOption().matches(options::OPT_mv850_fpu)) {
+      CmdArgs.push_back("-target-feature");
+      CmdArgs.push_back("+fpu");
+    } else {
+      CmdArgs.push_back("-target-feature");
+      CmdArgs.push_back("-fpu");
+    }
+  }
 }
 
 void Clang::DumpCompilationDatabase(Compilation &C, StringRef Filename,
