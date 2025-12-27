@@ -2158,8 +2158,9 @@ def CVTFSD : FormatFPU_CVT<0b00010, 0b000, 0b10, 0b1001,
 
 // CVTF.WS reg2, reg3 - Word (int32) to Single (subop2=0, cat=0, type=2, subop=1)
 def CVTFWS : FormatFPU_CVT<0b00000, 0b000, 0b10, 0b0001,
-                           (outs GPR:$reg3), (ins GPR:$reg2),
-                           "cvtf.ws\t$reg2, $reg3", []>;
+                           (outs FPR:$reg3), (ins GPR:$reg2),
+                           "cvtf.ws\t$reg2, $reg3",
+                           [(set FPR:$reg3, (sint_to_fp GPR:$reg2))]>;
 
 // CVTF.WD reg2, reg3 - Word (int32) to Double (subop2=0, cat=0, type=2, subop=9)
 def CVTFWD : FormatFPU_CVT<0b00000, 0b000, 0b10, 0b1001,
@@ -2252,8 +2253,9 @@ def CVTFDUL : FormatFPU_CVT<0b10100, 0b000, 0b10, 0b1010,
 // --- TRNCF (Truncate) - Signed ---
 // TRNCF.SW reg2, reg3 - Truncate Single to Word (subop2=1, cat=0, type=2, subop=0)
 def TRNCFSW : FormatFPU_CVT<0b00001, 0b000, 0b10, 0b0000,
-                            (outs GPR:$reg3), (ins GPR:$reg2),
-                            "trncf.sw\t$reg2, $reg3", []>;
+                            (outs GPR:$reg3), (ins FPR:$reg2),
+                            "trncf.sw\t$reg2, $reg3",
+                            [(set GPR:$reg3, (fp_to_sint FPR:$reg2))]>;
 
 // TRNCF.DW reg2, reg3 - Truncate Double to Word (subop2=1, cat=0, type=2, subop=8)
 def TRNCFDW : FormatFPU_CVT<0b00001, 0b000, 0b10, 0b1000,
