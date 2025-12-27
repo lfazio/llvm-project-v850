@@ -181,8 +181,56 @@ def DBPC  : V850SysReg<18, "dbpc">;
 // DBPSW - Debug PSW
 def DBPSW : V850SysReg<19, "dbpsw">;
 
+// V850E2M System Registers
+//===----------------------------------------------------------------------===//
+
+// SYSCALL registers (V850E2M+)
+// SCCFG - SYSCALL operation setting
+def SCCFG : V850SysReg<11, "sccfg">;
+
+// SCBP - SYSCALL base pointer
+def SCBP  : V850SysReg<12, "scbp">;
+
+// Exception handler working registers (V850E2M+)
+// EIWR - EI level working register
+def EIWR  : V850SysReg<28, "eiwr">;
+
+// FEWR - FE level working register
+def FEWR  : V850SysReg<29, "fewr">;
+
+// DBWR - DB level working register
+def DBWR  : V850SysReg<30, "dbwr">;
+
+// BSEL - Register bank selection
+def BSEL  : V850SysReg<31, "bsel">;
+
+//===----------------------------------------------------------------------===//
+// FPU System Registers (V850E2M+)
+// Accessed via LDSR/STSR with register banking (GRP=20H, BNK=00H)
+//===----------------------------------------------------------------------===//
+
+// FPSR - Floating-point configuration/status
+// Contains CC (condition codes), rounding mode, and exception flags
+def FPSR  : V850SysReg<6, "fpsr">;
+
+// FPEPC - Floating-point exception PC
+def FPEPC : V850SysReg<7, "fpepc">;
+
+// FPST - Floating-point status
+def FPST  : V850SysReg<8, "fpst">;
+
+// FPCC - Floating-point comparison result (8 condition code bits)
+def FPCC  : V850SysReg<9, "fpcc">;
+
+// FPCFG - Floating-point configuration
+def FPCFG : V850SysReg<10, "fpcfg">;
+
+// FPEC - Floating-point exception control
+def FPEC  : V850SysReg<11, "fpec">;
+
 // System register class - not allocatable, accessed via LDSR/STSR only
 def SysReg : RegisterClass<"V850", [i32], 32,
-    (add EIPC, EIPSW, FEPC, FEPSW, ECR, PSW, CTPC, CTPSW, CTBP, DBPC, DBPSW)> {
+    (add EIPC, EIPSW, FEPC, FEPSW, ECR, PSW, CTPC, CTPSW, CTBP, DBPC, DBPSW,
+     SCCFG, SCBP, EIWR, FEWR, DBWR, BSEL, FPSR, FPEPC, FPST, FPCC, FPCFG, FPEC)> {
   let isAllocatable = 0;
 }

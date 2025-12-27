@@ -1672,4 +1672,419 @@ def CAXI : FormatXI<0b111111, 0b000111, 0b01110, (outs GPR:$reg3),
                     "caxi\t[$reg1], $reg2, $reg3",
                     []>;
 
+//===----------------------------------------------------------------------===//
+// V850E2M FPU Instructions - Single Precision Arithmetic
+// Format F:I - 32-bit FPU instructions
+// Encoding: reg2[15:11], 111111[10:5], reg1[4:0] | reg3[31:27], subop[26:16]
+//===----------------------------------------------------------------------===//
+
+// ADDF.S reg1, reg2, reg3 - Single-precision floating-point add
+// reg3 = reg2 + reg1
+// Encoding: rrrrr111111RRRRR wwwww1000110000 0
+def ADDFS : FormatFPU_RRR<0b0000, (outs GPR:$reg3),
+                          (ins GPR:$reg2, GPR:$reg1),
+                          "addf.s\t$reg1, $reg2, $reg3",
+                          []>;
+
+// SUBF.S reg1, reg2, reg3 - Single-precision floating-point subtract
+// reg3 = reg2 - reg1
+// Encoding: rrrrr111111RRRRR wwwww1000110001 0
+def SUBFS : FormatFPU_RRR<0b0001, (outs GPR:$reg3),
+                          (ins GPR:$reg2, GPR:$reg1),
+                          "subf.s\t$reg1, $reg2, $reg3",
+                          []>;
+
+// MULF.S reg1, reg2, reg3 - Single-precision floating-point multiply
+// reg3 = reg2 * reg1
+// Encoding: rrrrr111111RRRRR wwwww1000110010 0
+def MULFS : FormatFPU_RRR<0b0010, (outs GPR:$reg3),
+                          (ins GPR:$reg2, GPR:$reg1),
+                          "mulf.s\t$reg1, $reg2, $reg3",
+                          []>;
+
+// DIVF.S reg1, reg2, reg3 - Single-precision floating-point divide
+// reg3 = reg2 / reg1
+// Encoding: rrrrr111111RRRRR wwwww1000110111 0
+def DIVFS : FormatFPU_RRR<0b0111, (outs GPR:$reg3),
+                          (ins GPR:$reg2, GPR:$reg1),
+                          "divf.s\t$reg1, $reg2, $reg3",
+                          []>;
+
+// MAXF.S reg1, reg2, reg3 - Single-precision floating-point maximum
+// reg3 = max(reg2, reg1)
+// Encoding: rrrrr111111RRRRR wwwww1000110100 0
+def MAXFS : FormatFPU_RRR<0b0100, (outs GPR:$reg3),
+                          (ins GPR:$reg2, GPR:$reg1),
+                          "maxf.s\t$reg1, $reg2, $reg3",
+                          []>;
+
+// MINF.S reg1, reg2, reg3 - Single-precision floating-point minimum
+// reg3 = min(reg2, reg1)
+// Encoding: rrrrr111111RRRRR wwwww1000110101 0
+def MINFS : FormatFPU_RRR<0b0101, (outs GPR:$reg3),
+                          (ins GPR:$reg2, GPR:$reg1),
+                          "minf.s\t$reg1, $reg2, $reg3",
+                          []>;
+
+//===----------------------------------------------------------------------===//
+// V850E2M FPU Instructions - Single Precision 2-Operand
+// Format F:I with reg1 = 0 (unused)
+//===----------------------------------------------------------------------===//
+
+// ABSF.S reg2, reg3 - Single-precision floating-point absolute value
+// reg3 = |reg2|
+// Encoding: rrrrr111111 00000 wwwww1000100100 0
+def ABSFS : FormatFPU_RR<0b0100, (outs GPR:$reg3),
+                         (ins GPR:$reg2),
+                         "absf.s\t$reg2, $reg3",
+                         []>;
+
+// NEGF.S reg2, reg3 - Single-precision floating-point negate
+// reg3 = -reg2
+// Encoding: rrrrr111111 00000 wwwww1000101000 0
+def NEGFS : FormatFPU_RR<0b1000, (outs GPR:$reg3),
+                         (ins GPR:$reg2),
+                         "negf.s\t$reg2, $reg3",
+                         []>;
+
+// SQRTF.S reg2, reg3 - Single-precision floating-point square root
+// reg3 = sqrt(reg2)
+// Encoding: rrrrr111111 00000 wwwww1000101110 0
+def SQRTFS : FormatFPU_RR<0b1110, (outs GPR:$reg3),
+                          (ins GPR:$reg2),
+                          "sqrtf.s\t$reg2, $reg3",
+                          []>;
+
+// RECIPF.S reg2, reg3 - Single-precision floating-point reciprocal
+// reg3 = 1 / reg2
+// Encoding: rrrrr111111 00001 wwwww1000101110 0
+let Defs = [FPSR] in
+def RECIPFS : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2),
+                         "recipf.s\t$reg2, $reg3",
+                         []> {
+  bits<5> reg2;
+  bits<5> reg3;
+
+  let Inst{15-11} = reg2;
+  let Inst{10-5}  = 0b111111;
+  let Inst{4-0}   = 0b00001;
+  let Inst{31-27} = reg3;
+  let Inst{26}    = 1;
+  let Inst{25-23} = 0b000;
+  let Inst{22-21} = 0b10;
+  let Inst{20-17} = 0b1110;
+  let Inst{16}    = 0;
+}
+
+// RSQRTF.S reg2, reg3 - Single-precision reciprocal square root
+// reg3 = 1 / sqrt(reg2)
+// Encoding: rrrrr111111 00010 wwwww1000101110 0
+let Defs = [FPSR] in
+def RSQRTFS : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2),
+                          "rsqrtf.s\t$reg2, $reg3",
+                          []> {
+  bits<5> reg2;
+  bits<5> reg3;
+
+  let Inst{15-11} = reg2;
+  let Inst{10-5}  = 0b111111;
+  let Inst{4-0}   = 0b00010;
+  let Inst{31-27} = reg3;
+  let Inst{26}    = 1;
+  let Inst{25-23} = 0b000;
+  let Inst{22-21} = 0b10;
+  let Inst{20-17} = 0b1110;
+  let Inst{16}    = 0;
+}
+
+//===----------------------------------------------------------------------===//
+// V850E2M FPU Instructions - Double Precision Arithmetic
+// Double precision uses even register pairs (r0, r2, r4, ..., r30)
+// For a 64-bit value, it uses {rN+1, rN} where N is even
+// The low bit of each register field (bits 0, 11, 27) must be 0 for double
+//===----------------------------------------------------------------------===//
+
+// ADDF.D reg1, reg2, reg3 - Double-precision floating-point add
+// reg3 = reg2 + reg1 (uses register pairs)
+// Encoding: rrrr0111111RRRR0 wwww01000111000 0
+def ADDFD : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2, GPR:$reg1),
+                       "addf.d\t$reg1, $reg2, $reg3", []> {
+  bits<5> reg1;
+  bits<5> reg2;
+  bits<5> reg3;
+
+  let Inst{15-12} = reg2{4-1};
+  let Inst{11}    = 0;              // Even register constraint
+  let Inst{10-5}  = 0b111111;
+  let Inst{4-1}   = reg1{4-1};
+  let Inst{0}     = 0;              // Even register constraint
+  let Inst{31-28} = reg3{4-1};
+  let Inst{27}    = 0;              // Even register constraint
+  let Inst{26}    = 1;
+  let Inst{25-23} = 0b000;
+  let Inst{22-21} = 0b11;
+  let Inst{20-17} = 0b1000;
+  let Inst{16}    = 0;
+}
+
+// SUBF.D reg1, reg2, reg3 - Double-precision floating-point subtract
+// reg3 = reg2 - reg1
+def SUBFD : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2, GPR:$reg1),
+                       "subf.d\t$reg1, $reg2, $reg3", []> {
+  bits<5> reg1;
+  bits<5> reg2;
+  bits<5> reg3;
+
+  let Inst{15-12} = reg2{4-1};
+  let Inst{11}    = 0;
+  let Inst{10-5}  = 0b111111;
+  let Inst{4-1}   = reg1{4-1};
+  let Inst{0}     = 0;
+  let Inst{31-28} = reg3{4-1};
+  let Inst{27}    = 0;
+  let Inst{26}    = 1;
+  let Inst{25-23} = 0b000;
+  let Inst{22-21} = 0b11;
+  let Inst{20-17} = 0b1001;
+  let Inst{16}    = 0;
+}
+
+// MULF.D reg1, reg2, reg3 - Double-precision floating-point multiply
+// reg3 = reg2 * reg1
+def MULFD : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2, GPR:$reg1),
+                       "mulf.d\t$reg1, $reg2, $reg3", []> {
+  bits<5> reg1;
+  bits<5> reg2;
+  bits<5> reg3;
+
+  let Inst{15-12} = reg2{4-1};
+  let Inst{11}    = 0;
+  let Inst{10-5}  = 0b111111;
+  let Inst{4-1}   = reg1{4-1};
+  let Inst{0}     = 0;
+  let Inst{31-28} = reg3{4-1};
+  let Inst{27}    = 0;
+  let Inst{26}    = 1;
+  let Inst{25-23} = 0b000;
+  let Inst{22-21} = 0b11;
+  let Inst{20-17} = 0b1010;
+  let Inst{16}    = 0;
+}
+
+// DIVF.D reg1, reg2, reg3 - Double-precision floating-point divide
+// reg3 = reg2 / reg1
+def DIVFD : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2, GPR:$reg1),
+                       "divf.d\t$reg1, $reg2, $reg3", []> {
+  bits<5> reg1;
+  bits<5> reg2;
+  bits<5> reg3;
+
+  let Inst{15-12} = reg2{4-1};
+  let Inst{11}    = 0;
+  let Inst{10-5}  = 0b111111;
+  let Inst{4-1}   = reg1{4-1};
+  let Inst{0}     = 0;
+  let Inst{31-28} = reg3{4-1};
+  let Inst{27}    = 0;
+  let Inst{26}    = 1;
+  let Inst{25-23} = 0b000;
+  let Inst{22-21} = 0b11;
+  let Inst{20-17} = 0b1111;
+  let Inst{16}    = 0;
+}
+
+// MAXF.D reg1, reg2, reg3 - Double-precision floating-point maximum
+// reg3 = max(reg2, reg1)
+def MAXFD : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2, GPR:$reg1),
+                       "maxf.d\t$reg1, $reg2, $reg3", []> {
+  bits<5> reg1;
+  bits<5> reg2;
+  bits<5> reg3;
+
+  let Inst{15-12} = reg2{4-1};
+  let Inst{11}    = 0;
+  let Inst{10-5}  = 0b111111;
+  let Inst{4-1}   = reg1{4-1};
+  let Inst{0}     = 0;
+  let Inst{31-28} = reg3{4-1};
+  let Inst{27}    = 0;
+  let Inst{26}    = 1;
+  let Inst{25-23} = 0b000;
+  let Inst{22-21} = 0b11;
+  let Inst{20-17} = 0b1100;
+  let Inst{16}    = 0;
+}
+
+// MINF.D reg1, reg2, reg3 - Double-precision floating-point minimum
+// reg3 = min(reg2, reg1)
+def MINFD : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2, GPR:$reg1),
+                       "minf.d\t$reg1, $reg2, $reg3", []> {
+  bits<5> reg1;
+  bits<5> reg2;
+  bits<5> reg3;
+
+  let Inst{15-12} = reg2{4-1};
+  let Inst{11}    = 0;
+  let Inst{10-5}  = 0b111111;
+  let Inst{4-1}   = reg1{4-1};
+  let Inst{0}     = 0;
+  let Inst{31-28} = reg3{4-1};
+  let Inst{27}    = 0;
+  let Inst{26}    = 1;
+  let Inst{25-23} = 0b000;
+  let Inst{22-21} = 0b11;
+  let Inst{20-17} = 0b1101;
+  let Inst{16}    = 0;
+}
+
+//===----------------------------------------------------------------------===//
+// V850E2M FPU Instructions - Double Precision 2-Operand
+//===----------------------------------------------------------------------===//
+
+// ABSF.D reg2, reg3 - Double-precision floating-point absolute value
+// reg3 = |reg2|
+def ABSFD : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2),
+                       "absf.d\t$reg2, $reg3", []> {
+  bits<5> reg2;
+  bits<5> reg3;
+
+  let Inst{15-12} = reg2{4-1};
+  let Inst{11}    = 0;
+  let Inst{10-5}  = 0b111111;
+  let Inst{4-0}   = 0;
+  let Inst{31-28} = reg3{4-1};
+  let Inst{27}    = 0;
+  let Inst{26}    = 1;
+  let Inst{25-23} = 0b000;
+  let Inst{22-21} = 0b10;
+  let Inst{20-17} = 0b1100;
+  let Inst{16}    = 0;
+}
+
+// NEGF.D reg2, reg3 - Double-precision floating-point negate
+// reg3 = -reg2
+def NEGFD : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2),
+                       "negf.d\t$reg2, $reg3", []> {
+  bits<5> reg2;
+  bits<5> reg3;
+
+  let Inst{15-12} = reg2{4-1};
+  let Inst{11}    = 0;
+  let Inst{10-5}  = 0b111111;
+  let Inst{4-0}   = 0b00001;
+  let Inst{31-28} = reg3{4-1};
+  let Inst{27}    = 0;
+  let Inst{26}    = 1;
+  let Inst{25-23} = 0b000;
+  let Inst{22-21} = 0b10;
+  let Inst{20-17} = 0b1000;
+  let Inst{16}    = 0;
+}
+
+// SQRTF.D reg2, reg3 - Double-precision floating-point square root
+// reg3 = sqrt(reg2)
+def SQRTFD : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2),
+                        "sqrtf.d\t$reg2, $reg3", []> {
+  bits<5> reg2;
+  bits<5> reg3;
+
+  let Inst{15-12} = reg2{4-1};
+  let Inst{11}    = 0;
+  let Inst{10-5}  = 0b111111;
+  let Inst{4-0}   = 0;
+  let Inst{31-28} = reg3{4-1};
+  let Inst{27}    = 0;
+  let Inst{26}    = 1;
+  let Inst{25-23} = 0b000;
+  let Inst{22-21} = 0b10;
+  let Inst{20-17} = 0b1110;
+  let Inst{16}    = 0;
+}
+
+// RECIPF.D reg2, reg3 - Double-precision floating-point reciprocal
+// reg3 = 1 / reg2
+let Defs = [FPSR] in
+def RECIPFD : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2),
+                         "recipf.d\t$reg2, $reg3", []> {
+  bits<5> reg2;
+  bits<5> reg3;
+
+  let Inst{15-12} = reg2{4-1};
+  let Inst{11}    = 0;
+  let Inst{10-5}  = 0b111111;
+  let Inst{4-0}   = 0b00001;
+  let Inst{31-28} = reg3{4-1};
+  let Inst{27}    = 0;
+  let Inst{26}    = 1;
+  let Inst{25-23} = 0b000;
+  let Inst{22-21} = 0b10;
+  let Inst{20-17} = 0b1110;
+  let Inst{16}    = 0;
+}
+
+// RSQRTF.D reg2, reg3 - Double-precision reciprocal square root
+// reg3 = 1 / sqrt(reg2)
+let Defs = [FPSR] in
+def RSQRTFD : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2),
+                          "rsqrtf.d\t$reg2, $reg3", []> {
+  bits<5> reg2;
+  bits<5> reg3;
+
+  let Inst{15-12} = reg2{4-1};
+  let Inst{11}    = 0;
+  let Inst{10-5}  = 0b111111;
+  let Inst{4-0}   = 0b00010;
+  let Inst{31-28} = reg3{4-1};
+  let Inst{27}    = 0;
+  let Inst{26}    = 1;
+  let Inst{25-23} = 0b000;
+  let Inst{22-21} = 0b10;
+  let Inst{20-17} = 0b1110;
+  let Inst{16}    = 0;
+}
+
+//===----------------------------------------------------------------------===//
+// V850E2M FPU Instructions - Multiply-Add (Single Precision Only)
+// Format: reg4 = (reg2 * reg1) +/- reg3
+//===----------------------------------------------------------------------===//
+
+// MADDF.S reg1, reg2, reg3, reg4 - Floating-point multiply-add
+// reg4 = (reg2 * reg1) + reg3
+def MADDFS : FormatFPU_RRRR<0b00, (outs GPR:$reg4),
+                            (ins GPR:$reg2, GPR:$reg1, GPR:$reg3),
+                            "maddf.s\t$reg1, $reg2, $reg3, $reg4",
+                            []>;
+
+// MSUBF.S reg1, reg2, reg3, reg4 - Floating-point multiply-subtract
+// reg4 = (reg2 * reg1) - reg3
+def MSUBFS : FormatFPU_RRRR<0b01, (outs GPR:$reg4),
+                            (ins GPR:$reg2, GPR:$reg1, GPR:$reg3),
+                            "msubf.s\t$reg1, $reg2, $reg3, $reg4",
+                            []>;
+
+// NMADDF.S reg1, reg2, reg3, reg4 - Floating-point negate multiply-add
+// reg4 = -((reg2 * reg1) + reg3)
+def NMADDFS : FormatFPU_RRRR<0b10, (outs GPR:$reg4),
+                             (ins GPR:$reg2, GPR:$reg1, GPR:$reg3),
+                             "nmaddf.s\t$reg1, $reg2, $reg3, $reg4",
+                             []>;
+
+// NMSUBF.S reg1, reg2, reg3, reg4 - Floating-point negate multiply-subtract
+// reg4 = -((reg2 * reg1) - reg3)
+def NMSUBFS : FormatFPU_RRRR<0b11, (outs GPR:$reg4),
+                             (ins GPR:$reg2, GPR:$reg1, GPR:$reg3),
+                             "nmsubf.s\t$reg1, $reg2, $reg3, $reg4",
+                             []>;
+
+//===----------------------------------------------------------------------===//
+// V850E2M FPU Instructions - Transfer FPSR to PSW
+//===----------------------------------------------------------------------===//
+
+// TRFSR fcbit - Transfer floating-point condition to PSW.Z
+// PSW.Z = FPCC[fcbit]
+let Defs = [PSW], Uses = [FPCC] in
+def TRFSR : FormatFPU_TRFSR<(outs), (ins uimm3:$fcbit),
+                            "trfsr\t$fcbit",
+                            []>;
+
 } // Predicates = [HasV850E2M]

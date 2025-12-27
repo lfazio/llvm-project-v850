@@ -406,3 +406,120 @@ class FormatVI_E2<bits<6> opcode, dag outs, dag ins, string asmstr, list<dag> pa
   let Inst{47-32} = disp32{31-16};    // disp32[31:16]
 }
 
+//===----------------------------------------------------------------------===//
+// Format F:I - FPU Instructions (32-bit) - V850E2M+
+//
+// FPU instructions use Format F:I with:
+// First halfword:  15-11 = reg2, 10-5 = 111111 (FPU opcode), 4-0 = reg1
+// Second halfword: 31-27 = reg3, 26-16 = sub-opcode/category/type fields
+//
+// Single-precision: uses all 5 bits of registers
+// Double-precision: uses even registers (bit 0 = 0), uses pairs {rN+1, rN}
+//
+// Sub-opcode encoding varies by instruction type:
+// - Arithmetic (ADDF/SUBF/MULF/DIVF): bits 26=1, 25-23=000, 22-21=11, 20-17=subop
+// - 2-operand (ABSF/NEGF/SQRTF): bits 26=1, 25-23=000, 22-21=10, 20-17=subop
+// - Comparison (CMPF): bits 26=1, 25-23=000, 22-21=0F, 20-17=fff0 (fcbit)
+// - Conversion: various category/type combinations
+//===----------------------------------------------------------------------===//
+
+// Base class for FPU 3-operand instructions: reg3 = reg2 op reg1
+// Used for: ADDF, SUBF, MULF, DIVF, MAXF, MINF
+class FormatFPU_RRR<bits<4> subop, dag outs, dag ins, string asmstr,
+                    list<dag> pattern>
+    : V850Inst32<outs, ins, asmstr, pattern> {
+  bits<5> reg1;
+  bits<5> reg2;
+  bits<5> reg3;
+
+  let Inst{15-11} = reg2;
+  let Inst{10-5}  = 0b111111;         // FPU opcode
+  let Inst{4-0}   = reg1;
+  let Inst{31-27} = reg3;
+  let Inst{26}    = 1;
+  let Inst{25-23} = 0b000;            // Category
+  let Inst{22-21} = 0b11;             // Type (arithmetic)
+  let Inst{20-17} = subop;
+  let Inst{16}    = 0;
+}
+
+// Base class for FPU 2-operand instructions: reg3 = op(reg2)
+// Used for: ABSF, NEGF, SQRTF, RECIPF, RSQRTF
+class FormatFPU_RR<bits<4> subop, dag outs, dag ins, string asmstr,
+                   list<dag> pattern>
+    : V850Inst32<outs, ins, asmstr, pattern> {
+  bits<5> reg2;
+  bits<5> reg3;
+
+  let Inst{15-11} = reg2;
+  let Inst{10-5}  = 0b111111;         // FPU opcode
+  let Inst{4-0}   = 0;                // reg1 unused
+  let Inst{31-27} = reg3;
+  let Inst{26}    = 1;
+  let Inst{25-23} = 0b000;            // Category
+  let Inst{22-21} = 0b10;             // Type (2-operand)
+  let Inst{20-17} = subop;
+  let Inst{16}    = 0;
+}
+
+// Note: FPU comparison instructions (CMPF.S, CMPF.D) have complex encoding
+// with fcond in bits 31-27 and fcbit in bits 20-18. Define these directly
+// in V850InstrInfo.td using V850Inst32 base class when needed.
+
+// Base class for FPU 4-operand instructions: reg4 = (reg2 * reg1) +/- reg3
+// Used for: MADDF.S, MSUBF.S, NMADDF.S, NMSUBF.S
+// reg4 is encoded across bits 26 and 20-17
+class FormatFPU_RRRR<bits<2> subop, dag outs, dag ins, string asmstr,
+                     list<dag> pattern>
+    : V850Inst32<outs, ins, asmstr, pattern> {
+  bits<5> reg1;
+  bits<5> reg2;
+  bits<5> reg3;
+  bits<5> reg4;
+
+  let Inst{15-11} = reg2;
+  let Inst{10-5}  = 0b111111;         // FPU opcode
+  let Inst{4-0}   = reg1;
+  let Inst{31-27} = reg3;
+  let Inst{26}    = reg4{4};          // reg4 bit 4
+  let Inst{25-23} = 0b101;            // Category for MADD
+  let Inst{22-21} = subop;            // 00=MADDF, 01=MSUBF, 10=NMADDF, 11=NMSUBF
+  let Inst{20-17} = reg4{3-0};        // reg4 bits 3-0
+  let Inst{16}    = 0;
+}
+
+// Base class for FPU conversion instructions: reg3 = convert(reg2)
+// The category and type bits vary based on source/dest types
+class FormatFPU_CVT<bits<5> subop2, bits<3> category, bits<2> type,
+                    dag outs, dag ins, string asmstr, list<dag> pattern>
+    : V850Inst32<outs, ins, asmstr, pattern> {
+  bits<5> reg2;
+  bits<5> reg3;
+
+  let Inst{15-11} = reg2;
+  let Inst{10-5}  = 0b111111;         // FPU opcode
+  let Inst{4-0}   = subop2;           // Additional sub-opcode or 0
+  let Inst{31-27} = reg3;
+  let Inst{26}    = 1;
+  let Inst{25-23} = category;
+  let Inst{22-21} = type;
+  let Inst{20-17} = 0;                // Usually 0 for conversions
+  let Inst{16}    = 0;
+}
+
+// TRFSR - Transfer floating-point status to PSW.Z
+class FormatFPU_TRFSR<dag outs, dag ins, string asmstr, list<dag> pattern>
+    : V850Inst32<outs, ins, asmstr, pattern> {
+  bits<3> fcbit;
+
+  let Inst{15-11} = 0;
+  let Inst{10-5}  = 0b111111;         // FPU opcode
+  let Inst{4-0}   = 0;
+  let Inst{31-27} = 0;
+  let Inst{26}    = 1;
+  let Inst{25-23} = 0b000;
+  let Inst{22-21} = 0b00;
+  let Inst{20-17} = {fcbit, 0};
+  let Inst{16}    = 0;
+}
+

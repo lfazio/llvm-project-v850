@@ -1,0 +1,5 @@
+// RUN: llvm-mc -triple=v850 -mcpu=v850e2m -show-encoding %s | FileCheck %s
+
+// MAXF.S - Single-precision floating-point maximum
+// CHECK: maxf.s r6, r7, r10 ; encoding: [0xe6,0x3f,0x68,0x54]
+maxf.s r6, r7, r10
