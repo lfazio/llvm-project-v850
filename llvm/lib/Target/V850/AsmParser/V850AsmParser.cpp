@@ -64,6 +64,7 @@ class V850AsmParser : public MCTargetAsmParser {
   ParseStatus parseImmediate(OperandVector &Operands);
   ParseStatus parseBranchTarget(OperandVector &Operands);
   ParseStatus parseCondCode(OperandVector &Operands);
+  ParseStatus parseFPCondCode(OperandVector &Operands);
 
   MCRegister matchRegisterName(StringRef Name);
   MCRegister matchRegisterAltName(StringRef Name);
@@ -75,6 +76,11 @@ class V850AsmParser : public MCTargetAsmParser {
 #include "V850GenAsmMatcher.inc"
 
   ParseStatus parseDirective(AsmToken DirectiveID) override;
+
+  /// Validate register pair constraints for double-precision FPU instructions.
+  /// Returns true if validation fails (odd register used where even required).
+  bool validateFPURegisterPair(StringRef Mnemonic, const OperandVector &Operands,
+                               SMLoc IDLoc);
 
 public:
   V850AsmParser(const MCSubtargetInfo &STI, MCAsmParser &Parser,
@@ -447,6 +453,13 @@ ParseStatus V850AsmParser::parseOperand(OperandVector &Operands,
   if (getLexer().is(AsmToken::LBrac))
     return parseMemoryOperand(Operands);
 
+  // For FPU comparison instructions, try FP condition codes first
+  // These have priority over regular condition codes for cmpf.s/cmpf.d
+  if (Mnemonic.starts_with("cmpf.")) {
+    if (parseFPCondCode(Operands).isSuccess())
+      return ParseStatus::Success;
+  }
+
   // Try to parse as a condition code (for cmov, setf, sasf, adf, sbf, etc.)
   if (parseCondCode(Operands).isSuccess())
     return ParseStatus::Success;
@@ -550,6 +563,46 @@ ParseStatus V850AsmParser::parseCondCode(OperandVector &Operands) {
   return ParseStatus::Success;
 }
 
+ParseStatus V850AsmParser::parseFPCondCode(OperandVector &Operands) {
+  SMLoc StartLoc = Parser.getTok().getLoc();
+
+  if (Parser.getTok().isNot(AsmToken::Identifier))
+    return ParseStatus::NoMatch;
+
+  StringRef Name = Parser.getTok().getString();
+
+  // Map FPU condition code names to their numeric values (4-bit encoding)
+  // These are used by CMPF.S and CMPF.D instructions
+  int FCondVal = StringSwitch<int>(Name.lower())
+      .Case("f", 0)       // False
+      .Case("un", 1)      // Unordered
+      .Case("eq", 2)      // Equal
+      .Case("ueq", 3)     // Unordered or Equal
+      .Case("olt", 4)     // Ordered Less Than
+      .Case("ult", 5)     // Unordered or Less Than
+      .Case("ole", 6)     // Ordered Less or Equal
+      .Case("ule", 7)     // Unordered or Less or Equal
+      .Case("sf", 8)      // Signaling False
+      .Case("ngle", 9)    // Not Greater, Less, or Equal
+      .Case("seq", 10)    // Signaling Equal
+      .Case("ngl", 11)    // Not Greater or Less
+      .Case("lt", 12)     // Less Than
+      .Case("nge", 13)    // Not Greater or Equal
+      .Case("le", 14)     // Less or Equal
+      .Case("ngt", 15)    // Not Greater Than
+      .Default(-1);
+
+  if (FCondVal < 0)
+    return ParseStatus::NoMatch;
+
+  SMLoc EndLoc = Parser.getTok().getEndLoc();
+  Parser.Lex(); // Consume the FP condition code token
+
+  const MCExpr *Expr = MCConstantExpr::create(FCondVal, getContext());
+  Operands.push_back(V850Operand::createImm(Expr, StartLoc, EndLoc));
+  return ParseStatus::Success;
+}
+
 bool V850AsmParser::parseInstruction(ParseInstructionInfo &Info, StringRef Name,
                                       SMLoc NameLoc, OperandVector &Operands) {
   // Add the mnemonic as first operand
@@ -579,6 +632,133 @@ bool V850AsmParser::parseInstruction(ParseInstructionInfo &Info, StringRef Name,
   return false;
 }
 
+bool V850AsmParser::validateFPURegisterPair(StringRef Mnemonic,
+                                             const OperandVector &Operands,
+                                             SMLoc IDLoc) {
+  // Double-precision FPU instructions require even-numbered registers for
+  // register pairs. Validate the appropriate operands based on instruction.
+
+  // Helper to check if a register operand is even-numbered
+  auto isEvenRegister = [&](const MCParsedAsmOperand &Op) -> bool {
+    const V850Operand &VOp = static_cast<const V850Operand &>(Op);
+    if (!VOp.isReg())
+      return true; // Not a register, skip validation
+    MCRegister Reg = VOp.getReg();
+    unsigned RegNo = MRI.getEncodingValue(Reg);
+    return (RegNo & 1) == 0;
+  };
+
+  // Get error location from operand if possible
+  auto getOperandLoc = [&](unsigned Idx) -> SMLoc {
+    if (Idx < Operands.size()) {
+      const V850Operand &VOp = static_cast<const V850Operand &>(*Operands[Idx]);
+      return VOp.getStartLoc();
+    }
+    return IDLoc;
+  };
+
+  // Double-precision arithmetic: addf.d, subf.d, mulf.d, divf.d, maxf.d, minf.d
+  // Format: op reg1, reg2, reg3 - all three registers must be even
+  if (Mnemonic == "addf.d" || Mnemonic == "subf.d" || Mnemonic == "mulf.d" ||
+      Mnemonic == "divf.d" || Mnemonic == "maxf.d" || Mnemonic == "minf.d") {
+    // Operands: [mnemonic, reg1, reg2, reg3]
+    for (unsigned i = 1; i <= 3 && i < Operands.size(); ++i) {
+      if (!isEvenRegister(*Operands[i])) {
+        Error(getOperandLoc(i),
+              "double-precision FPU instruction requires even-numbered register");
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Double-precision unary: absf.d, negf.d, sqrtf.d, recipf.d, rsqrtf.d
+  // Format: op reg1, reg2 - both registers must be even
+  if (Mnemonic == "absf.d" || Mnemonic == "negf.d" || Mnemonic == "sqrtf.d" ||
+      Mnemonic == "recipf.d" || Mnemonic == "rsqrtf.d") {
+    for (unsigned i = 1; i <= 2 && i < Operands.size(); ++i) {
+      if (!isEvenRegister(*Operands[i])) {
+        Error(getOperandLoc(i),
+              "double-precision FPU instruction requires even-numbered register");
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Double-precision comparison: cmpf.d fcond, reg1, reg2, fcbit
+  // reg1 and reg2 must be even (operands 2 and 3)
+  if (Mnemonic == "cmpf.d") {
+    for (unsigned i = 2; i <= 3 && i < Operands.size(); ++i) {
+      if (!isEvenRegister(*Operands[i])) {
+        Error(getOperandLoc(i),
+              "double-precision FPU instruction requires even-numbered register");
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Conversion from double: cvtf.ds, cvtf.dw, cvtf.dl, cvtf.duw, cvtf.dul
+  // Format: op reg1, reg2 - reg1 (source double) must be even
+  if (Mnemonic == "cvtf.ds" || Mnemonic == "cvtf.dw" || Mnemonic == "cvtf.dl" ||
+      Mnemonic == "cvtf.duw" || Mnemonic == "cvtf.dul") {
+    if (Operands.size() > 1 && !isEvenRegister(*Operands[1])) {
+      Error(getOperandLoc(1),
+            "double-precision source register must be even-numbered");
+      return true;
+    }
+    return false;
+  }
+
+  // Conversion to double: cvtf.sd, cvtf.wd, cvtf.ld, cvtf.uwd, cvtf.uld
+  // Format: op reg1, reg2 - reg2 (dest double) must be even
+  if (Mnemonic == "cvtf.sd" || Mnemonic == "cvtf.wd" || Mnemonic == "cvtf.ld" ||
+      Mnemonic == "cvtf.uwd" || Mnemonic == "cvtf.uld") {
+    if (Operands.size() > 2 && !isEvenRegister(*Operands[2])) {
+      Error(getOperandLoc(2),
+            "double-precision destination register must be even-numbered");
+      return true;
+    }
+    return false;
+  }
+
+  // Rounding from double: trncf.d*, ceilf.d*, floorf.d*, cvtf.d* (to integer)
+  // Format: op reg1, reg2 - reg1 (source double) must be even
+  if (Mnemonic.starts_with("trncf.d") || Mnemonic.starts_with("ceilf.d") ||
+      Mnemonic.starts_with("floorf.d")) {
+    if (Operands.size() > 1 && !isEvenRegister(*Operands[1])) {
+      Error(getOperandLoc(1),
+            "double-precision source register must be even-numbered");
+      return true;
+    }
+    // For long output (64-bit), dest must also be even
+    if (Mnemonic.ends_with("l") || Mnemonic.ends_with("ul")) {
+      if (Operands.size() > 2 && !isEvenRegister(*Operands[2])) {
+        Error(getOperandLoc(2),
+              "64-bit destination register must be even-numbered");
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Rounding from single to long: trncf.sl, trncf.sul, ceilf.sl, etc.
+  // Format: op reg1, reg2 - reg2 (dest long) must be even
+  if ((Mnemonic.starts_with("trncf.s") || Mnemonic.starts_with("ceilf.s") ||
+       Mnemonic.starts_with("floorf.s")) &&
+      (Mnemonic.ends_with("l") || Mnemonic.ends_with("ul"))) {
+    if (Operands.size() > 2 && !isEvenRegister(*Operands[2])) {
+      Error(getOperandLoc(2),
+            "64-bit destination register must be even-numbered");
+      return true;
+    }
+    return false;
+  }
+
+  return false;
+}
+
 bool V850AsmParser::matchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
                                              OperandVector &Operands,
                                              MCStreamer &Out,
@@ -594,10 +774,23 @@ bool V850AsmParser::matchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
   switch (Result) {
   default:
     break;
-  case Match_Success:
+  case Match_Success: {
+    // Get the mnemonic for register pair validation
+    StringRef Mnemonic;
+    if (!Operands.empty()) {
+      const V850Operand &Op = static_cast<const V850Operand &>(*Operands[0]);
+      if (Op.isToken())
+        Mnemonic = Op.getToken();
+    }
+
+    // Validate register pair constraints for double-precision FPU instructions
+    if (validateFPURegisterPair(Mnemonic, Operands, IDLoc))
+      return true;
+
     Inst.setLoc(IDLoc);
     Out.emitInstruction(Inst, getSTI());
     return false;
+  }
   case Match_MissingFeature:
     return Error(IDLoc, "instruction requires a CPU feature not available");
   case Match_InvalidOperand: {
