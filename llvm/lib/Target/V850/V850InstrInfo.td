@@ -41,6 +41,11 @@ def uimm3 : Operand<i32>, ImmLeaf<i32, [{return isUInt<3>(Imm);}]> {
   let DecoderMethod = "decodeUImmOperand<3>";
 }
 
+// 4-bit unsigned immediate (for FPU condition codes)
+def uimm4 : Operand<i32>, ImmLeaf<i32, [{return isUInt<4>(Imm);}]> {
+  let DecoderMethod = "decodeUImmOperand<4>";
+}
+
 // 7-bit unsigned immediate (for short load/store displacement)
 def uimm7 : Operand<i32>, ImmLeaf<i32, [{return isUInt<7>(Imm);}]> {
   let DecoderMethod = "decodeUImmOperand<7>";
@@ -2086,5 +2091,44 @@ let Defs = [PSW], Uses = [FPCC] in
 def TRFSR : FormatFPU_TRFSR<(outs), (ins uimm3:$fcbit),
                             "trfsr\t$fcbit",
                             []>;
+
+//===----------------------------------------------------------------------===//
+// V850E2M FPU Instructions - Comparison
+// CMPF.S/CMPF.D - Compare floating-point values
+// Sets FPCC[fcbit] based on comparison result using condition fcond
+//
+// fcond values:
+//   0 (F)    - False
+//   1 (UN)   - Unordered
+//   2 (EQ)   - Equal
+//   3 (UEQ)  - Unordered or Equal
+//   4 (OLT)  - Ordered Less Than
+//   5 (ULT)  - Unordered or Less Than
+//   6 (OLE)  - Ordered Less or Equal
+//   7 (ULE)  - Unordered or Less or Equal
+//   8 (SF)   - Signaling False
+//   9 (NGLE) - Not Greater, Less, or Equal
+//  10 (SEQ)  - Signaling Equal
+//  11 (NGL)  - Not Greater or Less
+//  12 (LT)   - Less Than
+//  13 (NGE)  - Not Greater or Equal
+//  14 (LE)   - Less or Equal
+//  15 (NGT)  - Not Greater Than
+//===----------------------------------------------------------------------===//
+
+// CMPF.S fcond, reg1, reg2, fcbit - Single-precision compare
+// FPCC[fcbit] = reg2 cmp reg1 (using fcond)
+let Defs = [FPCC] in
+def CMPFS : FormatFPU_CMP<0, (outs), (ins uimm4:$fcond, GPR:$reg1, GPR:$reg2, uimm3:$fcbit),
+                          "cmpf.s\t$fcond, $reg1, $reg2, $fcbit",
+                          []>;
+
+// CMPF.D fcond, reg1, reg2, fcbit - Double-precision compare
+// FPCC[fcbit] = reg2 cmp reg1 (using fcond)
+// Note: reg1 and reg2 must be even registers (specify lower register of pair)
+let Defs = [FPCC] in
+def CMPFD : FormatFPU_CMP<1, (outs), (ins uimm4:$fcond, GPR:$reg1, GPR:$reg2, uimm3:$fcbit),
+                          "cmpf.d\t$fcond, $reg1, $reg2, $fcbit",
+                          []>;
 
 } // Predicates = [HasV850E2M]

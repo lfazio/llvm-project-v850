@@ -523,3 +523,25 @@ class FormatFPU_TRFSR<dag outs, dag ins, string asmstr, list<dag> pattern>
   let Inst{16}    = 0;
 }
 
+// Base class for FPU comparison instructions: FPCC[fcbit] = reg2 cmp reg1
+// Used for: CMPF.S, CMPF.D
+// Encoding: reg2[15:11], 111111[10:5], reg1[4:0] | 0fcond[31:27], 1000011[26:20], fcbit[19:17], dbl[16]
+class FormatFPU_CMP<bit dbl, dag outs, dag ins, string asmstr, list<dag> pattern>
+    : V850Inst32<outs, ins, asmstr, pattern> {
+  bits<5> reg1;
+  bits<5> reg2;
+  bits<4> fcond;
+  bits<3> fcbit;
+
+  let Inst{15-11} = reg2;
+  let Inst{10-5}  = 0b111111;         // FPU opcode
+  let Inst{4-0}   = reg1;
+  let Inst{31}    = 0;
+  let Inst{30-27} = fcond;
+  let Inst{26}    = 1;
+  let Inst{25-23} = 0b000;
+  let Inst{22-20} = 0b011;
+  let Inst{19-17} = fcbit;
+  let Inst{16}    = dbl;
+}
+
