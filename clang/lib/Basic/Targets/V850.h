@@ -28,6 +28,7 @@ class LLVM_LIBRARY_VISIBILITY V850TargetInfo : public TargetInfo {
     CK_NONE,
     CK_V850,
     CK_V850E1,
+    CK_V850ES,  // V850ES has same ISA as V850E1
     CK_V850E2,
     CK_V850E2M,
     CK_V850E3,
@@ -88,6 +89,7 @@ public:
         .Case("v850", true)
         .Case("v850e", CPU >= CK_V850E1)
         .Case("v850e1", CPU >= CK_V850E1)
+        .Case("v850es", CPU >= CK_V850E1)  // V850ES has same ISA as V850E1
         .Case("v850e2", CPU >= CK_V850E2)
         .Case("v850e2m", CPU >= CK_V850E2M)
         .Case("v850e3", CPU >= CK_V850E3)
