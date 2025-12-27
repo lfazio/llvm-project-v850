@@ -424,17 +424,32 @@ class FormatVI_E2<bits<6> opcode, dag outs, dag ins, string asmstr, list<dag> pa
 //===----------------------------------------------------------------------===//
 
 
-// Base class for FPU 3-operand instructions: reg3 = reg2 op reg1
+//===----------------------------------------------------------------------===//
+// Format F:I - FPU Instructions (32-bit)
+// All FPU instructions share the 111111 opcode in bits 10-5
+//
+// Layout: reg2[15:11] | 111111[10:5] | reg1/subop2[4:0] |
+//         reg3/fcond[31:27] | bit26 | category[25:23] | type[22:21] |
+//         subop[20:17] | bit16
+//===----------------------------------------------------------------------===//
+
+// Base class for all FPU instructions (Format F:I)
+class FormatFI<dag outs, dag ins, string asmstr, list<dag> pattern>
+    : V850Inst32<outs, ins, asmstr, pattern> {
+  // Common FPU opcode in bits 10-5
+  let Inst{10-5} = 0b111111;
+}
+
+// FPU 3-operand instructions: reg3 = reg2 op reg1
 // Used for: ADDF, SUBF, MULF, DIVF, MAXF, MINF
 class FormatFPU_RRR<bits<4> subop, dag outs, dag ins, string asmstr,
                     list<dag> pattern>
-    : V850Inst32<outs, ins, asmstr, pattern> {
+    : FormatFI<outs, ins, asmstr, pattern> {
   bits<5> reg1;
   bits<5> reg2;
   bits<5> reg3;
 
   let Inst{15-11} = reg2;
-  let Inst{10-5}  = 0b111111;         // FPU opcode
   let Inst{4-0}   = reg1;
   let Inst{31-27} = reg3;
   let Inst{26}    = 1;
@@ -444,16 +459,15 @@ class FormatFPU_RRR<bits<4> subop, dag outs, dag ins, string asmstr,
   let Inst{16}    = 0;
 }
 
-// Base class for FPU 2-operand instructions: reg3 = op(reg2)
+// FPU 2-operand instructions: reg3 = op(reg2)
 // Used for: ABSF, NEGF, SQRTF, RECIPF, RSQRTF
 class FormatFPU_RR<bits<4> subop, dag outs, dag ins, string asmstr,
                    list<dag> pattern>
-    : V850Inst32<outs, ins, asmstr, pattern> {
+    : FormatFI<outs, ins, asmstr, pattern> {
   bits<5> reg2;
   bits<5> reg3;
 
   let Inst{15-11} = reg2;
-  let Inst{10-5}  = 0b111111;         // FPU opcode
   let Inst{4-0}   = 0;                // reg1 unused
   let Inst{31-27} = reg3;
   let Inst{26}    = 1;
@@ -463,23 +477,18 @@ class FormatFPU_RR<bits<4> subop, dag outs, dag ins, string asmstr,
   let Inst{16}    = 0;
 }
 
-// Note: FPU comparison instructions (CMPF.S, CMPF.D) have complex encoding
-// with fcond in bits 31-27 and fcbit in bits 20-18. Define these directly
-// in V850InstrInfo.td using V850Inst32 base class when needed.
-
-// Base class for FPU 4-operand instructions: reg4 = (reg2 * reg1) +/- reg3
+// FPU 4-operand instructions: reg4 = (reg2 * reg1) +/- reg3
 // Used for: MADDF.S, MSUBF.S, NMADDF.S, NMSUBF.S
 // reg4 is encoded across bits 26 and 20-17
 class FormatFPU_RRRR<bits<2> subop, dag outs, dag ins, string asmstr,
                      list<dag> pattern>
-    : V850Inst32<outs, ins, asmstr, pattern> {
+    : FormatFI<outs, ins, asmstr, pattern> {
   bits<5> reg1;
   bits<5> reg2;
   bits<5> reg3;
   bits<5> reg4;
 
   let Inst{15-11} = reg2;
-  let Inst{10-5}  = 0b111111;         // FPU opcode
   let Inst{4-0}   = reg1;
   let Inst{31-27} = reg3;
   let Inst{26}    = reg4{4};          // reg4 bit 4
@@ -489,17 +498,16 @@ class FormatFPU_RRRR<bits<2> subop, dag outs, dag ins, string asmstr,
   let Inst{16}    = 0;
 }
 
-// Base class for FPU conversion instructions: reg3 = convert(reg2)
+// FPU conversion/rounding instructions: reg3 = convert(reg2)
 // The category and type bits vary based on source/dest types
 // subop2 encodes source type, subop encodes destination type
 class FormatFPU_CVT<bits<5> subop2, bits<3> category, bits<2> type, bits<4> subop,
                     dag outs, dag ins, string asmstr, list<dag> pattern>
-    : V850Inst32<outs, ins, asmstr, pattern> {
+    : FormatFI<outs, ins, asmstr, pattern> {
   bits<5> reg2;
   bits<5> reg3;
 
   let Inst{15-11} = reg2;
-  let Inst{10-5}  = 0b111111;         // FPU opcode
   let Inst{4-0}   = subop2;           // Additional sub-opcode
   let Inst{31-27} = reg3;
   let Inst{26}    = 1;
@@ -513,11 +521,10 @@ class FormatFPU_CVT<bits<5> subop2, bits<3> category, bits<2> type, bits<4> subo
 // Encoding: 00000 111111 00000 | 00000 1 000 00 0fff 0
 // Where fff = fcbit (3 bits) in bits 19-17, bit 20 = 0
 class FormatFPU_TRFSR<dag outs, dag ins, string asmstr, list<dag> pattern>
-    : V850Inst32<outs, ins, asmstr, pattern> {
+    : FormatFI<outs, ins, asmstr, pattern> {
   bits<3> fcbit;
 
   let Inst{15-11} = 0;
-  let Inst{10-5}  = 0b111111;         // FPU opcode
   let Inst{4-0}   = 0;
   let Inst{31-27} = 0;
   let Inst{26}    = 1;
@@ -528,18 +535,17 @@ class FormatFPU_TRFSR<dag outs, dag ins, string asmstr, list<dag> pattern>
   let Inst{16}    = 0;
 }
 
-// Base class for FPU comparison instructions: FPCC[fcbit] = reg2 cmp reg1
+// FPU comparison instructions: FPCC[fcbit] = reg2 cmp reg1
 // Used for: CMPF.S, CMPF.D
 // Encoding: reg2[15:11], 111111[10:5], reg1[4:0] | 0fcond[31:27], 1000011[26:20], fcbit[19:17], dbl[16]
 class FormatFPU_CMP<bit dbl, dag outs, dag ins, string asmstr, list<dag> pattern>
-    : V850Inst32<outs, ins, asmstr, pattern> {
+    : FormatFI<outs, ins, asmstr, pattern> {
   bits<5> reg1;
   bits<5> reg2;
   bits<4> fcond;
   bits<3> fcbit;
 
   let Inst{15-11} = reg2;
-  let Inst{10-5}  = 0b111111;         // FPU opcode
   let Inst{4-0}   = reg1;
   let Inst{31}    = 0;
   let Inst{30-27} = fcond;
