@@ -39,16 +39,26 @@ public:
   DecodeStatus getInstruction(MCInst &Instr, uint64_t &Size,
                               ArrayRef<uint8_t> Bytes, uint64_t Address,
                               raw_ostream &CStream) const override;
+  DecodeStatus getInstruction16(MCInst &Instr, uint64_t &Size,
+                                ArrayRef<uint8_t> Bytes, uint64_t Address,
+                                raw_ostream &CStream) const;
+  DecodeStatus getInstruction32(MCInst &Instr, uint64_t &Size,
+                                ArrayRef<uint8_t> Bytes, uint64_t Address,
+                                raw_ostream &CStream) const;
+  DecodeStatus getInstruction48(MCInst &Instr, uint64_t &Size,
+                                ArrayRef<uint8_t> Bytes, uint64_t Address,
+                                raw_ostream &CStream) const;
 };
 } // end anonymous namespace
 
 static MCDisassembler *createV850Disassembler(const Target &T,
-                                               const MCSubtargetInfo &STI,
-                                               MCContext &Ctx) {
+                                              const MCSubtargetInfo &STI,
+                                              MCContext &Ctx) {
   return new V850Disassembler(STI, Ctx);
 }
 
-extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void LLVMInitializeV850Disassembler() {
+extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void
+LLVMInitializeV850Disassembler() {
   TargetRegistry::RegisterMCDisassembler(getTheV850Target(),
                                          createV850Disassembler);
 }
@@ -59,19 +69,15 @@ extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void LLVMInitializeV850Disassembler
 
 // Lookup table mapping hardware encoding (0-31) to register enum values
 static const MCPhysReg GPRDecoderTable[] = {
-  V850::R0,  V850::R1,  V850::R2,  V850::SP,
-  V850::GP,  V850::TP,  V850::R6,  V850::R7,
-  V850::R8,  V850::R9,  V850::R10, V850::R11,
-  V850::R12, V850::R13, V850::R14, V850::R15,
-  V850::R16, V850::R17, V850::R18, V850::R19,
-  V850::R20, V850::R21, V850::R22, V850::R23,
-  V850::R24, V850::R25, V850::R26, V850::R27,
-  V850::R28, V850::R29, V850::EP,  V850::LP
-};
+    V850::R0,  V850::R1,  V850::R2,  V850::SP,  V850::GP,  V850::TP,  V850::R6,
+    V850::R7,  V850::R8,  V850::R9,  V850::R10, V850::R11, V850::R12, V850::R13,
+    V850::R14, V850::R15, V850::R16, V850::R17, V850::R18, V850::R19, V850::R20,
+    V850::R21, V850::R22, V850::R23, V850::R24, V850::R25, V850::R26, V850::R27,
+    V850::R28, V850::R29, V850::EP,  V850::LP};
 
 static DecodeStatus DecodeGPRRegisterClass(MCInst &Inst, uint32_t RegNo,
-                                            uint64_t Address,
-                                            const MCDisassembler *Decoder) {
+                                           uint64_t Address,
+                                           const MCDisassembler *Decoder) {
   if (RegNo >= 32)
     return MCDisassembler::Fail;
 
@@ -82,8 +88,8 @@ static DecodeStatus DecodeGPRRegisterClass(MCInst &Inst, uint32_t RegNo,
 
 // FPR uses the same physical registers as GPR
 static DecodeStatus DecodeFPRRegisterClass(MCInst &Inst, uint32_t RegNo,
-                                            uint64_t Address,
-                                            const MCDisassembler *Decoder) {
+                                           uint64_t Address,
+                                           const MCDisassembler *Decoder) {
   if (RegNo >= 32)
     return MCDisassembler::Fail;
 
@@ -93,8 +99,8 @@ static DecodeStatus DecodeFPRRegisterClass(MCInst &Inst, uint32_t RegNo,
 }
 
 static DecodeStatus DecodeGPRnoR0RegisterClass(MCInst &Inst, uint32_t RegNo,
-                                                uint64_t Address,
-                                                const MCDisassembler *Decoder) {
+                                               uint64_t Address,
+                                               const MCDisassembler *Decoder) {
   if (RegNo == 0 || RegNo >= 32)
     return MCDisassembler::Fail;
 
@@ -104,8 +110,8 @@ static DecodeStatus DecodeGPRnoR0RegisterClass(MCInst &Inst, uint32_t RegNo,
 }
 
 static DecodeStatus DecodeSysRegRegisterClass(MCInst &Inst, uint32_t RegNo,
-                                               uint64_t Address,
-                                               const MCDisassembler *Decoder) {
+                                              uint64_t Address,
+                                              const MCDisassembler *Decoder) {
   // System registers have a different encoding
   // For now, just add the register number as immediate
   if (RegNo >= 32)
@@ -123,17 +129,16 @@ static DecodeStatus DecodeSysRegRegisterClass(MCInst &Inst, uint32_t RegNo,
 
 template <unsigned N>
 static DecodeStatus decodeUImmOperand(MCInst &Inst, uint32_t Imm,
-                                       int64_t Address,
-                                       const MCDisassembler *Decoder) {
+                                      int64_t Address,
+                                      const MCDisassembler *Decoder) {
   assert(isUInt<N>(Imm) && "Invalid immediate");
   Inst.addOperand(MCOperand::createImm(Imm));
   return MCDisassembler::Success;
 }
 
 template <unsigned N>
-static DecodeStatus decodeSImm(MCInst &Inst, uint32_t Imm,
-                                int64_t Address,
-                                const MCDisassembler *Decoder) {
+static DecodeStatus decodeSImm(MCInst &Inst, uint32_t Imm, int64_t Address,
+                               const MCDisassembler *Decoder) {
   assert(isUInt<N>(Imm) && "Invalid immediate");
   // Sign-extend the number in the bottom N bits of Imm
   Inst.addOperand(MCOperand::createImm(SignExtend64<N>(Imm)));
@@ -145,8 +150,8 @@ static DecodeStatus decodeSImm(MCInst &Inst, uint32_t Imm,
 //===----------------------------------------------------------------------===//
 
 static DecodeStatus decodeBranchTarget9(MCInst &Inst, uint32_t Imm,
-                                         int64_t Address,
-                                         const MCDisassembler *Decoder) {
+                                        int64_t Address,
+                                        const MCDisassembler *Decoder) {
   // 9-bit signed offset, bit 0 is implicitly 0
   // The encoding stores bits [8:1], so we need to shift left by 1
   int32_t Offset = SignExtend32<9>(Imm << 1);
@@ -155,8 +160,8 @@ static DecodeStatus decodeBranchTarget9(MCInst &Inst, uint32_t Imm,
 }
 
 static DecodeStatus decodeBranchTarget22(MCInst &Inst, uint32_t Imm,
-                                          int64_t Address,
-                                          const MCDisassembler *Decoder) {
+                                         int64_t Address,
+                                         const MCDisassembler *Decoder) {
   // 22-bit signed offset, bit 0 is implicitly 0
   // The encoding stores bits [21:1], so we need to shift left by 1
   int32_t Offset = SignExtend32<22>(Imm << 1);
@@ -165,8 +170,8 @@ static DecodeStatus decodeBranchTarget22(MCInst &Inst, uint32_t Imm,
 }
 
 static DecodeStatus decodeBranchTarget32(MCInst &Inst, uint32_t Imm,
-                                          int64_t Address,
-                                          const MCDisassembler *Decoder) {
+                                         int64_t Address,
+                                         const MCDisassembler *Decoder) {
   // 32-bit signed offset, bit 0 is implicitly 0
   // The encoding stores bits [31:1], so we need to shift left by 1
   int32_t Offset = Imm << 1;
@@ -185,10 +190,97 @@ static DecodeStatus decodeBranchTarget32(MCInst &Inst, uint32_t Imm,
 // V850Disassembler::getInstruction
 //===----------------------------------------------------------------------===//
 
+DecodeStatus V850Disassembler::getInstruction16(MCInst &MI, uint64_t &Size,
+                                                ArrayRef<uint8_t> Bytes,
+                                                uint64_t Address,
+                                                raw_ostream &CS) const {
+  if (Bytes.size() < 2) {
+    Size = 0;
+    return MCDisassembler::Fail;
+  }
+  uint16_t Insn16 = support::endian::read16le(Bytes.data());
+
+  bool HasV850E2M = STI.hasFeature(V850::FeatureV850E2M);
+
+  if (HasV850E2M) {
+    MI.clear();
+    DecodeStatus Result = decodeInstruction(DecoderTableV850E2M16, MI, Insn16,
+                                            Address, this, STI);
+    if (Result != MCDisassembler::Fail) {
+      Size = 2;
+      return Result;
+    }
+  }
+
+  MI.clear();
+  DecodeStatus Result =
+      decodeInstruction(DecoderTable16, MI, Insn16, Address, this, STI);
+  if (Result != MCDisassembler::Fail) {
+    Size = 2;
+    return Result;
+  }
+
+  return MCDisassembler::Fail;
+}
+
+DecodeStatus V850Disassembler::getInstruction32(MCInst &MI, uint64_t &Size,
+                                                ArrayRef<uint8_t> Bytes,
+                                                uint64_t Address,
+                                                raw_ostream &CS) const {
+  if (Bytes.size() < 4) {
+    Size = 0;
+    return MCDisassembler::Fail;
+  }
+  uint32_t Insn32 = support::endian::read32le(Bytes.data());
+
+  bool HasV850E2M = STI.hasFeature(V850::FeatureV850E2M);
+
+  if (HasV850E2M) {
+    MI.clear();
+    DecodeStatus Result = decodeInstruction(DecoderTableV850E2M32, MI, Insn32,
+                                            Address, this, STI);
+    if (Result != MCDisassembler::Fail) {
+      Size = 4;
+      return Result;
+    }
+  }
+
+  MI.clear();
+  DecodeStatus Result =
+      decodeInstruction(DecoderTable32, MI, Insn32, Address, this, STI);
+  if (Result != MCDisassembler::Fail) {
+    Size = 4;
+    return Result;
+  }
+
+  return MCDisassembler::Fail;
+}
+
+DecodeStatus V850Disassembler::getInstruction48(MCInst &MI, uint64_t &Size,
+                                                ArrayRef<uint8_t> Bytes,
+                                                uint64_t Address,
+                                                raw_ostream &CS) const {
+  // 48-bit decoders are not generated by default in this target layout.
+  // If in future a DecoderTable48 is added, implement similar logic as
+  // for 16/32-bit. For now, read bytes to check availability and fail.
+  if (Bytes.size() < 6) {
+    Size = 0;
+    return MCDisassembler::Fail;
+  }
+
+  // build little-endian 48-bit value
+  uint64_t Insn = 0;
+  for (size_t i = 0; i < 6; ++i)
+    Insn |= (uint64_t)Bytes[i] << (8 * i);
+
+  // No decoder table available; indicate failure.
+  return MCDisassembler::Fail;
+}
+
 DecodeStatus V850Disassembler::getInstruction(MCInst &MI, uint64_t &Size,
-                                               ArrayRef<uint8_t> Bytes,
-                                               uint64_t Address,
-                                               raw_ostream &CS) const {
+                                              ArrayRef<uint8_t> Bytes,
+                                              uint64_t Address,
+                                              raw_ostream &CS) const {
   // V850 uses little-endian byte ordering
   // Instructions are either 16-bit or 32-bit
 
@@ -200,56 +292,39 @@ DecodeStatus V850Disassembler::getInstruction(MCInst &MI, uint64_t &Size,
   // Read the first 16-bit halfword
   uint16_t Insn16 = support::endian::read16le(Bytes.data());
 
-  // Check if we have V850E2M features for extended instructions
-  bool HasV850E2M = STI.hasFeature(V850::FeatureV850E2M);
+  // Check if we have V850E1 features for extended instructions
+  bool HasV850E1 = STI.hasFeature(V850::FeatureV850E1);
 
-  // Try to decode as a 32-bit instruction first if we have enough bytes
-  // V850 32-bit instructions are determined by specific opcode patterns
-  if (Bytes.size() >= 4) {
-    // Read the full 32-bit instruction
-    uint32_t Insn32 = support::endian::read32le(Bytes.data());
+  // Decide whether to try 16-bit or 32-bit first using a small heuristic.
+  // Many 32-bit V850 formats use the extended opcode value 0b111111 in
+  // bits [10:5] of the first halfword (FormatIX/XI/XII/etc.). If those
+  // bits are 0b111111, prefer the 32-bit decoder first; otherwise try the
+  // 16-bit decoder first and fall back to 32-bit when available.
 
-    // Try V850E2M 32-bit decoder table first if we have V850E2M features
-    if (HasV850E2M) {
-      MI.clear();
-      DecodeStatus Result = decodeInstruction(DecoderTableV850E2M32, MI, Insn32,
-                                              Address, this, STI);
-      if (Result != MCDisassembler::Fail) {
-        Size = 4;
-        return Result;
-      }
-    }
+  unsigned Opcode6 = (Insn16 >> 5) & 0x3F;
+  bool Prefer32 = (Opcode6 == 0x3F);
 
-    // Try base 32-bit decoder table
-    MI.clear();
-    DecodeStatus Result = decodeInstruction(DecoderTable32, MI, Insn32,
-                                            Address, this, STI);
-    if (Result != MCDisassembler::Fail) {
-      Size = 4;
-      return Result;
-    }
+  if (Prefer32 && Bytes.size() >= 4) {
+    DecodeStatus R = getInstruction32(MI, Size, Bytes, Address, CS);
+    if (R != MCDisassembler::Fail)
+      return R;
+    // fallthrough to try 16-bit
   }
 
-  // Try V850E2M 16-bit decoder table first if we have V850E2M features
-  if (HasV850E2M) {
-    MI.clear();
-    DecodeStatus Result = decodeInstruction(DecoderTableV850E2M16, MI, Insn16,
-                                            Address, this, STI);
-    if (Result != MCDisassembler::Fail) {
-      Size = 2;
-      return Result;
-    }
+  // Try 16-bit decoders first (including E2M variant)
+  DecodeStatus R16 = getInstruction16(MI, Size, Bytes, Address, CS);
+  if (R16 != MCDisassembler::Fail)
+    return R16;
+
+  // If we didn't prefer 32 above and we have enough bytes, try 32-bit as a
+  // recovery path.
+  if (!Prefer32 && Bytes.size() >= 4) {
+    DecodeStatus R32 = getInstruction32(MI, Size, Bytes, Address, CS);
+    if (R32 != MCDisassembler::Fail)
+      return R32;
   }
 
-  // Try to decode as a 16-bit instruction
-  MI.clear();
-  DecodeStatus Result = decodeInstruction(DecoderTable16, MI, Insn16,
-                                          Address, this, STI);
-  if (Result != MCDisassembler::Fail) {
-    Size = 2;
-    return Result;
-  }
-
-  Size = 2;  // Consume at least 2 bytes on failure
+  // On failure, consume at least 2 bytes so the disassembler can progress.
+  Size = 2;
   return MCDisassembler::Fail;
 }
