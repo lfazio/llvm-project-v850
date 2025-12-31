@@ -32,9 +32,14 @@ def FeatureV850E2 : SubtargetFeature<"v850e2", "HasV850E2", "true",
                                       [FeatureV850E1]>;
 
 // V850E2M feature - adds FPU
+def FeatureV850FPU : SubtargetFeature<"v850fpu", "HasV850FPU", "true",
+                                      "Enable V850 FPU extensions",
+                                      []>;
+
+// V850E2M feature - adds FPU
 def FeatureV850E2M : SubtargetFeature<"v850e2m", "HasV850E2M", "true",
                                        "Enable V850E2M extensions (includes FPU)",
-                                       [FeatureV850E2]>;
+                                       [FeatureV850E2, FeatureV850FPU]>;
 
 // V850E3 feature - additional extensions
 def FeatureV850E3 : SubtargetFeature<"v850e3", "HasV850E3", "true",

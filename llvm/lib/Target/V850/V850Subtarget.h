@@ -36,6 +36,7 @@ class V850Subtarget : public V850GenSubtargetInfo {
   bool HasV850E1 = false;
   bool HasV850E2 = false;
   bool HasV850E2M = false;
+  bool HasV850FPU = false;
   bool HasV850E3 = false;
 
   V850InstrInfo InstrInfo;
@@ -77,6 +78,7 @@ public:
   bool hasV850E1() const { return HasV850E1; }
   bool hasV850E2() const { return HasV850E2; }
   bool hasV850E2M() const { return HasV850E2M; }
+  bool hasV850FPU() const { return HasV850FPU; }
   bool hasV850E3() const { return HasV850E3; }
 };
 

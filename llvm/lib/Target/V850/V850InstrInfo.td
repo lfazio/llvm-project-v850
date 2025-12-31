@@ -161,6 +161,8 @@ def HasV850E2 : Predicate<"Subtarget->hasV850E2()">,
                 AssemblerPredicate<(all_of FeatureV850E2), "V850E2">;
 def HasV850E2M : Predicate<"Subtarget->hasV850E2M()">,
                  AssemblerPredicate<(all_of FeatureV850E2M), "V850E2M">;
+def HasV850FPU : Predicate<"Subtarget->hasV850FPU()">,
+                 AssemblerPredicate<(all_of FeatureV850FPU), "V850FPU">;
 def HasV850E3 : Predicate<"Subtarget->hasV850E3()">,
                 AssemblerPredicate<(all_of FeatureV850E3), "V850E3">;
 
@@ -1677,6 +1679,10 @@ def CAXI : FormatXI<0b111111, 0b000111, 0b01110, (outs GPR:$reg3),
                     "caxi\t[$reg1], $reg2, $reg3",
                     []>;
 
+} // Predicates = [HasV850E2M]
+
+let Predicates = [HasV850FPU], DecoderNamespace = "V850FPU" in {
+
 //===----------------------------------------------------------------------===//
 // V850E2M FPU Instructions - Single Precision Arithmetic
 // Format F:I - 32-bit FPU instructions
@@ -2377,4 +2383,4 @@ def FLOORFDUL : FormatFPU_CVT<0b10011, 0b000, 0b10, 0b1010,
                               (outs GPR:$reg3), (ins GPR:$reg2),
                               "floorf.dul\t$reg2, $reg3", []>;
 
-} // Predicates = [HasV850E2M]
+} // Predicates = [HasV850FPU]
