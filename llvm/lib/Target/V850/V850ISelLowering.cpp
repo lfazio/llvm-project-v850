@@ -41,9 +41,9 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
   // Set up the register classes
   addRegisterClass(MVT::i32, &V850::GPRRegClass);
 
-  // V850E2M has FPU - use FPR class for floating-point
+  // V850 FPU feature - use FPR class for floating-point
   // (FPR uses same physical registers as GPR but for f32 type)
-  if (STI.hasV850E2M()) {
+  if (STI.hasV850FPU()) {
     addRegisterClass(MVT::f32, &V850::FPRRegClass);
     // f64 uses register pairs, will be expanded to library calls
   }
@@ -154,8 +154,8 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
   // Atomics - not supported, expand
   setMaxAtomicSizeInBitsSupported(0);
 
-  // FPU operations for V850E2M
-  if (STI.hasV850E2M()) {
+  // FPU operations when hardware FPU feature is present
+  if (STI.hasV850FPU()) {
     // Single-precision floating-point operations - Legal
     // V850E2M has hardware support for these
     setOperationAction(ISD::FADD, MVT::f32, Legal);
