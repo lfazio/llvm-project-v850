@@ -1191,6 +1191,42 @@ def DIVH_3 : FormatXI<0b111111, 0b010100, 0b00000, (outs GPR:$reg2, GPR:$reg3),
   let Constraints = "$rs = $reg2";
 }
 
+// DIVQ/DIVQU - High-speed divide instructions (V850E2M only)
+// These use variable-step execution and are faster than DIV/DIVU
+let Predicates = [HasV850E2M], DecoderNamespace = "V850E2M" in {
+
+// DIVQ reg1, reg2, reg3 - Divide word signed quickly (V850E2M)
+// High-speed division with variable-step execution (N+5 cycles)
+// reg2 (input/output): dividend, receives quotient
+// reg3 (output): receives remainder
+// Opcode: 111111, sub-op: 010111, sub-id: 11100
+// Flags: OV, S, Z modified
+// AddedComplexity makes DIVQ preferred over DIV on V850E2M (faster)
+let Defs = [PSW], AddedComplexity = 10 in
+def DIVQ : FormatXI<0b111111, 0b010111, 0b11100, (outs GPR:$reg2, GPR:$reg3),
+                    (ins GPR:$rs, GPR:$reg1),
+                    "divq\t$reg1, $reg2, $reg3",
+                    [(set GPR:$reg2, GPR:$reg3, (V850sdivrem GPR:$rs, GPR:$reg1))]> {
+  let Constraints = "$rs = $reg2";
+}
+
+// DIVQU reg1, reg2, reg3 - Divide word unsigned quickly (V850E2M)
+// High-speed division with variable-step execution (N+4 cycles)
+// reg2 (input/output): dividend, receives quotient
+// reg3 (output): receives remainder
+// Opcode: 111111, sub-op: 010111, sub-id: 11110
+// Flags: OV, S, Z modified
+// AddedComplexity makes DIVQU preferred over DIVU on V850E2M (faster)
+let Defs = [PSW], AddedComplexity = 10 in
+def DIVQU : FormatXI<0b111111, 0b010111, 0b11110, (outs GPR:$reg2, GPR:$reg3),
+                    (ins GPR:$rs, GPR:$reg1),
+                    "divqu\t$reg1, $reg2, $reg3",
+                    [(set GPR:$reg2, GPR:$reg3, (V850udivrem GPR:$rs, GPR:$reg1))]> {
+  let Constraints = "$rs = $reg2";
+}
+
+} // Predicates = [HasV850E2M]
+
 //===----------------------------------------------------------------------===//
 // PREPARE/DISPOSE Instructions (Format XIII)
 // Used for function prologue/epilogue optimization
