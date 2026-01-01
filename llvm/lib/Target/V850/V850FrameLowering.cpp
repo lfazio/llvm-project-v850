@@ -31,9 +31,25 @@ V850FrameLowering::V850FrameLowering(const V850Subtarget &STI)
 
 bool V850FrameLowering::hasFPImpl(const MachineFunction &MF) const {
   const MachineFrameInfo &MFI = MF.getFrameInfo();
+  const TargetRegisterInfo *RegInfo = MF.getSubtarget().getRegisterInfo();
 
-  return (MF.getTarget().Options.DisableFramePointerElim(MF) ||
-          MFI.hasVarSizedObjects() || MFI.isFrameAddressTaken());
+  // ABI-required frame pointer or user requested via -fno-omit-frame-pointer
+  if (MF.getTarget().Options.DisableFramePointerElim(MF))
+    return true;
+
+  // Frame pointer required for variable-sized stack allocations (alloca)
+  if (MFI.hasVarSizedObjects())
+    return true;
+
+  // Frame pointer required when address of frame is taken
+  if (MFI.isFrameAddressTaken())
+    return true;
+
+  // Frame pointer required for stack realignment
+  if (RegInfo->hasStackRealignment(MF))
+    return true;
+
+  return false;
 }
 
 bool V850FrameLowering::hasReservedCallFrame(const MachineFunction &MF) const {
