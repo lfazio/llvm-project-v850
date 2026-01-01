@@ -235,22 +235,25 @@ DecodeStatus V850Disassembler::getInstruction32(MCInst &MI, uint64_t &Size,
 
   bool HasV850E2M = STI.hasFeature(V850::FeatureV850E2M);
 
-  if (HasV850E2M) {
-    MI.clear();
-    DecodeStatus Result = decodeInstruction(DecoderTableV850E2M32, MI, Insn32,
-                                            Address, this, STI);
-    if (Result != MCDisassembler::Fail) {
-      Size = 4;
-      return Result;
-    }
-  }
-
+  // Try base 32-bit decoder first; this favors integer instructions that
+  // otherwise can be mis-decoded by the E2M table (which contains FPU
+  // encodings that overlap extended opcode patterns).
   MI.clear();
   DecodeStatus Result =
       decodeInstruction(DecoderTable32, MI, Insn32, Address, this, STI);
   if (Result != MCDisassembler::Fail) {
     Size = 4;
     return Result;
+  }
+
+  if (HasV850E2M) {
+    MI.clear();
+    DecodeStatus Result2 = decodeInstruction(DecoderTableV850E2M32, MI, Insn32,
+                                             Address, this, STI);
+    if (Result2 != MCDisassembler::Fail) {
+      Size = 4;
+      return Result2;
+    }
   }
 
   return MCDisassembler::Fail;
