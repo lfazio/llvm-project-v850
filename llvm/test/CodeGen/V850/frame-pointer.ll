@@ -20,7 +20,7 @@ define i32 @simple_leaf(i32 %a, i32 %b) {
 
 ; Function with local variables on stack
 ; CHECK-NO-FP-LABEL: with_locals:
-; CHECK-NO-FP: addi -{{[0-9]+}}, r3, r3
+; CHECK-NO-FP: add -{{[0-9]+}}, r3
 ; CHECK-NO-FP-NOT: mov r3, r29
 
 ; CHECK-FP-LABEL: with_locals:

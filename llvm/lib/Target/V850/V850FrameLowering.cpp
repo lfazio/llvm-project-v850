@@ -73,11 +73,19 @@ void V850FrameLowering::emitPrologue(MachineFunction &MF,
     return;
 
   // Adjust stack pointer: SP = SP - StackSize
-  // Use ADDI if the offset fits, otherwise we need to use a register
-  if (isInt<16>(-static_cast<int64_t>(StackSize))) {
+  // Prefer 16-bit ADDi for small offsets, then 32-bit ADDI, then use a register
+  int64_t NegStackSize = -static_cast<int64_t>(StackSize);
+  if (isInt<5>(NegStackSize)) {
+    // 16-bit ADDi for small offsets (-16 to +15)
+    BuildMI(MBB, MBBI, DL, TII.get(V850::ADDi), V850::SP)
+        .addImm(NegStackSize)
+        .addReg(V850::SP)
+        .setMIFlag(MachineInstr::FrameSetup);
+  } else if (isInt<16>(NegStackSize)) {
+    // 32-bit ADDI for medium offsets
     BuildMI(MBB, MBBI, DL, TII.get(V850::ADDI), V850::SP)
         .addReg(V850::SP)
-        .addImm(-static_cast<int64_t>(StackSize))
+        .addImm(NegStackSize)
         .setMIFlag(MachineInstr::FrameSetup);
   } else {
     // For large frames, load the offset into a temp register first
@@ -126,7 +134,15 @@ void V850FrameLowering::emitEpilogue(MachineFunction &MF,
         .setMIFlag(MachineInstr::FrameDestroy);
   } else {
     // Adjust stack pointer: SP = SP + StackSize
-    if (isInt<16>(StackSize)) {
+    // Prefer 16-bit ADDi for small offsets
+    if (isInt<5>(StackSize)) {
+      // 16-bit ADDi for small offsets (-16 to +15)
+      BuildMI(MBB, MBBI, DL, TII.get(V850::ADDi), V850::SP)
+          .addImm(StackSize)
+          .addReg(V850::SP)
+          .setMIFlag(MachineInstr::FrameDestroy);
+    } else if (isInt<16>(StackSize)) {
+      // 32-bit ADDI for medium offsets
       BuildMI(MBB, MBBI, DL, TII.get(V850::ADDI), V850::SP)
           .addReg(V850::SP)
           .addImm(StackSize)
@@ -222,16 +238,28 @@ MachineBasicBlock::iterator V850FrameLowering::eliminateCallFramePseudoInstr(
       Amount = alignTo(Amount, getStackAlign());
 
       if (MI.getOpcode() == V850::ADJCALLSTACKDOWN) {
-        // Subtract from SP
-        BuildMI(MBB, I, MI.getDebugLoc(), TII.get(V850::ADDI), V850::SP)
-            .addReg(V850::SP)
-            .addImm(-Amount);
+        // Subtract from SP - prefer 16-bit ADDi for small offsets
+        if (isInt<5>(-Amount)) {
+          BuildMI(MBB, I, MI.getDebugLoc(), TII.get(V850::ADDi), V850::SP)
+              .addImm(-Amount)
+              .addReg(V850::SP);
+        } else {
+          BuildMI(MBB, I, MI.getDebugLoc(), TII.get(V850::ADDI), V850::SP)
+              .addReg(V850::SP)
+              .addImm(-Amount);
+        }
       } else {
         assert(MI.getOpcode() == V850::ADJCALLSTACKUP);
-        // Add to SP
-        BuildMI(MBB, I, MI.getDebugLoc(), TII.get(V850::ADDI), V850::SP)
-            .addReg(V850::SP)
-            .addImm(Amount);
+        // Add to SP - prefer 16-bit ADDi for small offsets
+        if (isInt<5>(Amount)) {
+          BuildMI(MBB, I, MI.getDebugLoc(), TII.get(V850::ADDi), V850::SP)
+              .addImm(Amount)
+              .addReg(V850::SP);
+        } else {
+          BuildMI(MBB, I, MI.getDebugLoc(), TII.get(V850::ADDI), V850::SP)
+              .addReg(V850::SP)
+              .addImm(Amount);
+        }
       }
     }
   }

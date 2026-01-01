@@ -5,7 +5,7 @@
 define i32 @test_local_var(i32 %a) {
 entry:
 ; CHECK-LABEL: test_local_var:
-; CHECK: addi{{.*}}r3, r3
+; CHECK: add -{{[0-9]+}}, r3
 ; CHECK: st.w
 ; CHECK: ld.w
   %local = alloca i32
@@ -17,7 +17,7 @@ entry:
 define i32 @test_multiple_locals(i32 %a, i32 %b) {
 entry:
 ; CHECK-LABEL: test_multiple_locals:
-; CHECK: addi{{.*}}r3, r3
+; CHECK: add -{{[0-9]+}}, r3
 ; CHECK: st.w
 ; CHECK: st.w
 ; CHECK: ld.w
