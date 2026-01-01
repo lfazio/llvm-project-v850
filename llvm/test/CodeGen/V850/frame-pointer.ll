@@ -47,7 +47,7 @@ define i32 @with_vla(i32 %n) {
 
 ; Function that calls another function (non-leaf)
 ; CHECK-NO-FP-LABEL: non_leaf:
-; CHECK-NO-FP: st.w r31
+; CHECK-NO-FP: prepare
 ; CHECK-NO-FP-NOT: mov r3, r29
 ; CHECK-NO-FP: jarl
 

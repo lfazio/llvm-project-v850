@@ -57,6 +57,16 @@ public:
 
   void determineCalleeSaves(MachineFunction &MF, BitVector &SavedRegs,
                             RegScavenger *RS = nullptr) const override;
+
+private:
+  /// Check if PREPARE/DISPOSE instructions can be used for the given CSI.
+  /// Returns true if V850E1+ and all registers are in r20-r31 range.
+  bool canUsePrepareDispose(const MachineFunction &MF,
+                            ArrayRef<CalleeSavedInfo> CSI) const;
+
+  /// Build the list12 register mask for PREPARE/DISPOSE from CSI.
+  /// Returns the 12-bit mask where bit N corresponds to register r(20+N).
+  unsigned buildList12Mask(ArrayRef<CalleeSavedInfo> CSI) const;
 };
 
 } // end namespace llvm

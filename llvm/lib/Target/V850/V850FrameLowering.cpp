@@ -64,6 +64,13 @@ void V850FrameLowering::emitPrologue(MachineFunction &MF,
       *static_cast<const V850InstrInfo *>(MF.getSubtarget().getInstrInfo());
 
   MachineBasicBlock::iterator MBBI = MBB.begin();
+
+  // Skip past any PREPARE instruction (CSR saves) so that prologue code
+  // (especially FP setup) comes after CSR saves. This is required because
+  // PREPARE saves the old register values before modification.
+  while (MBBI != MBB.end() && MBBI->getOpcode() == V850::PREPARE)
+    ++MBBI;
+
   DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
 
   // Get the number of bytes to allocate from the FrameInfo
@@ -178,6 +185,25 @@ bool V850FrameLowering::spillCalleeSavedRegisters(
   MachineFunction &MF = *MBB.getParent();
   const TargetInstrInfo &TII = *MF.getSubtarget().getInstrInfo();
 
+  // Try to use PREPARE instruction (V850E1+)
+  if (canUsePrepareDispose(MF, CSI)) {
+    unsigned List12 = buildList12Mask(CSI);
+
+    // Add all callee-saved registers as live-in
+    for (const CalleeSavedInfo &I : CSI)
+      MBB.addLiveIn(I.getReg());
+
+    // PREPARE list12, imm5
+    // imm5 = 0 (no additional stack allocation via PREPARE; emitPrologue handles it)
+    BuildMI(MBB, MI, DL, TII.get(V850::PREPARE))
+        .addImm(List12)
+        .addImm(0)
+        .setMIFlag(MachineInstr::FrameSetup);
+
+    return true;
+  }
+
+  // Fallback: use individual store instructions
   for (const CalleeSavedInfo &I : CSI) {
     Register Reg = I.getReg();
     int FI = I.getFrameIdx();
@@ -209,6 +235,40 @@ bool V850FrameLowering::restoreCalleeSavedRegisters(
   MachineFunction &MF = *MBB.getParent();
   const TargetInstrInfo &TII = *MF.getSubtarget().getInstrInfo();
 
+  // Try to use DISPOSE instruction (V850E1+)
+  if (canUsePrepareDispose(MF, CSI)) {
+    unsigned List12 = buildList12Mask(CSI);
+
+    // Check if we can use DISPOSEr to combine restore and return
+    // This is only valid if MI points to a RET instruction
+    bool UseDisposeWithReturn = false;
+    if (MI != MBB.end() && MI->getOpcode() == V850::RET) {
+      UseDisposeWithReturn = true;
+    }
+
+    if (UseDisposeWithReturn) {
+      // DISPOSEr imm5, list12, [LP] - restore, deallocate, and return
+      // imm5 = 0 (emitEpilogue handles remaining stack adjustment)
+      BuildMI(MBB, MI, DL, TII.get(V850::DISPOSEr))
+          .addImm(0)
+          .addImm(List12)
+          .addReg(V850::LP)
+          .setMIFlag(MachineInstr::FrameDestroy);
+
+      // Remove the original RET instruction since DISPOSEr includes the return
+      MI->eraseFromParent();
+    } else {
+      // DISPOSE imm5, list12 - restore without return
+      BuildMI(MBB, MI, DL, TII.get(V850::DISPOSE))
+          .addImm(0)
+          .addImm(List12)
+          .setMIFlag(MachineInstr::FrameDestroy);
+    }
+
+    return true;
+  }
+
+  // Fallback: use individual load instructions
   // Restore in reverse order
   for (const CalleeSavedInfo &I : llvm::reverse(CSI)) {
     Register Reg = I.getReg();
@@ -279,4 +339,49 @@ void V850FrameLowering::determineCalleeSaves(MachineFunction &MF,
   // Save frame pointer if used
   if (hasFP(MF))
     SavedRegs.set(V850::R29);
+}
+
+//===----------------------------------------------------------------------===//
+// PREPARE/DISPOSE Support (V850E1+)
+//===----------------------------------------------------------------------===//
+
+bool V850FrameLowering::canUsePrepareDispose(
+    const MachineFunction &MF, ArrayRef<CalleeSavedInfo> CSI) const {
+  // PREPARE/DISPOSE requires V850E1 or later
+  const V850Subtarget &Subtarget = MF.getSubtarget<V850Subtarget>();
+  if (!Subtarget.hasV850E1())
+    return false;
+
+  // When frame pointer is used, the epilogue restores SP from FP which
+  // conflicts with DISPOSE's stack pointer handling. Disable for now.
+  // TODO: Handle FP case by excluding r29 from list12 or adjusting SP.
+  if (hasFP(MF))
+    return false;
+
+  // Check that all callee-saved registers are in r20-r31 range
+  for (const CalleeSavedInfo &I : CSI) {
+    Register Reg = I.getReg();
+    unsigned HWReg = TRI->getEncodingValue(Reg);
+    // list12 covers registers r20-r31 (hardware encodings 20-31)
+    if (HWReg < 20 || HWReg > 31)
+      return false;
+  }
+
+  return true;
+}
+
+unsigned V850FrameLowering::buildList12Mask(ArrayRef<CalleeSavedInfo> CSI) const {
+  unsigned List12 = 0;
+
+  for (const CalleeSavedInfo &I : CSI) {
+    Register Reg = I.getReg();
+    unsigned HWReg = TRI->getEncodingValue(Reg);
+    // list12 bit N corresponds to register r(20+N)
+    // bit 0 = r20, bit 1 = r21, ..., bit 9 = r29, bit 10 = r30(EP), bit 11 = r31(LP)
+    if (HWReg >= 20 && HWReg <= 31) {
+      List12 |= (1 << (HWReg - 20));
+    }
+  }
+
+  return List12;
 }
