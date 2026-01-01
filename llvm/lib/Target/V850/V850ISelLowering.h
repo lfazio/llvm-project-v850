@@ -27,6 +27,7 @@ enum NodeType : unsigned {
   FIRST_NUMBER = ISD::BUILTIN_OP_END,
   RET_GLUE,    // Return with a glue operand
   CALL,        // Function call
+  TAIL,        // Tail call
   WRAPPER,     // Global address wrapper
   BR_CC,       // Branch on condition code
   CMP,         // Compare
@@ -84,6 +85,10 @@ public:
 
 private:
   const V850Subtarget &Subtarget;
+
+  bool isEligibleForTailCallOptimization(
+      CCState &CCInfo, CallLoweringInfo &CLI, MachineFunction &MF,
+      const SmallVectorImpl<CCValAssign> &ArgLocs) const;
 
   SDValue LowerFormalArguments(SDValue Chain, CallingConv::ID CallConv,
                                bool isVarArg,

@@ -252,6 +252,8 @@ const char *V850TargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "V850ISD::RET_GLUE";
   case V850ISD::CALL:
     return "V850ISD::CALL";
+  case V850ISD::TAIL:
+    return "V850ISD::TAIL";
   case V850ISD::WRAPPER:
     return "V850ISD::WRAPPER";
   case V850ISD::BR_CC:
@@ -505,6 +507,7 @@ SDValue V850TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   SDValue Callee = CLI.Callee;
   CallingConv::ID CallConv = CLI.CallConv;
   bool isVarArg = CLI.IsVarArg;
+  bool &IsTailCall = CLI.IsTailCall;
 
   MachineFunction &MF = DAG.getMachineFunction();
 
@@ -513,10 +516,21 @@ SDValue V850TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   CCState CCInfo(CallConv, isVarArg, MF, ArgLocs, *DAG.getContext());
   CCInfo.AnalyzeCallOperands(Outs, CC_V850);
 
+  // Check if it's really possible to do a tail call.
+  if (IsTailCall)
+    IsTailCall = isEligibleForTailCallOptimization(CCInfo, CLI, MF, ArgLocs);
+
+  if (IsTailCall)
+    MF.getFrameInfo().setHasTailCall();
+  else if (CLI.CB && CLI.CB->isMustTailCall())
+    report_fatal_error("failed to perform tail call elimination on a call "
+                       "site marked musttail");
+
   // Get the size of the outgoing arguments stack space
   unsigned NumBytes = CCInfo.getStackSize();
 
-  Chain = DAG.getCALLSEQ_START(Chain, NumBytes, 0, DL);
+  if (!IsTailCall)
+    Chain = DAG.getCALLSEQ_START(Chain, NumBytes, 0, DL);
 
   SmallVector<std::pair<Register, SDValue>, 4> RegsToPass;
   SmallVector<SDValue, 12> MemOpChains;
@@ -547,6 +561,8 @@ SDValue V850TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
       RegsToPass.push_back(std::make_pair(VA.getLocReg(), Arg));
     } else {
       assert(VA.isMemLoc());
+      assert(!IsTailCall && "Tail call not allowed if stack is used "
+                            "for passing parameters");
       SDValue StackPtr = DAG.getCopyFromReg(Chain, DL, V850::SP, MVT::i32);
       SDValue PtrOff = DAG.getIntPtrConstant(VA.getLocMemOffset(), DL);
       PtrOff = DAG.getNode(ISD::ADD, DL, MVT::i32, StackPtr, PtrOff);
@@ -580,16 +596,29 @@ SDValue V850TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   for (auto &Reg : RegsToPass)
     Ops.push_back(DAG.getRegister(Reg.first, Reg.second.getValueType()));
 
-  // Add a register mask operand representing call-preserved registers
-  const TargetRegisterInfo *TRI = Subtarget.getRegisterInfo();
-  const uint32_t *Mask = TRI->getCallPreservedMask(MF, CallConv);
-  assert(Mask && "Missing call preserved mask for calling convention");
-  Ops.push_back(DAG.getRegisterMask(Mask));
+  // For non-tail calls, add a register mask operand representing
+  // call-preserved registers. Tail calls don't need this since they
+  // end the function.
+  if (!IsTailCall) {
+    const TargetRegisterInfo *TRI = Subtarget.getRegisterInfo();
+    const uint32_t *Mask = TRI->getCallPreservedMask(MF, CallConv);
+    assert(Mask && "Missing call preserved mask for calling convention");
+    Ops.push_back(DAG.getRegisterMask(Mask));
+  }
 
   if (InGlue.getNode())
     Ops.push_back(InGlue);
 
   SDVTList NodeTys = DAG.getVTList(MVT::Other, MVT::Glue);
+
+  if (IsTailCall) {
+    // Tail call - emit TAIL node and return
+    Chain = DAG.getNode(V850ISD::TAIL, DL, NodeTys, Ops);
+    DAG.addNoMergeSiteInfo(Chain.getNode(), CLI.NoMerge);
+    return Chain;
+  }
+
+  // Normal call
   Chain = DAG.getNode(V850ISD::CALL, DL, NodeTys, Ops);
   InGlue = Chain.getValue(1);
 
@@ -701,4 +730,50 @@ V850TargetLowering::getRegForInlineAsmConstraint(const TargetRegisterInfo *TRI,
   }
 
   return TargetLowering::getRegForInlineAsmConstraint(TRI, Constraint, VT);
+}
+
+//===----------------------------------------------------------------------===//
+// Tail Call Optimization
+//===----------------------------------------------------------------------===//
+
+bool V850TargetLowering::isEligibleForTailCallOptimization(
+    CCState &CCInfo, CallLoweringInfo &CLI, MachineFunction &MF,
+    const SmallVectorImpl<CCValAssign> &ArgLocs) const {
+
+  auto CalleeCC = CLI.CallConv;
+  auto &Outs = CLI.Outs;
+  auto &Caller = MF.getFunction();
+  auto CallerCC = Caller.getCallingConv();
+
+  // Do not tail call opt if the stack is used to pass parameters.
+  if (CCInfo.getStackSize() != 0)
+    return false;
+
+  // Do not tail call opt if any parameters need to be passed indirectly.
+  for (auto &VA : ArgLocs)
+    if (VA.getLocInfo() == CCValAssign::Indirect)
+      return false;
+
+  // Do not tail call opt if either caller or callee uses struct return
+  // semantics.
+  auto IsCallerStructRet = Caller.hasStructRetAttr();
+  auto IsCalleeStructRet = Outs.empty() ? false : Outs[0].Flags.isSRet();
+  if (IsCallerStructRet || IsCalleeStructRet)
+    return false;
+
+  // Do not tail call opt if either the callee or caller has a byval argument.
+  for (auto &Arg : Outs)
+    if (Arg.Flags.isByVal())
+      return false;
+
+  // The callee has to preserve all registers the caller needs to preserve.
+  const V850RegisterInfo *TRI = Subtarget.getRegisterInfo();
+  const uint32_t *CallerPreserved = TRI->getCallPreservedMask(MF, CallerCC);
+  if (CalleeCC != CallerCC) {
+    const uint32_t *CalleePreserved = TRI->getCallPreservedMask(MF, CalleeCC);
+    if (!TRI->regmaskSubsetEqual(CallerPreserved, CalleePreserved))
+      return false;
+  }
+
+  return true;
 }

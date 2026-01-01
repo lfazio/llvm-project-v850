@@ -121,6 +121,12 @@ def brtarget22 : Operand<OtherVT> {
   let DecoderMethod = "decodeBranchTarget22";
 }
 
+// Call target operand for CALL/TAIL instructions
+def calltarget : Operand<i32> {
+  let EncoderMethod = "getBranchTarget22OpValue";
+  let DecoderMethod = "decodeBranchTarget22";
+}
+
 // 32-bit PC-relative branch target (bit 0 implicitly 0, V850E2+)
 def brtarget32 : Operand<OtherVT> {
   let EncoderMethod = "getBranchTarget32OpValue";
@@ -187,6 +193,9 @@ def CallSeqEnd   : SDNode<"ISD::CALLSEQ_END", SDT_V850CallSeqEnd,
 def V850Call     : SDNode<"V850ISD::CALL", SDT_V850Call,
                           [SDNPHasChain, SDNPOutGlue, SDNPOptInGlue,
                            SDNPVariadic]>;
+
+def V850Tail     : SDNode<"V850ISD::TAIL", SDT_V850Call,
+                          [SDNPHasChain, SDNPOptInGlue, SDNPVariadic]>;
 
 def V850RetGlue  : SDNode<"V850ISD::RET_GLUE", SDTNone,
                           [SDNPHasChain, SDNPOptInGlue, SDNPVariadic]>;
@@ -616,6 +625,24 @@ let isCall = 1,
 def CALL : V850Pseudo<(outs), (ins brtarget22:$target),
                       "jarl\t$target, lp",
                       []>;
+
+// TAIL_CALL pseudo-instruction for tail call optimization
+// Uses JR instead of JARL since we don't need to save return address
+let isCall = 1, isTerminator = 1, isReturn = 1, isBarrier = 1,
+    Uses = [SP] in
+def TAIL_CALL : V850Pseudo<(outs), (ins calltarget:$target),
+                           "jr\t$target",
+                           [(V850Tail tglobaladdr:$target)]>;
+
+// TAIL_CALL_REG - Tail call via register (indirect)
+let isCall = 1, isTerminator = 1, isReturn = 1, isBarrier = 1, isIndirectBranch = 1,
+    Uses = [SP] in
+def TAIL_CALL_REG : V850Pseudo<(outs), (ins GPR:$target),
+                               "jmp\t[$target]",
+                               [(V850Tail GPR:$target)]>;
+
+// Pattern for external symbols (e.g., external function tail calls)
+def : Pat<(V850Tail texternalsym:$target), (TAIL_CALL texternalsym:$target)>;
 
 //===----------------------------------------------------------------------===//
 // Extended Instructions - Format IX (32-bit)
