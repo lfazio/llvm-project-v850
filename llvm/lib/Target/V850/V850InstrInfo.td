@@ -396,10 +396,11 @@ def SATSUBR : FormatI<0b000100, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
 // SATSUB reg1, reg2 - Saturated subtract
 // Opcode: 000101 (0x05)
 // Flags: CY, OV, S, Z, SAT modified
+// Operation: reg2 = saturate(reg2 - reg1)
 let Constraints = "$rs = $reg2", Defs = [PSW] in
 def SATSUB : FormatI<0b000101, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
                      "satsub\t$reg1, $reg2",
-                     []>;
+                     [(set GPR:$reg2, (ssubsat GPR:$rs, GPR:$reg1))]>;
 
 // SATADD reg1, reg2 - Saturated add
 // Opcode: 000110 (0x06)
@@ -407,7 +408,7 @@ def SATSUB : FormatI<0b000101, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
 let Constraints = "$rs = $reg2", Defs = [PSW] in
 def SATADD : FormatI<0b000110, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
                      "satadd\t$reg1, $reg2",
-                     []>;
+                     [(set GPR:$reg2, (saddsat GPR:$rs, GPR:$reg1))]>;
 
 // MULH reg1, reg2 - Multiply halfword (16x16 -> 32)
 // Opcode: 000111 (0x07)
@@ -460,10 +461,11 @@ def MOVi : FormatII<0b010000, (outs GPR:$reg2), (ins simm5:$imm5),
 // SATADD imm5, reg2 - Saturated add immediate
 // Opcode: 010001 (0x11)
 // Flags: CY, OV, S, Z, SAT modified
+// Operation: reg2 = saturate(reg2 + imm5)
 let Constraints = "$rs = $reg2", Defs = [PSW] in
 def SATADDi : FormatII<0b010001, (outs GPR:$reg2), (ins GPR:$rs, simm5:$imm5),
                        "satadd\t$imm5, $reg2",
-                       []>;
+                       [(set GPR:$reg2, (saddsat GPR:$rs, simm5:$imm5))]>;
 
 // ADD imm5, reg2 - Add sign-extended 5-bit immediate to reg2
 // Opcode: 010010 (0x12)
@@ -545,10 +547,11 @@ def : Pat<(i32 simm16_pred:$imm), (MOVEA R0, simm16:$imm)>;
 // SATSUBI imm16, reg1, reg2 - Saturated subtract immediate
 // Opcode: 110011 (0x33)
 // Flags: CY, OV, S, Z, SAT modified
+// Operation: reg2 = saturate(reg1 - imm16)
 let Defs = [PSW] in
 def SATSUBI : FormatVI<0b110011, (outs GPR:$reg2), (ins GPR:$reg1, simm16:$imm16),
                        "satsubi\t$imm16, $reg1, $reg2",
-                       []>;
+                       [(set GPR:$reg2, (ssubsat GPR:$reg1, simm16:$imm16))]>;
 
 // ORI imm16, reg1, reg2 - OR with zero-extended immediate
 // Opcode: 110100 (0x34)
@@ -1558,20 +1561,24 @@ def SHL_3 : FormatXI<0b111111, 0b000110, 0b00010, (outs GPR:$reg3),
 // SATADD reg1, reg2, reg3 - Saturating add 3-operand
 // Opcode: 111111, sub-op: 011101, sub-id: 00010
 // Flags: CY, OV, S, Z, SAT modified
-let Defs = [PSW] in
+// Operation: reg3 = saturate(reg2 + reg1)
+// Use AddedComplexity to prefer 3-operand over 2-operand when available
+let Defs = [PSW], AddedComplexity = 1 in
 def SATADD_3 : FormatXI<0b111111, 0b011101, 0b00010, (outs GPR:$reg3),
                         (ins GPR:$reg2, GPR:$reg1),
                         "satadd\t$reg1, $reg2, $reg3",
-                        []>;
+                        [(set GPR:$reg3, (saddsat GPR:$reg2, GPR:$reg1))]>;
 
 // SATSUB reg1, reg2, reg3 - Saturating subtract 3-operand
 // Opcode: 111111, sub-op: 011100, sub-id: 00010
 // Flags: CY, OV, S, Z, SAT modified
-let Defs = [PSW] in
+// Operation: reg3 = saturate(reg2 - reg1)
+// Use AddedComplexity to prefer 3-operand over 2-operand when available
+let Defs = [PSW], AddedComplexity = 1 in
 def SATSUB_3 : FormatXI<0b111111, 0b011100, 0b00010, (outs GPR:$reg3),
                         (ins GPR:$reg2, GPR:$reg1),
                         "satsub\t$reg1, $reg2, $reg3",
-                        []>;
+                        [(set GPR:$reg3, (ssubsat GPR:$reg2, GPR:$reg1))]>;
 
 //===----------------------------------------------------------------------===//
 // HSH Instruction

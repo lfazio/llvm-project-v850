@@ -115,6 +115,14 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
   setOperationAction(ISD::BSWAP, MVT::i32, Legal);  // V850 has BSW instruction
   setOperationAction(ISD::BITREVERSE, MVT::i32, Expand);
 
+  // Saturating arithmetic - V850 has SATADD/SATSUB instructions
+  // These are signed saturating operations (saturate to INT_MIN/INT_MAX)
+  setOperationAction(ISD::SADDSAT, MVT::i32, Legal);
+  setOperationAction(ISD::SSUBSAT, MVT::i32, Legal);
+  // Unsigned saturating not supported in hardware
+  setOperationAction(ISD::UADDSAT, MVT::i32, Expand);
+  setOperationAction(ISD::USUBSAT, MVT::i32, Expand);
+
   // Sign extension in register - V850 has SXB and SXH instructions
   setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i1, Expand);
   setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i8, Legal);
