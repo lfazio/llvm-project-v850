@@ -1338,6 +1338,7 @@ def : Pat<(or (srl GPR:$rs, (i32 16)), (shl GPR:$rs, (i32 16))), (HSW GPR:$rs)>;
 // CMOV cccc, reg1, reg2, reg3 - Conditional move (register form)
 // If condition true: reg3 = reg1, else reg3 = reg2
 // Opcode: 111111, sub-op: 011001, subid: {cond, 0}
+let Uses = [PSW] in
 def CMOVr : FormatXI<0b111111, 0b011001, 0b00000, (outs GPR:$reg3),
                      (ins cmov_cond:$cond, GPR:$reg1, GPR:$reg2),
                      "cmov\t$cond, $reg1, $reg2, $reg3",
@@ -1350,6 +1351,7 @@ def CMOVr : FormatXI<0b111111, 0b011001, 0b00000, (outs GPR:$reg3),
 // CMOV cccc, imm5, reg2, reg3 - Conditional move (immediate form)
 // If condition true: reg3 = sign_ext(imm5), else reg3 = reg2
 // Opcode: 111111, sub-op: 011000
+let Uses = [PSW] in
 def CMOVi : FormatXII<0b111111, 0b011000, (outs GPR:$reg3),
                       (ins cmov_cond:$cond, simm5:$imm5, GPR:$reg2),
                       "cmov\t$cond, $imm5, $reg2, $reg3",

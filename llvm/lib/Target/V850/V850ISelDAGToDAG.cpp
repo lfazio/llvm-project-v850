@@ -215,10 +215,24 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
 
   case V850ISD::SELECT_CC: {
     // V850ISD::SELECT_CC trueVal, falseVal, condcode, glue
-    // Since V850 doesn't have a conditional move, we'll need to expand this
-    // This is typically handled by lowering to branches, but for now
-    // we'll leave it to be expanded by the legalizer
-    break;
+    // Use CMOV instruction: cmov cond, trueVal, falseVal, result
+    // If condition true: result = trueVal, else result = falseVal
+    SDValue TrueVal = Node->getOperand(0);
+    SDValue FalseVal = Node->getOperand(1);
+    ConstantSDNode *CCNode = cast<ConstantSDNode>(Node->getOperand(2));
+    ISD::CondCode CC = static_cast<ISD::CondCode>(CCNode->getZExtValue());
+    SDValue Glue = Node->getOperand(3);
+
+    // Get V850 condition code
+    unsigned V850CC = getSetFCondCode(CC);
+    SDValue CondVal = CurDAG->getTargetConstant(V850CC, DL, MVT::i32);
+
+    // Emit CMOVr: cmov cond, trueVal, falseVal, result
+    // Note: Glue must be the last operand
+    SDValue Ops[] = {CondVal, TrueVal, FalseVal, Glue};
+    SDNode *CmovNode = CurDAG->getMachineNode(V850::CMOVr, DL, MVT::i32, Ops);
+    ReplaceNode(Node, CmovNode);
+    return;
   }
 
   case V850ISD::CALL: {
