@@ -71,6 +71,21 @@ public:
 
   bool
   reverseBranchCondition(SmallVectorImpl<MachineOperand> &Cond) const override;
+
+  // Branch relaxation support
+  bool isBranchOffsetInRange(unsigned BranchOpc,
+                             int64_t BrOffset) const override;
+
+  MachineBasicBlock *getBranchDestBlock(const MachineInstr &MI) const override;
+
+  void insertIndirectBranch(MachineBasicBlock &MBB,
+                            MachineBasicBlock &NewDestBB,
+                            MachineBasicBlock &RestoreBB, const DebugLoc &DL,
+                            int64_t BrOffset, RegScavenger *RS) const override;
+
+  /// Return the opcode of the branch with the opposite condition.
+  /// Returns 0 if there is no opposite branch opcode.
+  unsigned getOppositeBranchOpcode(unsigned Opc) const;
 };
 
 } // namespace llvm

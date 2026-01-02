@@ -94,6 +94,7 @@ public:
   }
 
   bool addInstSelector() override;
+  void addPreEmitPass() override;
 };
 
 } // end anonymous namespace
@@ -105,4 +106,11 @@ TargetPassConfig *V850TargetMachine::createPassConfig(PassManagerBase &PM) {
 bool V850PassConfig::addInstSelector() {
   addPass(createV850ISelDag(getV850TargetMachine(), getOptLevel()));
   return false;
+}
+
+void V850PassConfig::addPreEmitPass() {
+  // Branch relaxation must run after all other passes that modify code layout.
+  // It expands conditional branches that are out of range by inverting the
+  // condition and inserting an unconditional branch to the original target.
+  addPass(&BranchRelaxationPassID);
 }
