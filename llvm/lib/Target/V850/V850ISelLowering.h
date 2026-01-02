@@ -44,6 +44,14 @@ enum NodeType : unsigned {
   SDIVREM,
   // UDIVREM: Unsigned divide, returns (quotient, remainder)
   UDIVREM,
+
+  // Multiply-accumulate operations (V850E2M+)
+  // SMAC: Signed multiply-accumulate
+  // (res_lo, res_hi) = (acc_lo, acc_hi) + sext(a) * sext(b)
+  SMAC,
+  // UMAC: Unsigned multiply-accumulate
+  // (res_lo, res_hi) = (acc_lo, acc_hi) + zext(a) * zext(b)
+  UMAC,
 };
 } // namespace V850ISD
 
@@ -73,6 +81,9 @@ public:
   SDValue LowerMULHS(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerMULHU(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerDivRem(SDValue Op, SelectionDAG &DAG) const;
+
+  /// PerformDAGCombine - Perform target-specific DAG combining.
+  SDValue PerformDAGCombine(SDNode *N, DAGCombinerInfo &DCI) const override;
 
   Register getRegisterByName(const char *RegName, LLT VT,
                              const MachineFunction &MF) const override;

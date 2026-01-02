@@ -1,15 +1,13 @@
-// RUN: llvm-mc -triple=v850 -mcpu=v850e2 -show-encoding %s | FileCheck %s
+// RUN: llvm-mc -triple=v850 -mcpu=v850e2m -show-encoding < %s | FileCheck %s
 
-// MAC - Multiply-accumulate signed (Format XI, 32-bit)
-// Syntax: mac reg1, reg2, reg3, reg4
-// Operation: (reg3:reg4) <- (reg3:reg4) + (reg1 * reg2)
-// Requires: V850E2 or later
+// CHECK: mac r6, r7, r8, r9
+// CHECK: encoding: [0xe6,0x3f,0xc0,0x43]
+mac r6, r7, r8, r9
 
-// CHECK: mac r5, r10, r20, r22 ; encoding: [0xe5,0x57,0xc0,0xa3]
-mac r5, r10, r20, r22
+// CHECK: mac r1, r2, r3, r4
+// CHECK: encoding: [0xe1,0x17,0xc0,0x1b]
+mac r1, r2, r3, r4
 
-// CHECK: mac r6, r12, r24, r26 ; encoding: [0xe6,0x67,0xc0,0xc3]
-mac r6, r12, r24, r26
-
-// CHECK: mac r7, r14, r20, r21 ; encoding: [0xe7,0x77,0xc0,0xa3]
-mac r7, r14, r20, r21
+// CHECK: mac r10, r11, r12, r13
+// CHECK: encoding: [0xea,0x5f,0xc0,0x63]
+mac r10, r11, r12, r13

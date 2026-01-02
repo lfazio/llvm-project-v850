@@ -228,6 +228,16 @@ def SDT_V850Mul : SDTypeProfile<2, 2, [SDTCisSameAs<0, 1>,
 def V850smul : SDNode<"V850ISD::SMUL", SDT_V850Mul>;
 def V850umul : SDNode<"V850ISD::UMUL", SDT_V850Mul>;
 
+// Multiply-accumulate node - takes 4 i32s (a, b, acc_lo, acc_hi), returns 2 i32s (res_lo, res_hi)
+def SDT_V850Mac : SDTypeProfile<2, 4, [SDTCisSameAs<0, 1>,
+                                        SDTCisSameAs<0, 2>,
+                                        SDTCisSameAs<0, 3>,
+                                        SDTCisSameAs<0, 4>,
+                                        SDTCisSameAs<0, 5>,
+                                        SDTCisVT<0, i32>]>;
+def V850smac : SDNode<"V850ISD::SMAC", SDT_V850Mac>;
+def V850umac : SDNode<"V850ISD::UMAC", SDT_V850Mac>;
+
 // Divide-remainder node - returns (quotient, remainder) pair
 def SDT_V850DivRem : SDTypeProfile<2, 2, [SDTCisSameAs<0, 1>,
                                           SDTCisSameAs<0, 2>,
@@ -1431,21 +1441,28 @@ def SBF : FormatXI<0b111111, 0b011100, 0b00000, (outs GPR:$reg3),
 }
 
 // MAC reg1, reg2, reg3, reg4 - Multiply-accumulate signed
-// (reg3:reg4) = (reg3:reg4) + (reg1 * reg2)
+// (reg3:reg4) = (reg3:reg4) + sext(reg1) * sext(reg2)
 // Opcode: 111111, sub-op: 011110, sub-id: 00000
 def MAC : FormatXI<0b111111, 0b011110, 0b00000, (outs GPR:$reg3, GPR:$reg4),
                    (ins GPR:$reg1, GPR:$reg2, GPR:$reg3_in, GPR:$reg4_in),
                    "mac\t$reg1, $reg2, $reg3, $reg4",
-                   []> {
+                   [(set GPR:$reg3, GPR:$reg4,
+                         (V850smac GPR:$reg1, GPR:$reg2,
+                                   GPR:$reg3_in, GPR:$reg4_in))]>,
+          Requires<[HasV850E2M]> {
   let Constraints = "$reg3_in = $reg3, $reg4_in = $reg4";
 }
 
 // MACU reg1, reg2, reg3, reg4 - Multiply-accumulate unsigned
+// (reg3:reg4) = (reg3:reg4) + zext(reg1) * zext(reg2)
 // Opcode: 111111, sub-op: 011111, sub-id: 00000
 def MACU : FormatXI<0b111111, 0b011111, 0b00000, (outs GPR:$reg3, GPR:$reg4),
                     (ins GPR:$reg1, GPR:$reg2, GPR:$reg3_in, GPR:$reg4_in),
                     "macu\t$reg1, $reg2, $reg3, $reg4",
-                    []> {
+                    [(set GPR:$reg3, GPR:$reg4,
+                          (V850umac GPR:$reg1, GPR:$reg2,
+                                    GPR:$reg3_in, GPR:$reg4_in))]>,
+          Requires<[HasV850E2M]> {
   let Constraints = "$reg3_in = $reg3, $reg4_in = $reg4";
 }
 

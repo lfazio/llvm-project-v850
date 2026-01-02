@@ -207,6 +207,11 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
 
   // Set minimum function alignment
   setMinFunctionAlignment(Align(2));
+
+  // Enable DAG combining for MAC pattern recognition (V850E2M+)
+  if (STI.hasV850E2M()) {
+    setTargetDAGCombine(ISD::ADD);
+  }
 }
 
 SDValue V850TargetLowering::LowerOperation(SDValue Op,
@@ -270,6 +275,10 @@ const char *V850TargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "V850ISD::SDIVREM";
   case V850ISD::UDIVREM:
     return "V850ISD::UDIVREM";
+  case V850ISD::SMAC:
+    return "V850ISD::SMAC";
+  case V850ISD::UMAC:
+    return "V850ISD::UMAC";
   }
   return nullptr;
 }
@@ -695,6 +704,149 @@ V850TargetLowering::LowerReturn(SDValue Chain, CallingConv::ID CallConv,
     RetOps.push_back(Glue);
 
   return DAG.getNode(V850ISD::RET_GLUE, dl, MVT::Other, RetOps);
+}
+
+//===----------------------------------------------------------------------===//
+// DAG Combining
+//===----------------------------------------------------------------------===//
+
+/// Try to combine multiply-add patterns into MAC/MACU instructions.
+/// Pattern after type legalization:
+///   sum_lo = add acc_lo, mul_lo   (where mul_lo = SMUL/UMUL result 0)
+///   carry = setcc sum_lo, acc_lo, setult
+///   partial_hi = add acc_hi, mul_hi (where mul_hi = SMUL/UMUL result 1)
+///   sum_hi = add partial_hi, carry
+///
+/// We look for the final add (sum_hi = add partial_hi, carry) and trace back.
+static SDValue performADDCombine(SDNode *N, SelectionDAG &DAG,
+                                 const V850Subtarget &Subtarget) {
+  // Only V850E2M and later have MAC/MACU
+  if (!Subtarget.hasV850E2M())
+    return SDValue();
+
+  SDLoc DL(N);
+
+  // Look for: add (add acc_hi, mul_hi), carry
+  // where carry = setcc (add acc_lo, mul_lo), acc_lo, setult
+  SDValue LHS = N->getOperand(0);
+  SDValue RHS = N->getOperand(1);
+
+  // Find which operand is the carry (from setcc)
+  SDValue PartialHi, Carry;
+  if (LHS.getOpcode() == ISD::SETCC) {
+    Carry = LHS;
+    PartialHi = RHS;
+  } else if (RHS.getOpcode() == ISD::SETCC) {
+    Carry = RHS;
+    PartialHi = LHS;
+  } else {
+    return SDValue();
+  }
+
+  // Verify the setcc is for unsigned less-than (carry detection)
+  if (cast<CondCodeSDNode>(Carry.getOperand(2))->get() != ISD::SETULT)
+    return SDValue();
+
+  // PartialHi should be: add acc_hi, mul_hi
+  if (PartialHi.getOpcode() != ISD::ADD)
+    return SDValue();
+
+  // Find mul_hi from PartialHi = add acc_hi, mul_hi
+  SDValue MulHi, AccHi;
+  bool IsSigned = false;
+
+  SDValue PHOp0 = PartialHi.getOperand(0);
+  SDValue PHOp1 = PartialHi.getOperand(1);
+
+  if (PHOp0.getOpcode() == V850ISD::SMUL && PHOp0.getResNo() == 1) {
+    MulHi = PHOp0;
+    AccHi = PHOp1;
+    IsSigned = true;
+  } else if (PHOp0.getOpcode() == V850ISD::UMUL && PHOp0.getResNo() == 1) {
+    MulHi = PHOp0;
+    AccHi = PHOp1;
+    IsSigned = false;
+  } else if (PHOp1.getOpcode() == V850ISD::SMUL && PHOp1.getResNo() == 1) {
+    MulHi = PHOp1;
+    AccHi = PHOp0;
+    IsSigned = true;
+  } else if (PHOp1.getOpcode() == V850ISD::UMUL && PHOp1.getResNo() == 1) {
+    MulHi = PHOp1;
+    AccHi = PHOp0;
+    IsSigned = false;
+  } else {
+    return SDValue();
+  }
+
+  SDNode *MulHiNode = MulHi.getNode();
+
+  // Carry = setcc sum_lo, acc_lo, setult
+  // sum_lo should be: add acc_lo, mul_lo
+  SDValue SumLo = Carry.getOperand(0);
+  SDValue CompareOp = Carry.getOperand(1);  // Should be acc_lo
+
+  if (SumLo.getOpcode() != ISD::ADD)
+    return SDValue();
+
+  // Find mul_lo from SumLo = add acc_lo, mul_lo
+  // Note: For unsigned, the low multiply may use SMUL while high uses UMUL
+  // (the low 32 bits are identical for signed/unsigned multiply)
+  SDValue AccLo;
+  SDValue SLOp0 = SumLo.getOperand(0);
+  SDValue SLOp1 = SumLo.getOperand(1);
+
+  auto isMulLow = [&](SDValue V) -> bool {
+    // Check if this is a mul result 0 with the same operands as MulHi
+    if (V.getResNo() != 0)
+      return false;
+    if (V.getOpcode() != V850ISD::SMUL && V.getOpcode() != V850ISD::UMUL)
+      return false;
+    // Verify same multiply operands
+    return V.getOperand(0) == MulHiNode->getOperand(0) &&
+           V.getOperand(1) == MulHiNode->getOperand(1);
+  };
+
+  if (isMulLow(SLOp0)) {
+    AccLo = SLOp1;
+  } else if (isMulLow(SLOp1)) {
+    AccLo = SLOp0;
+  } else {
+    return SDValue();
+  }
+
+  // Verify CompareOp is AccLo (the setcc should compare sum_lo with acc_lo)
+  if (CompareOp != AccLo)
+    return SDValue();
+
+  // We have a match! Create the MAC node.
+  // Use the multiply operands (same for both MulHi and MulLo nodes)
+  SDValue MulA = MulHiNode->getOperand(0);
+  SDValue MulB = MulHiNode->getOperand(1);
+
+  unsigned MacOpc = IsSigned ? V850ISD::SMAC : V850ISD::UMAC;
+  SDValue MacOps[] = {MulA, MulB, AccLo, AccHi};
+  SDVTList VTs = DAG.getVTList(MVT::i32, MVT::i32);
+  SDValue Mac = DAG.getNode(MacOpc, DL, VTs, MacOps);
+
+  // Replace SumLo uses with MAC low result
+  DAG.ReplaceAllUsesOfValueWith(SumLo, Mac.getValue(0));
+
+  // Return high part for this ADD node
+  return Mac.getValue(1);
+}
+
+SDValue V850TargetLowering::PerformDAGCombine(SDNode *N,
+                                               DAGCombinerInfo &DCI) const {
+  SelectionDAG &DAG = DCI.DAG;
+
+  switch (N->getOpcode()) {
+  default:
+    break;
+  case ISD::ADD:
+    return performADDCombine(N, DAG, Subtarget);
+  }
+
+  return SDValue();
 }
 
 //===----------------------------------------------------------------------===//
