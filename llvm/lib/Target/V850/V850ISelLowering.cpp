@@ -123,10 +123,17 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
   setOperationAction(ISD::UADDSAT, MVT::i32, Expand);
   setOperationAction(ISD::USUBSAT, MVT::i32, Expand);
 
-  // Sign extension in register - V850 has SXB and SXH instructions
+  // Sign extension in register - V850E1+ has SXB and SXH instructions
   setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i1, Expand);
-  setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i8, Legal);
-  setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i16, Legal);
+  if (STI.hasV850E1()) {
+    // V850E1+ has SXB (sign extend byte) and SXH (sign extend halfword)
+    setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i8, Legal);
+    setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i16, Legal);
+  } else {
+    // Base V850 must expand to shifts
+    setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i8, Expand);
+    setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i16, Expand);
+  }
 
   // Expand SELECT to SELECT_CC
   setOperationAction(ISD::SELECT, MVT::i32, Expand);

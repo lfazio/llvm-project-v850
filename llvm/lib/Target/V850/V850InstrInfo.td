@@ -997,9 +997,13 @@ def : Pat<(i32 (sextloadi16 (add GPR:$base, simm16:$off))), (LDH GPR:$base, simm
 def : Pat<(i32 (extloadi8 (add GPR:$base, simm16:$off))), (LDB GPR:$base, simm16:$off)>;
 def : Pat<(i32 (extloadi16 (add GPR:$base, simm16:$off))), (LDH GPR:$base, simm16:$off)>;
 
-// Zero-extending loads need AND with mask
+// Zero-extending loads need AND with mask (base V850 has no LD.BU/LD.HU)
 def : Pat<(i32 (zextloadi8 GPR:$base)), (ANDI (LDB GPR:$base, 0), 0xFF)>;
 def : Pat<(i32 (zextloadi16 GPR:$base)), (ANDI (LDH GPR:$base, 0), 0xFFFF)>;
+def : Pat<(i32 (zextloadi8 (add GPR:$base, simm16:$off))),
+          (ANDI (LDB GPR:$base, simm16:$off), 0xFF)>;
+def : Pat<(i32 (zextloadi16 (add GPR:$base, simm16:$off))),
+          (ANDI (LDH GPR:$base, simm16:$off), 0xFFFF)>;
 
 //===----------------------------------------------------------------------===//
 // Store patterns
