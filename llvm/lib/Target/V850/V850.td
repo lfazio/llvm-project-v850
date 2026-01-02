@@ -53,6 +53,8 @@ def FeatureV850E3 : SubtargetFeature<"v850e3", "HasV850E3", "true",
 include "V850RegisterInfo.td"
 include "V850CallingConv.td"
 include "V850InstrInfo.td"
+include "V850Schedule.td"
+include "V850SchedV850E2M.td"
 
 def V850InstrInfo : InstrInfo;
 
@@ -60,18 +62,18 @@ def V850InstrInfo : InstrInfo;
 // V850 processors supported
 //===----------------------------------------------------------------------===//
 
-class Proc<string Name, list<SubtargetFeature> Features>
-    : Processor<Name, NoItineraries, Features>;
+// Base V850 processors use V850Model (no FPU)
+def : ProcessorModel<"generic", V850Model, []>;
+def : ProcessorModel<"v850", V850Model, []>;
+def : ProcessorModel<"v850e1", V850Model, [FeatureV850E1]>;
+def : ProcessorModel<"v850es", V850Model, [FeatureV850E1]>;  // V850ES has same ISA as V850E1
+def : ProcessorModel<"v850e2", V850Model, [FeatureV850E2]>;
 
-def : Proc<"generic", []>;
-def : Proc<"v850", []>;
-def : Proc<"v850e1", [FeatureV850E1]>;
-def : Proc<"v850es", [FeatureV850E1]>;  // V850ES has same ISA as V850E1
-def : Proc<"v850e2", [FeatureV850E2]>;
-def : Proc<"v850e2m", [FeatureV850E2M]>;
-def : Proc<"v850e2v3", [FeatureV850E2M]>;
-def : Proc<"v850e3", [FeatureV850E3]>;
-def : Proc<"v850e3v5", [FeatureV850E3]>;
+// V850E2M+ processors use V850E2MModel (includes FPU)
+def : ProcessorModel<"v850e2m", V850E2MModel, [FeatureV850E2M]>;
+def : ProcessorModel<"v850e2v3", V850E2MModel, [FeatureV850E2M]>;
+def : ProcessorModel<"v850e3", V850E2MModel, [FeatureV850E3]>;
+def : ProcessorModel<"v850e3v5", V850E2MModel, [FeatureV850E3]>;
 
 //===----------------------------------------------------------------------===//
 // V850 assembly writer
