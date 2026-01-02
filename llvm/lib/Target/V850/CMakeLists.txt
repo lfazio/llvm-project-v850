@@ -20,6 +20,7 @@ add_llvm_target(V850CodeGen
   V850InstrInfo.cpp
   V850ISelDAGToDAG.cpp
   V850ISelLowering.cpp
+  V850LoadStoreOptimizer.cpp
   V850MCInstLower.cpp
   V850RegisterInfo.cpp
   V850Subtarget.cpp

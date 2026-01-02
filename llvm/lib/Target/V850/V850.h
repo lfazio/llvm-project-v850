@@ -28,7 +28,12 @@ class PassRegistry;
 FunctionPass *createV850ISelDag(V850TargetMachine &TM,
                                 CodeGenOptLevel OptLevel);
 
+// createV850LoadStoreOptimizerPass - This pass optimizes load/store
+// operations, promoting 32-bit LD.W/ST.W to 16-bit SLD.W/SST.W when possible.
+FunctionPass *createV850LoadStoreOptimizerPass();
+
 void initializeV850DAGToDAGISelLegacyPass(PassRegistry &);
+void initializeV850LoadStoreOptimizerPass(PassRegistry &);
 void initializeV850AsmPrinterPass(PassRegistry &);
 
 } // namespace llvm

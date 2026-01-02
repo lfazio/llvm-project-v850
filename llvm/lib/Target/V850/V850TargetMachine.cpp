@@ -30,6 +30,7 @@ extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void LLVMInitializeV850Target() {
   // Initialize passes
   PassRegistry &PR = *PassRegistry::getPassRegistry();
   initializeV850DAGToDAGISelLegacyPass(PR);
+  initializeV850LoadStoreOptimizerPass(PR);
 }
 
 static std::string computeDataLayout(const Triple &TT) {
@@ -109,6 +110,11 @@ bool V850PassConfig::addInstSelector() {
 }
 
 void V850PassConfig::addPreEmitPass() {
+  // Load/store optimizer: promotes 32-bit LD.W/ST.W to 16-bit SLD.W/SST.W
+  // when EP is the base and displacement fits. Must run before branch
+  // relaxation since it changes instruction sizes.
+  addPass(createV850LoadStoreOptimizerPass());
+
   // Branch relaxation must run after all other passes that modify code layout.
   // It expands conditional branches that are out of range by inverting the
   // condition and inserting an unconditional branch to the original target.
