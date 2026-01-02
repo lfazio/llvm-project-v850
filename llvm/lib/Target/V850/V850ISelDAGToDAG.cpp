@@ -262,6 +262,44 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
     return;
   }
 
+  case V850ISD::SET1_MEM:
+  case V850ISD::CLR1_MEM:
+  case V850ISD::NOT1_MEM: {
+    // V850ISD::*_MEM chain, addr, bitnum -> chain
+    // Emit: SET1/CLR1/NOT1 bitnum, 0[addr]
+    SDValue Chain = Node->getOperand(0);
+    SDValue Addr = Node->getOperand(1);
+    SDValue BitNumVal = Node->getOperand(2);
+
+    // BitNum must be a constant (0-7)
+    auto *BitNumNode = dyn_cast<ConstantSDNode>(BitNumVal);
+    if (!BitNumNode) {
+      // Fall back to default selection
+      break;
+    }
+
+    // Select the appropriate opcode
+    unsigned Opc;
+    switch (Node->getOpcode()) {
+    case V850ISD::SET1_MEM: Opc = V850::SET1; break;
+    case V850ISD::CLR1_MEM: Opc = V850::CLR1; break;
+    case V850ISD::NOT1_MEM: Opc = V850::NOT1; break;
+    default: llvm_unreachable("Unexpected opcode");
+    }
+
+    // BitNum as target immediate (3-bit)
+    SDValue BitNum = CurDAG->getTargetConstant(BitNumNode->getZExtValue(), DL,
+                                               MVT::i32);
+    // Displacement is 0 (address is directly in register)
+    SDValue Disp = CurDAG->getTargetConstant(0, DL, MVT::i32);
+
+    // Operand order: bit3, reg1, disp16, chain
+    SDValue Ops[] = {BitNum, Addr, Disp, Chain};
+    SDNode *BitOp = CurDAG->getMachineNode(Opc, DL, MVT::Other, Ops);
+    ReplaceNode(Node, BitOp);
+    return;
+  }
+
   default:
     break;
   }

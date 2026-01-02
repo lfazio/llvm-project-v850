@@ -246,6 +246,18 @@ def SDT_V850DivRem : SDTypeProfile<2, 2, [SDTCisSameAs<0, 1>,
 def V850sdivrem : SDNode<"V850ISD::SDIVREM", SDT_V850DivRem>;
 def V850udivrem : SDNode<"V850ISD::UDIVREM", SDT_V850DivRem>;
 
+// Bit manipulation in memory - (chain, addr, bitnum) -> chain
+def SDT_V850BitMem : SDTypeProfile<0, 2, [SDTCisVT<0, i32>, SDTCisVT<1, i32>]>;
+def V850set1mem : SDNode<"V850ISD::SET1_MEM", SDT_V850BitMem,
+                         [SDNPHasChain, SDNPMayLoad, SDNPMayStore,
+                          SDNPMemOperand]>;
+def V850clr1mem : SDNode<"V850ISD::CLR1_MEM", SDT_V850BitMem,
+                         [SDNPHasChain, SDNPMayLoad, SDNPMayStore,
+                          SDNPMemOperand]>;
+def V850not1mem : SDNode<"V850ISD::NOT1_MEM", SDT_V850BitMem,
+                         [SDNPHasChain, SDNPMayLoad, SDNPMayStore,
+                          SDNPMemOperand]>;
+
 //===----------------------------------------------------------------------===//
 // Pattern fragments for instruction selection
 //===----------------------------------------------------------------------===//

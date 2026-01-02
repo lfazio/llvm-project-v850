@@ -212,6 +212,10 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
   if (STI.hasV850E2M()) {
     setTargetDAGCombine(ISD::ADD);
   }
+
+  // Enable DAG combining for bit manipulation (SET1/CLR1/NOT1)
+  // These instructions are available on all V850 variants
+  setTargetDAGCombine(ISD::STORE);
 }
 
 SDValue V850TargetLowering::LowerOperation(SDValue Op,
@@ -279,6 +283,12 @@ const char *V850TargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "V850ISD::SMAC";
   case V850ISD::UMAC:
     return "V850ISD::UMAC";
+  case V850ISD::SET1_MEM:
+    return "V850ISD::SET1_MEM";
+  case V850ISD::CLR1_MEM:
+    return "V850ISD::CLR1_MEM";
+  case V850ISD::NOT1_MEM:
+    return "V850ISD::NOT1_MEM";
   }
   return nullptr;
 }
@@ -710,6 +720,123 @@ V850TargetLowering::LowerReturn(SDValue Chain, CallingConv::ID CallConv,
 // DAG Combining
 //===----------------------------------------------------------------------===//
 
+/// Try to combine store(op(load(addr), const), addr) into SET1/CLR1/NOT1.
+/// Pattern: store(or(load(addr), 2^n), addr) -> SET1 n, addr
+/// Pattern: store(and(load(addr), ~(2^n)), addr) -> CLR1 n, addr
+/// Pattern: store(xor(load(addr), 2^n), addr) -> NOT1 n, addr
+static SDValue performSTORECombine(SDNode *N, SelectionDAG &DAG,
+                                   const V850Subtarget &Subtarget) {
+  StoreSDNode *ST = cast<StoreSDNode>(N);
+
+  // Only match byte stores (SET1/CLR1/NOT1 operate on bytes)
+  EVT VT = ST->getMemoryVT();
+  if (VT != MVT::i8)
+    return SDValue();
+
+  // Don't match volatile stores (bit ops are read-modify-write)
+  if (ST->isVolatile())
+    return SDValue();
+
+  // Get the value being stored
+  SDValue StoreVal = ST->getValue();
+  unsigned Opcode = StoreVal.getOpcode();
+
+  // Must be OR, AND, or XOR
+  if (Opcode != ISD::OR && Opcode != ISD::AND && Opcode != ISD::XOR)
+    return SDValue();
+
+  // One operand must be a load, the other a constant
+  SDValue LoadOp, ConstOp;
+  if (StoreVal.getOperand(0).getOpcode() == ISD::LOAD) {
+    LoadOp = StoreVal.getOperand(0);
+    ConstOp = StoreVal.getOperand(1);
+  } else if (StoreVal.getOperand(1).getOpcode() == ISD::LOAD) {
+    LoadOp = StoreVal.getOperand(1);
+    ConstOp = StoreVal.getOperand(0);
+  } else {
+    return SDValue();
+  }
+
+  // The constant must be a ConstantSDNode
+  auto *ConstNode = dyn_cast<ConstantSDNode>(ConstOp);
+  if (!ConstNode)
+    return SDValue();
+
+  LoadSDNode *LD = cast<LoadSDNode>(LoadOp);
+
+  // Don't match volatile loads
+  if (LD->isVolatile())
+    return SDValue();
+
+  // Load and store must have the same address
+  SDValue LoadAddr = LD->getBasePtr();
+  SDValue StoreAddr = ST->getBasePtr();
+  if (LoadAddr != StoreAddr)
+    return SDValue();
+
+  // Load must be zero-extending or sign-extending from i8
+  // (or anyext, which is what we get for byte loads)
+  if (LD->getMemoryVT() != MVT::i8)
+    return SDValue();
+
+  // The load must have only one use (the OR/AND/XOR operation)
+  // Actually, it may have two uses: one for the value and one chain
+  // Let's check if the load chain is used only by the store
+  if (!LoadOp.hasOneUse())
+    return SDValue();
+
+  int64_t Const = ConstNode->getSExtValue();
+  int BitNum = -1;
+  unsigned V850Opcode;
+
+  switch (Opcode) {
+  case ISD::OR:
+    // OR with power-of-2 sets a bit: x |= (1 << n)
+    if (Const > 0 && Const < 256 && isPowerOf2_64(Const)) {
+      BitNum = Log2_64(Const);
+      V850Opcode = V850ISD::SET1_MEM;
+    }
+    break;
+  case ISD::AND:
+    // AND with ~(power-of-2) clears a bit: x &= ~(1 << n)
+    // Const will be like 0xFB for clearing bit 2 (i.e., ~4)
+    // But we're working with i8 after extension, so check byte range
+    {
+      uint8_t ByteConst = Const & 0xFF;
+      uint8_t Inverted = ~ByteConst;
+      if (Inverted != 0 && isPowerOf2_64(Inverted)) {
+        BitNum = Log2_64(Inverted);
+        V850Opcode = V850ISD::CLR1_MEM;
+      }
+    }
+    break;
+  case ISD::XOR:
+    // XOR with power-of-2 toggles a bit: x ^= (1 << n)
+    if (Const > 0 && Const < 256 && isPowerOf2_64(Const)) {
+      BitNum = Log2_64(Const);
+      V850Opcode = V850ISD::NOT1_MEM;
+    }
+    break;
+  }
+
+  if (BitNum < 0 || BitNum > 7)
+    return SDValue();
+
+  // Create the bit manipulation node
+  SDLoc DL(N);
+  SDValue Chain = ST->getChain();
+
+  // We need to use the load's chain to ensure proper ordering
+  // But we're replacing both the load and store with a single RMW operation
+  Chain = LD->getChain();
+
+  SDValue BitNumVal = DAG.getConstant(BitNum, DL, MVT::i32);
+
+  // The SET1_MEM/CLR1_MEM/NOT1_MEM node: (chain, addr, bitnum) -> chain
+  SDValue Ops[] = {Chain, StoreAddr, BitNumVal};
+  return DAG.getNode(V850Opcode, DL, MVT::Other, Ops);
+}
+
 /// Try to combine multiply-add patterns into MAC/MACU instructions.
 /// Pattern after type legalization:
 ///   sum_lo = add acc_lo, mul_lo   (where mul_lo = SMUL/UMUL result 0)
@@ -844,6 +971,8 @@ SDValue V850TargetLowering::PerformDAGCombine(SDNode *N,
     break;
   case ISD::ADD:
     return performADDCombine(N, DAG, Subtarget);
+  case ISD::STORE:
+    return performSTORECombine(N, DAG, Subtarget);
   }
 
   return SDValue();

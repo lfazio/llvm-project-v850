@@ -52,6 +52,14 @@ enum NodeType : unsigned {
   // UMAC: Unsigned multiply-accumulate
   // (res_lo, res_hi) = (acc_lo, acc_hi) + zext(a) * zext(b)
   UMAC,
+
+  // Memory bit manipulation operations (atomic RMW)
+  // SET1_MEM: Set bit in memory byte - chain = SET1_MEM chain, addr, bitnum
+  SET1_MEM,
+  // CLR1_MEM: Clear bit in memory byte - chain = CLR1_MEM chain, addr, bitnum
+  CLR1_MEM,
+  // NOT1_MEM: Toggle bit in memory byte - chain = NOT1_MEM chain, addr, bitnum
+  NOT1_MEM,
 };
 } // namespace V850ISD
 
