@@ -15,6 +15,10 @@
 #include "V850Subtarget.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
+#include "llvm/CodeGen/MachineModuleInfo.h"
+#include "llvm/CodeGen/MachineOutliner.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/Module.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
 
@@ -391,4 +395,180 @@ void V850InstrInfo::insertIndirectBranch(MachineBasicBlock &MBB,
   assert(llvm::isInt<22>(BrOffset) && "Branch offset out of range for JR");
 
   BuildMI(&MBB, DL, get(V850::JR)).addMBB(&NewDestBB);
+}
+
+//===----------------------------------------------------------------------===//
+// Machine Outliner Support
+//===----------------------------------------------------------------------===//
+
+// V850 machine outliner cost model:
+// - Call to outlined function: JARL (4 bytes)
+// - Return from outlined function: JMP [LP] (2 bytes)
+// - Total overhead per call site: 4 bytes (JARL replaces inlined code)
+// - Frame overhead: 2 bytes (JMP [LP] at end of outlined function)
+
+enum MachineOutlinerConstructionID {
+  MachineOutlinerDefault
+};
+
+bool V850InstrInfo::isFunctionSafeToOutlineFrom(
+    MachineFunction &MF, bool OutlineFromLinkOnceODRs) const {
+  const Function &F = MF.getFunction();
+
+  // Functions with section markings need the outliner to produce matching
+  // sections, which we don't currently support.
+  if (F.hasSection())
+    return false;
+
+  // Can outline from linkonce_odr functions if requested.
+  if (F.hasLinkOnceODRLinkage() && !OutlineFromLinkOnceODRs)
+    return false;
+
+  // Don't outline from functions with VarArgs.
+  if (F.isVarArg())
+    return false;
+
+  return true;
+}
+
+bool V850InstrInfo::isMBBSafeToOutlineFrom(MachineBasicBlock &MBB,
+                                           unsigned &Flags) const {
+  // No special flags needed for V850.
+  Flags = 0;
+  return TargetInstrInfo::isMBBSafeToOutlineFrom(MBB, Flags);
+}
+
+bool V850InstrInfo::shouldOutlineFromFunctionByDefault(
+    MachineFunction &MF) const {
+  // Outline from functions that are optimized for size.
+  return MF.getFunction().hasMinSize();
+}
+
+std::optional<std::unique_ptr<outliner::OutlinedFunction>>
+V850InstrInfo::getOutliningCandidateInfo(
+    const MachineModuleInfo &MMI,
+    std::vector<outliner::Candidate> &RepeatedSequenceLocs,
+    unsigned MinRepeats) const {
+  // Compute the cost of the frame (return instruction at the end).
+  // JMP [LP] is 2 bytes.
+  unsigned FrameOverhead = 2;
+
+  // We need at least MinRepeats candidates.
+  if (RepeatedSequenceLocs.size() < MinRepeats)
+    return std::nullopt;
+
+  // Compute the cost of calling the outlined function.
+  // JARL is 4 bytes.
+  unsigned CallOverhead = 4;
+
+  // Compute the total code size of the outlined sequence.
+  unsigned SequenceSize = 0;
+  for (auto &MI : RepeatedSequenceLocs[0])
+    SequenceSize += getInstSizeInBytes(MI);
+
+  // For outlining to be beneficial:
+  // (NumCandidates * CallOverhead) + FrameOverhead + SequenceSize <
+  // NumCandidates * SequenceSize
+  // This simplifies to:
+  // FrameOverhead < (NumCandidates - 1) * (SequenceSize - CallOverhead)
+  unsigned NumCandidates = RepeatedSequenceLocs.size();
+  if (SequenceSize <= CallOverhead)
+    return std::nullopt;
+
+  int Benefit = (NumCandidates - 1) * (SequenceSize - CallOverhead) -
+                FrameOverhead;
+  if (Benefit <= 0)
+    return std::nullopt;
+
+  // Set up the candidate info.
+  for (auto &C : RepeatedSequenceLocs) {
+    C.setCallInfo(MachineOutlinerDefault, CallOverhead);
+  }
+
+  return std::make_unique<outliner::OutlinedFunction>(
+      RepeatedSequenceLocs, SequenceSize, FrameOverhead,
+      MachineOutlinerDefault);
+}
+
+outliner::InstrType
+V850InstrInfo::getOutliningTypeImpl(const MachineModuleInfo &MMI,
+                                    MachineBasicBlock::iterator &MBBI,
+                                    unsigned Flags) const {
+  MachineInstr &MI = *MBBI;
+
+  // Don't allow instructions that modify the stack pointer.
+  if (MI.modifiesRegister(V850::SP, &RI))
+    return outliner::InstrType::Illegal;
+
+  // Don't allow instructions that modify the link register.
+  if (MI.modifiesRegister(V850::LP, &RI))
+    return outliner::InstrType::Illegal;
+
+  // Don't allow calls or returns.
+  if (MI.isCall() || MI.isReturn())
+    return outliner::InstrType::Illegal;
+
+  // Don't allow branches.
+  if (MI.isBranch())
+    return outliner::InstrType::Illegal;
+
+  // Don't allow instructions with MBB operands (position-dependent).
+  for (const MachineOperand &MO : MI.operands())
+    if (MO.isMBB())
+      return outliner::InstrType::Illegal;
+
+  // CFI instructions are invisible (don't affect outlining but should be
+  // stripped from outlined sequences).
+  if (MI.isCFIInstruction())
+    return outliner::InstrType::Invisible;
+
+  // Debug instructions are invisible.
+  if (MI.isDebugInstr())
+    return outliner::InstrType::Invisible;
+
+  // Implicit defs are invisible.
+  if (MI.isImplicitDef())
+    return outliner::InstrType::Invisible;
+
+  // KILL instructions are invisible.
+  if (MI.isKill())
+    return outliner::InstrType::Invisible;
+
+  // All other instructions are legal.
+  return outliner::InstrType::Legal;
+}
+
+void V850InstrInfo::buildOutlinedFrame(
+    MachineBasicBlock &MBB, MachineFunction &MF,
+    const outliner::OutlinedFunction &OF) const {
+  // Strip CFI instructions from the outlined function.
+  bool ChangedMBB = true;
+  while (ChangedMBB) {
+    ChangedMBB = false;
+    for (MachineInstr &MI : llvm::make_early_inc_range(MBB)) {
+      if (MI.isCFIInstruction()) {
+        MI.eraseFromParent();
+        ChangedMBB = true;
+        break;
+      }
+    }
+  }
+
+  // Add a return instruction at the end of the outlined function.
+  // JMP [LP] returns to the caller.
+  MBB.addLiveIn(V850::LP);
+  BuildMI(MBB, MBB.end(), DebugLoc(), get(V850::JMP))
+      .addReg(V850::LP, RegState::Kill);
+}
+
+MachineBasicBlock::iterator V850InstrInfo::insertOutlinedCall(
+    Module &M, MachineBasicBlock &MBB, MachineBasicBlock::iterator &It,
+    MachineFunction &MF, outliner::Candidate &C) const {
+  // Insert a call to the outlined function.
+  // JARL target, LP
+  It = MBB.insert(It,
+                  BuildMI(MF, DebugLoc(), get(V850::JARL))
+                      .addGlobalAddress(M.getNamedValue(C.getMF()->getName()))
+                      .addReg(V850::LP, RegState::Define));
+  return It;
 }
