@@ -94,6 +94,7 @@ public:
     return getTM<V850TargetMachine>();
   }
 
+  void addIRPasses() override;
   bool addInstSelector() override;
   void addPreEmitPass() override;
 };
@@ -102,6 +103,14 @@ public:
 
 TargetPassConfig *V850TargetMachine::createPassConfig(PassManagerBase &PM) {
   return new V850PassConfig(*this, PM);
+}
+
+void V850PassConfig::addIRPasses() {
+  // Add the AtomicExpandPass to expand atomic RMW operations to cmpxchg loops
+  // V850E2M has CAXI for 32-bit compare-and-swap
+  addPass(createAtomicExpandLegacyPass());
+
+  TargetPassConfig::addIRPasses();
 }
 
 bool V850PassConfig::addInstSelector() {

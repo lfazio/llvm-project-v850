@@ -166,8 +166,13 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
   setOperationAction(ISD::FRAMEADDR, MVT::i32, Custom);
   setOperationAction(ISD::RETURNADDR, MVT::i32, Custom);
 
-  // Atomics - not supported, expand
-  setMaxAtomicSizeInBitsSupported(0);
+  // Atomics - V850E2M has CAXI instruction for 32-bit compare-and-swap
+  if (STI.hasV850E2M()) {
+    setMaxAtomicSizeInBitsSupported(32);
+    setMinCmpXchgSizeInBits(32);
+  } else {
+    setMaxAtomicSizeInBitsSupported(0);
+  }
 
   // FPU operations when hardware FPU feature is present
   if (STI.hasV850FPU()) {
@@ -1072,4 +1077,32 @@ bool V850TargetLowering::isEligibleForTailCallOptimization(
   }
 
   return true;
+}
+
+//===----------------------------------------------------------------------===//
+// Atomic Operations
+//===----------------------------------------------------------------------===//
+
+TargetLowering::AtomicExpansionKind
+V850TargetLowering::shouldExpandAtomicCmpXchgInIR(AtomicCmpXchgInst *CI) const {
+  // V850E2M has CAXI for 32-bit compare-and-swap
+  // Don't expand it - let it be lowered to the CAXI instruction
+  unsigned Size = CI->getCompareOperand()->getType()->getPrimitiveSizeInBits();
+  if (Subtarget.hasV850E2M() && Size == 32)
+    return AtomicExpansionKind::None;
+
+  // For other sizes or without V850E2M, use library calls
+  return AtomicExpansionKind::None;
+}
+
+TargetLowering::AtomicExpansionKind
+V850TargetLowering::shouldExpandAtomicRMWInIR(AtomicRMWInst *AI) const {
+  // V850E2M only has compare-and-swap, no atomic RMW instructions
+  // Expand atomic RMW to compare-and-swap loop when V850E2M is available
+  unsigned Size = AI->getType()->getPrimitiveSizeInBits();
+  if (Subtarget.hasV850E2M() && Size == 32)
+    return AtomicExpansionKind::CmpXChg;
+
+  // For other sizes or without V850E2M, use library calls
+  return AtomicExpansionKind::None;
 }

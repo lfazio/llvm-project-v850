@@ -1780,11 +1780,21 @@ def SYSCALL : V850Inst32<(outs), (ins uimm8:$vector8),
 
 let mayLoad = 1, mayStore = 1, Defs = [PSW] in
 def CAXI : FormatXI<0b111111, 0b000111, 0b01110, (outs GPR:$reg3),
-                    (ins GPR:$reg1, GPR:$reg2),
+                    (ins GPR:$reg1, GPR:$reg2, GPR:$reg3_in),
                     "caxi\t[$reg1], $reg2, $reg3",
-                    []>;
+                    []> {
+  // reg3 is both input (new value) and output (old value)
+  // Semantics: old = *[reg1]; if (old == reg2) *[reg1] = reg3_in; reg3 = old
+  let Constraints = "$reg3_in = $reg3";
+}
 
 } // Predicates = [HasV850E2M]
+
+let Predicates = [HasV850E2M] in
+// Pattern for atomic compare-and-swap (32-bit)
+// Maps __sync_val_compare_and_swap, __atomic_compare_exchange, etc.
+def : Pat<(atomic_cmp_swap_i32 GPR:$addr, GPR:$expected, GPR:$new),
+          (CAXI GPR:$addr, GPR:$expected, GPR:$new)>;
 
 let Predicates = [HasV850FPU], DecoderNamespace = "V850FPU" in {
 

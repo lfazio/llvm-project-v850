@@ -1,23 +1,20 @@
 // RUN: llvm-mc -triple=v850 -mcpu=v850e2m -show-encoding %s | FileCheck %s
 
-// CAXI - Compare and Exchange for Interlock (32-bit)
-// Atomic compare-and-swap operation
+// CAXI - Compare And Exchange for Interlock (Format XI, 32-bit)
 // Syntax: caxi [reg1], reg2, reg3
-// Operation:
-//   1. Read word at address in reg1 (lower 2 bits masked to 0)
-//   2. Compare with reg2, set flags based on (reg2 - read_value)
-//   3. If equal: store reg3 to memory, else: store read_value back
-//   4. Store read_value to reg3
-// Requires: V850E2M or later
+// Operation: old = *[reg1]; if (old == reg2) *[reg1] = reg3; reg3 = old
 
-// CHECK: caxi [r5], r10, r15 ; encoding: [0xe5,0x57,0xee,0x78]
-caxi [r5], r10, r15
+// CHECK: caxi [r6], r7, r8 ; encoding: [0xe6,0x3f,0xee,0x40]
+caxi [r6], r7, r8
+
+// CHECK: caxi [r10], r11, r12 ; encoding: [0xea,0x5f,0xee,0x60]
+caxi [r10], r11, r12
+
+// CHECK: caxi [r20], r21, r22 ; encoding: [0xf4,0xaf,0xee,0xb0]
+caxi [r20], r21, r22
 
 // CHECK: caxi [r1], r2, r3 ; encoding: [0xe1,0x17,0xee,0x18]
 caxi [r1], r2, r3
 
-// CHECK: caxi [r10], r20, r25 ; encoding: [0xea,0xa7,0xee,0xc8]
-caxi [r10], r20, r25
-
-// CHECK: caxi [r31], r0, r1 ; encoding: [0xff,0x07,0xee,0x08]
-caxi [r31], r0, r1
+// CHECK: caxi [r31], r30, r29 ; encoding: [0xff,0xf7,0xee,0xe8]
+caxi [r31], r30, r29
