@@ -258,6 +258,14 @@ def V850not1mem : SDNode<"V850ISD::NOT1_MEM", SDT_V850BitMem,
                          [SDNPHasChain, SDNPMayLoad, SDNPMayStore,
                           SDNPMemOperand]>;
 
+// Bit test in memory - (chain, addr, bitnum) -> (result, chain)
+// Returns 1 if bit was 0 (Z flag set), 0 otherwise
+def SDT_V850TstMem : SDTypeProfile<1, 2, [SDTCisVT<0, i32>,
+                                          SDTCisVT<1, i32>,
+                                          SDTCisVT<2, i32>]>;
+def V850tst1mem : SDNode<"V850ISD::TST1_MEM", SDT_V850TstMem,
+                         [SDNPHasChain, SDNPMayLoad, SDNPMemOperand]>;
+
 //===----------------------------------------------------------------------===//
 // Pattern fragments for instruction selection
 //===----------------------------------------------------------------------===//
@@ -968,6 +976,32 @@ def TST1r : FormatIX<0b111111, 0b000111, (outs),
 //===----------------------------------------------------------------------===//
 // Additional Patterns
 //===----------------------------------------------------------------------===//
+
+//===----------------------------------------------------------------------===//
+// Atomic Bit Manipulation Intrinsic Patterns (V850E1+)
+// These map the llvm.v850.set1/clr1/not1/tst1 intrinsics to instructions
+//===----------------------------------------------------------------------===//
+
+let Predicates = [HasV850E1] in {
+// SET1 - Atomically set a bit in memory
+def : Pat<(int_v850_set1 GPR:$addr, GPR:$bit),
+          (SET1r GPR:$bit, GPR:$addr)>;
+
+// CLR1 - Atomically clear a bit in memory
+def : Pat<(int_v850_clr1 GPR:$addr, GPR:$bit),
+          (CLR1r GPR:$bit, GPR:$addr)>;
+
+// NOT1 - Atomically toggle a bit in memory
+def : Pat<(int_v850_not1 GPR:$addr, GPR:$bit),
+          (NOT1r GPR:$bit, GPR:$addr)>;
+}
+
+// TST1_PSEUDO - Test bit in memory and return result
+// Expands to TST1r + SETF z (condition code 2 = Z flag)
+let usesCustomInserter = 1, Predicates = [HasV850E1] in
+def TST1_PSEUDO : V850Pseudo<(outs GPR:$result), (ins GPR:$bit, GPR:$addr),
+                             "# TST1_PSEUDO $bit, [$addr] -> $result",
+                             [(set GPR:$result, (V850tst1mem GPR:$addr, GPR:$bit))]>;
 
 //===----------------------------------------------------------------------===//
 // Large constant materialization patterns

@@ -24,6 +24,7 @@
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/IntrinsicsV850.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
@@ -174,6 +175,11 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
     setMaxAtomicSizeInBitsSupported(0);
   }
 
+  // Intrinsics - V850E1+ has register-based bit manipulation instructions
+  if (STI.hasV850E1()) {
+    setOperationAction(ISD::INTRINSIC_W_CHAIN, MVT::Other, Custom);
+  }
+
   // FPU operations when hardware FPU feature is present
   if (STI.hasV850FPU()) {
     // Single-precision floating-point operations - Legal
@@ -270,6 +276,8 @@ SDValue V850TargetLowering::LowerOperation(SDValue Op,
   case ISD::SDIVREM:
   case ISD::UDIVREM:
     return LowerDivRem(Op, DAG);
+  case ISD::INTRINSIC_W_CHAIN:
+    return LowerINTRINSIC_W_CHAIN(Op, DAG);
   }
 }
 
@@ -309,6 +317,8 @@ const char *V850TargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "V850ISD::CLR1_MEM";
   case V850ISD::NOT1_MEM:
     return "V850ISD::NOT1_MEM";
+  case V850ISD::TST1_MEM:
+    return "V850ISD::TST1_MEM";
   }
   return nullptr;
 }
@@ -478,6 +488,33 @@ Register V850TargetLowering::getRegisterByName(const char *RegName, LLT VT,
     return Reg;
 
   report_fatal_error(Twine("Invalid register name \"" + StringRef(RegName) + "\"."));
+}
+
+//===----------------------------------------------------------------------===//
+//                      Intrinsic Lowering
+//===----------------------------------------------------------------------===//
+
+SDValue V850TargetLowering::LowerINTRINSIC_W_CHAIN(SDValue Op,
+                                                    SelectionDAG &DAG) const {
+  SDLoc DL(Op);
+  unsigned IntNo = Op.getConstantOperandVal(1);
+
+  switch (IntNo) {
+  default:
+    return SDValue(); // Don't custom lower this intrinsic
+  case Intrinsic::v850_tst1: {
+    // TST1 - Test bit in memory
+    // Returns 1 if bit was 0 (Z flag set), 0 otherwise
+    SDValue Chain = Op.getOperand(0);
+    SDValue Addr = Op.getOperand(2);
+    SDValue Bit = Op.getOperand(3);
+
+    // Create TST1_MEM node: (result, chain) = TST1_MEM chain, addr, bit
+    SDVTList VTs = DAG.getVTList(MVT::i32, MVT::Other);
+    SDValue Ops[] = {Chain, Addr, Bit};
+    return DAG.getNode(V850ISD::TST1_MEM, DL, VTs, Ops);
+  }
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -1105,4 +1142,41 @@ V850TargetLowering::shouldExpandAtomicRMWInIR(AtomicRMWInst *AI) const {
 
   // For other sizes or without V850E2M, use library calls
   return AtomicExpansionKind::None;
+}
+
+//===----------------------------------------------------------------------===//
+// Custom Instruction Insertion
+//===----------------------------------------------------------------------===//
+
+MachineBasicBlock *
+V850TargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
+                                                 MachineBasicBlock *MBB) const {
+  switch (MI.getOpcode()) {
+  default:
+    llvm_unreachable("Unexpected instr type to insert");
+  case V850::TST1_PSEUDO: {
+    // Expand: TST1_PSEUDO $result, $bit, [$addr]
+    // To:     TST1r $bit, [$addr]    ; Sets Z flag if bit was 0
+    //         SETF z, $result        ; $result = Z flag (1 if bit was 0)
+    const TargetInstrInfo &TII = *Subtarget.getInstrInfo();
+    DebugLoc DL = MI.getDebugLoc();
+
+    Register ResultReg = MI.getOperand(0).getReg();
+    Register BitReg = MI.getOperand(1).getReg();
+    Register AddrReg = MI.getOperand(2).getReg();
+
+    // TST1r sets Z flag: Z=1 if the tested bit was 0
+    BuildMI(*MBB, MI, DL, TII.get(V850::TST1r))
+        .addReg(BitReg)
+        .addReg(AddrReg);
+
+    // SETF z, result: result = 1 if Z=1 (bit was 0), else result = 0
+    // Condition code 2 = "z" (zero/equal)
+    BuildMI(*MBB, MI, DL, TII.get(V850::SETF), ResultReg)
+        .addImm(2);  // CC_Z = 2
+
+    MI.eraseFromParent();
+    return MBB;
+  }
+  }
 }

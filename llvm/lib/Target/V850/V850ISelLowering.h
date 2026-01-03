@@ -61,6 +61,9 @@ enum NodeType : unsigned {
   CLR1_MEM,
   // NOT1_MEM: Toggle bit in memory byte - chain = NOT1_MEM chain, addr, bitnum
   NOT1_MEM,
+  // TST1_MEM: Test bit in memory - (result, chain) = TST1_MEM chain, addr, bitnum
+  // Returns 1 if bit was 0 (Z flag set), 0 otherwise
+  TST1_MEM,
 };
 } // namespace V850ISD
 
@@ -90,6 +93,7 @@ public:
   SDValue LowerMULHS(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerMULHU(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerDivRem(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerINTRINSIC_W_CHAIN(SDValue Op, SelectionDAG &DAG) const;
 
   /// PerformDAGCombine - Perform target-specific DAG combining.
   SDValue PerformDAGCombine(SDNode *N, DAGCombinerInfo &DCI) const override;
@@ -109,6 +113,11 @@ public:
 
   TargetLowering::AtomicExpansionKind
   shouldExpandAtomicRMWInIR(AtomicRMWInst *AI) const override;
+
+  // Custom instruction insertion for pseudo instructions
+  MachineBasicBlock *
+  EmitInstrWithCustomInserter(MachineInstr &MI,
+                              MachineBasicBlock *MBB) const override;
 
 private:
   const V850Subtarget &Subtarget;
