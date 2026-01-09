@@ -1283,7 +1283,7 @@ def DIVH_3 : FormatXI<0b111111, 0b010100, 0b00000, (outs GPR:$reg2, GPR:$reg3),
 
 // DIVQ/DIVQU - High-speed divide instructions (V850E2M only)
 // These use variable-step execution and are faster than DIV/DIVU
-let Predicates = [HasV850E2M], DecoderNamespace = "V850E2M" in {
+let Predicates = [HasV850E2M] in {
 
 // DIVQ reg1, reg2, reg3 - Divide word signed quickly (V850E2M)
 // High-speed division with variable-step execution (N+5 cycles)
@@ -1393,6 +1393,15 @@ def HSW : FormatXII<0b111111, 0b011010, (outs GPR:$reg3), (ins GPR:$reg2),
 // HSW patterns for expanded rotate by 16 (since ROTR is Expand)
 def : Pat<(or (shl GPR:$rs, (i32 16)), (srl GPR:$rs, (i32 16))), (HSW GPR:$rs)>;
 def : Pat<(or (srl GPR:$rs, (i32 16)), (shl GPR:$rs, (i32 16))), (HSW GPR:$rs)>;
+
+// BSH pattern: for bswap16 with masked input
+// When upper 16 bits are known zero, bsh is more efficient than bsw + shr
+// Pattern: (srl (bswap (and x, 0xFFFF)), 16) -> bsh x
+def : Pat<(srl (bswap (and GPR:$src, 0xFFFF)), (i32 16)), (BSH GPR:$src)>;
+
+// Intrinsic patterns for HSW and BSH
+def : Pat<(int_v850_hsw GPR:$src), (HSW GPR:$src)>;
+def : Pat<(int_v850_bsh GPR:$src), (BSH GPR:$src)>;
 
 //===----------------------------------------------------------------------===//
 // Conditional Move Instructions (32-bit) - Format XI/XII
@@ -1830,7 +1839,7 @@ let Predicates = [HasV850E2M] in
 def : Pat<(atomic_cmp_swap_i32 GPR:$addr, GPR:$expected, GPR:$new),
           (CAXI GPR:$addr, GPR:$expected, GPR:$new)>;
 
-let Predicates = [HasV850FPU], DecoderNamespace = "V850FPU" in {
+let Predicates = [HasV850FPU] in {
 
 //===----------------------------------------------------------------------===//
 // V850E2M FPU Instructions - Single Precision Arithmetic

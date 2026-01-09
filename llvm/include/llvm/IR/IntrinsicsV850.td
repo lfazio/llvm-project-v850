@@ -38,4 +38,20 @@ def int_v850_not1 : Intrinsic<[], [llvm_ptr_ty, llvm_i32_ty],
 def int_v850_tst1 : Intrinsic<[llvm_i32_ty], [llvm_ptr_ty, llvm_i32_ty],
                               [IntrReadMem, IntrArgMemOnly, NoCapture<ArgIndex<0>>]>;
 
+//===----------------------------------------------------------------------===//
+// Byte/Halfword Swap Operations
+//===----------------------------------------------------------------------===//
+
+// HSW - Halfword swap (swap upper and lower 16-bit halfwords)
+// i32 @llvm.v850.hsw(i32 %x)
+// Result: (x >> 16) | (x << 16), i.e., 0xAABBCCDD -> 0xCCDDAABB
+def int_v850_hsw : Intrinsic<[llvm_i32_ty], [llvm_i32_ty],
+                             [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
+
+// BSH - Byte swap halfword (swap bytes in lower 16 bits, keep upper unchanged)
+// i32 @llvm.v850.bsh(i32 %x)
+// Result: 0xAABBCCDD -> 0xAABBDDCC
+def int_v850_bsh : Intrinsic<[llvm_i32_ty], [llvm_i32_ty],
+                             [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
+
 } // TargetPrefix = "v850"
