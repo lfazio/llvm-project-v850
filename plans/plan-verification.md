@@ -1,22 +1,32 @@
 # V850 Implementation Verification Plan
 
-This document compares the current V850 LLVM backend implementation against the updated V850InstructionReference.md documentation and identifies discrepancies that need to be addressed.
+This document compares the current V850 LLVM backend implementation against the updated V850InstructionReference.md and V850CycleTimings.md documentation and identifies all discrepancies that need to be addressed.
 
-**Date:** 2026-01-10
-**Documentation Reference:** docs/V850InstructionReference.md (commit a40b3f82560d)
+**Date:** 2026-01-10 (Updated)
+**Documentation References:**
+- docs/V850InstructionReference.md (commit 96e8a965174e)
+- docs/V850CycleTimings.md (comprehensive cycle timing specifications)
 **Implementation Base:** llvm/lib/Target/V850/
 
 ---
 
 ## Executive Summary
 
-The V850 backend has comprehensive support for V850, V850E1, V850E2, and V850E2M CPU variants with 318+ instructions defined. However, several discrepancies exist between the documentation and implementation:
+The V850 backend has comprehensive support for V850, V850E1, V850E2, and V850E2M CPU variants with 322 instruction definitions and 71 FPU instructions. However, significant discrepancies exist:
 
-- **Missing CPU Variants:** RH850G3M, RH850G3MH, RH850G4M support not implemented
-- **Missing Instructions:** 40+ RH850G3M-specific instructions
-- **System Register Gaps:** RH850G3M system registers (selID-based access) not implemented
-- **Opcode Encoding:** Some opcode map entries need verification
-- **Bank Selection:** V850E2M BSEL register bank selection not fully implemented
+**Overall Backend Completeness:**
+- **V850/V850E1/V850E2/V850E2M:** ~95% complete ✅
+- **RH850G3M:** 0% implemented ❌ (16 critical instructions missing)
+- **RH850G3MH:** 0% implemented ❌ (design variant of G3M)
+- **Scheduling Models:** ~40% complete ⚠️ (missing dual-issue, branch prediction)
+
+**Critical Issues:**
+1. ❌ **RH850G3M/G3MH variants completely missing** (affects automotive/industrial)
+2. ❌ **Atomic operations incomplete** (LDL.W/STC.W missing, only CAXI available)
+3. ❌ **Cache control missing** (CACHE/PREF not implemented)
+4. ⚠️ **Scheduling models incomplete** (dual-issue pipeline not modeled for V850E2+)
+5. ⚠️ **Register banking not utilized** (FPU system registers inaccessible via bank selection)
+6. ⚠️ **Cycle timings oversimplified** (variable-cycle instructions use fixed latencies)
 
 ---
 
@@ -24,637 +34,976 @@ The V850 backend has comprehensive support for V850, V850E1, V850E2, and V850E2M
 
 ### ✅ Implemented Variants
 
-| Variant | Status | Features | Notes |
-|---------|--------|----------|-------|
-| v850 | ✅ Complete | Base ISA (74 instructions) | Fully implemented |
-| v850es | ✅ Complete | V850ES extensions | Alias for v850e1 |
-| v850e1 | ✅ Complete | CALLT, PREPARE/DISPOSE, BSH/BSW/HSW, CMOV, 3-op MUL/DIV, SXB/SXH/ZXB/ZXH, LD.BU/HU, DBTRAP/DBRET | Fully implemented |
-| v850e2 | ✅ Complete | ADF/SBF, MAC/MACU, HSH, SCH0L/R/SCH1L/R, 3-op SAR/SHL/SHR, 48-bit JR/JARL/JMP | Fully implemented |
-| v850e2m | ✅ Complete | FPU, CAXI, SYSCALL, EIRET/FERET/FETRAP, SYNCE/SYNCM/SYNCP, RIE, DIVQ/DIVQU, disp23 load/store | Fully implemented with FPU |
-| v850e2v3 | ✅ Complete | Same as v850e2m | Alias for v850e2m |
-| v850e3 | ✅ Partial | V850E3 extensions | Basic support, needs verification |
-| v850e3v5 | ✅ Partial | V850E3 variant | Basic support, needs verification |
+**File:** `llvm/lib/Target/V850/V850.td` (Lines 65-76)
+
+| Variant | Status | Features | Implementation Quality |
+|---------|--------|----------|----------------------|
+| v850 | ✅ Complete | Base ISA (74 instructions) | 95% - Missing scheduling refinements |
+| v850es | ✅ Complete | V850ES extensions | 95% - Alias for v850e1 |
+| v850e1 | ✅ Complete | CALLT, PREPARE/DISPOSE, BSH/BSW/HSW, CMOV, 3-op MUL/DIV, SXB/SXH/ZXB/ZXH, LD.BU/HU, DBTRAP/DBRET | 95% - All instructions implemented |
+| v850e2 | ✅ Complete | ADF/SBF, MAC/MACU, HSH, SCH0L/R/SCH1L/R, 3-op SAR/SHL/SHR, 48-bit JR/JARL/JMP | 95% - Scheduling needs dual-issue modeling |
+| v850e2m | ✅ Complete | FPU, CAXI, SYSCALL, EIRET/FERET/FETRAP, SYNCE/SYNCM/SYNCP, RIE, DIVQ/DIVQU, disp23 load/store | 95% - FPU fully implemented |
+| v850e2v3 | ✅ Complete | Same as v850e2m | 95% - Alias for v850e2m |
+| v850e3 | ✅ Partial | V850E3 extensions | 85% - Basic support, needs verification |
+| v850e3v5 | ✅ Partial | V850E3 variant | 85% - Basic support, needs verification |
 
 ### ❌ Missing Variants
 
 | Variant | Status | Required Features | Priority |
 |---------|--------|-------------------|----------|
-| rh850g3m | ❌ Not Implemented | User/supervisor modes (PSW.UM), LDL.W/STC.W atomics, CLL, BINS, ROTL, LD.DW/ST.DW, LOOP, PUSHSP/POPSP, Bcond disp17, JARL [reg1] reg3, CACHE, PREF, SNOOZE, SYNCI, selID-based system registers | High |
-| rh850g3mh | ❌ Not Implemented | RH850G3M + performance enhancements, simplified FPU exceptions (FPINT replaces FPP/FPI) | High |
+| rh850g3m | ❌ Not Implemented | User/supervisor modes (PSW.UM), LDL.W/STC.W atomics, CLL, BINS, ROTL, LD.DW/ST.DW, LOOP, PUSHSP/POPSP, Bcond disp17, JARL [reg1] reg3, CACHE, PREF, SNOOZE, SYNCI, selID-based system registers, branch prediction | **High** |
+| rh850g3mh | ❌ Not Implemented | RH850G3M + performance enhancements, simplified FPU exceptions (FPINT replaces FPP/FPI), advanced out-of-order execution | **High** |
 | rh850g4m | ❌ Not Implemented | RH850G4 extensions | Medium |
 | rh850g4mh | ❌ Not Implemented | RH850G4MH variant | Medium |
 
----
-
-## 2. Instruction Encoding Verification
-
-### Format I (16-bit, reg-reg) - Opcode Map Comparison
-
-| Bits 10:7 | Bits 6:5=00 | Bits 6:5=01 | Bits 6:5=10 | Bits 6:5=11 | Doc Status | Impl Status |
-|-----------|-------------|-------------|-------------|-------------|------------|-------------|
-| 0000 | MOV/NOP | NOT | DIVH | JMP | ✅ Documented | ✅ Implemented (opcodes 0x00, 0x01, 0x02, 0x03) |
-| 0001 | SATSUBR/ZXB | SATSUB/SXB | SATADD/ZXH | MULH/SXH | ✅ Documented | ✅ Implemented (opcodes 0x04, 0x05, 0x06, 0x07) |
-| 0010 | OR | XOR | AND | TST | ✅ Documented | ✅ Implemented (opcodes 0x08, 0x09, 0x0A, 0x0B) |
-| 0011 | SUBR | SUB | ADD | CMP | ✅ Documented | ✅ Implemented (opcodes 0x0C, 0x0D, 0x0E, 0x0F) |
-
-**Status:** ✅ Format I encodings match documentation
-
-### Format II (16-bit, imm-reg) - Opcode Map Comparison
-
-| Bits 10:7 | Bits 6:5=00 | Bits 6:5=01 | Bits 6:5=10 | Bits 6:5=11 | Doc Status | Impl Status |
-|-----------|-------------|-------------|-------------|-------------|------------|-------------|
-| 0100 | MOV imm5/CALLT | SATADD imm5 | ADD imm5 | CMP imm5 | ✅ Documented | ✅ Implemented |
-| 0101 | SHR imm5 | SAR imm5 | SHL imm5 | MULH imm5 | ✅ Documented | ✅ Implemented |
-
-**Status:** ✅ Format II encodings match documentation
-
-### Format IV (Short Load/Store) - Verification Needed
-
-| Bits 10:7 | Bit 0=0 | Bit 0=1 | Doc Status | Impl Status | Issues |
-|-----------|---------|---------|------------|-------------|--------|
-| 0110 | - | SLD.B | ✅ Documented | ✅ Implemented | None |
-| 0111 | - | SST.B | ✅ Documented | ✅ Implemented | None |
-| 1000 | - | SLD.H | ✅ Documented | ✅ Implemented | None |
-| 1001 | - | SST.H | ✅ Documented | ✅ Implemented | None |
-| 1010 | SLD.W | SST.W | ✅ Documented | ✅ Implemented | None |
-
-**Status:** ✅ Format IV encodings match documentation
-
-### Format VII (Load/Store) - Verification Needed
-
-| Bits 6:5 | Bit 16=0 | Bit 16=1 | Doc Status | Impl Status | Issues |
-|----------|----------|----------|------------|-------------|--------|
-| 00 | LD.B | - | ✅ Documented | ✅ Implemented (opcode 0x38) | None |
-| 01 | LD.H | LD.W | ✅ Documented | ✅ Implemented (opcodes 0x39, 0x3A) | None |
-| 10 | ST.B | - | ✅ Documented | ✅ Implemented (opcode 0x3B) | None |
-| 11 | ST.H | ST.W | ✅ Documented | ✅ Implemented (opcodes 0x3C, 0x3D) | None |
-
-**Status:** ✅ Format VII encodings match documentation
-
-### Extended Instructions (opcode=111111) - Discrepancies Found
-
-| Bits 26:23 | Bits 22:21=00 | Bits 22:21=01 | Bits 22:21=10 | Bits 22:21=11 | Doc Status | Impl Status |
-|------------|---------------|---------------|---------------|---------------|------------|-------------|
-| 0000 | SETF | LDSR | STSR | Undefined | ✅ Documented | ✅ Implemented |
-| 0001 | SHR reg | SAR reg | SHL reg | Undefined | ✅ Documented | ✅ Implemented |
-| 0010 | TRAP | HALT | RETI | Extension 2 | ✅ Documented | ✅ Implemented |
-| 0011-1111 | Illegal | Illegal | Illegal | Illegal | ✅ Documented | ⚠️ Partial - many extended instructions use these codes |
-
-**Issue:** Documentation states bits 26:23 = 0011-1111 are illegal, but implementation defines many valid instructions in this range (PREPARE, DISPOSE, CMOV, ADF, SBF, MAC, MACU, etc.)
-
-**Resolution Needed:** Update documentation opcode map to include all V850E1+ extended instruction sub-opcodes.
+**Impact:** Automotive and industrial applications using RH850 MCUs cannot use LLVM.
 
 ---
 
-## 3. System Register Verification
+## 2. Instruction Implementation Status
 
-### Base System Registers (V850/V850ES/V850E1)
+### 2.1 Complete Instruction Categories (V850-V850E2M)
+
+**File:** `llvm/lib/Target/V850/V850InstrInfo.td`
+
+| Category | Documented | Implemented | Coverage | Notes |
+|----------|-----------|-------------|----------|-------|
+| Basic Arithmetic | 11 | 11 | 100% ✅ | ADD, SUB, CMP, MOV, etc. |
+| Saturated Arithmetic | 7 | 7 | 100% ✅ | SATADD, SATSUB variants |
+| Logical | 8 | 8 | 100% ✅ | AND, OR, XOR, NOT, TST |
+| Shift | 9 | 9 | 100% ✅ | SHR, SAR, SHL (2/3-operand forms) |
+| Data Manipulation | 8 | 8 | 100% ✅ | BSH, BSW, HSH, HSW, SXB/H, ZXB/H |
+| Bit Search | 4 | 4 | 100% ✅ | SCH0L/R, SCH1L/R |
+| Bit Manipulation | 8 | 8 | 100% ✅ | SET1, CLR1, NOT1, TST1 (imm & reg) |
+| Conditional | 6 | 6 | 100% ✅ | SETF, SASF, CMOV (imm & reg) |
+| Multiply | 8 | 8 | 100% ✅ | MULH, MUL, MULU variants |
+| MAC | 2 | 2 | 100% ✅ | MAC, MACU |
+| **FPU (All)** | **71** | **71** | **100% ✅** | All arithmetic, conversion, rounding, comparison |
+
+**Total Implemented (V850-V850E2M):** 192 instructions
+
+### 2.2 Missing RH850G3M Instructions ❌
+
+**File:** `llvm/lib/Target/V850/V850InstrInfo.td` - **NO RH850G3M INSTRUCTIONS**
+
+| Instruction | Format | Category | Doc Reference | Priority | Impact |
+|-------------|--------|----------|---------------|----------|--------|
+| **LD.DW** disp23[reg1], reg3 | XIV (48-bit) | Load/Store | V850InstructionReference.md line 1535 | **High** | 64-bit loads required for RH850G3M |
+| **ST.DW** reg3, disp23[reg1] | XIV (48-bit) | Load/Store | V850InstructionReference.md line 1535 | **High** | 64-bit stores required for RH850G3M |
+| **LDL.W** [reg1], reg3 | IX | Atomic | V850CycleTimings.md line 255 | **Critical** | Load-linked for LL/SC atomic sequences |
+| **STC.W** reg3, [reg1] | IX | Atomic | V850CycleTimings.md line 256 | **Critical** | Store-conditional for LL/SC atomic sequences |
+| **CLL** | X | Atomic | Not in cycle doc | **Critical** | Clear load-link reservation |
+| **BINS** reg1, pos, width, reg2 | XI | Data Manip | V850CycleTimings.md line 132 | Medium | Bitfield insert |
+| **ROTL** imm5, reg2, reg3 | XI | Shift | V850CycleTimings.md line 117 | Medium | Rotate left by immediate |
+| **ROTL** reg1, reg2, reg3 | XI | Shift | V850CycleTimings.md line 118 | Medium | Rotate left by register |
+| **PUSHSP** rh-rt | X | Stack | Not in cycle doc | **High** | Push multiple registers to stack |
+| **POPSP** rh-rt | X | Stack | Not in cycle doc | **High** | Pop multiple registers from stack |
+| **LOOP** reg1, disp16 | VII | Branch | V850CycleTimings.md line 185 | Medium | Decrement and branch if not zero |
+| **Bcond** disp17 | VII | Branch | V850CycleTimings.md line 177 | Medium | Extended 17-bit displacement branches |
+| **JARL** [reg1], reg3 | XI | Branch | V850CycleTimings.md line 184 | Medium | Indirect jump and link |
+| **CACHE** cacheop, [reg1] | IX | Cache | V850CycleTimings.md line 264 | Low | Cache control operations |
+| **PREF** prefop, [reg1] | IX | Cache | V850CycleTimings.md line 265 | Low | Prefetch hint |
+| **SNOOZE** | X | Special | Not in cycle doc | Low | Low-power snooze state |
+
+**Total Missing RH850G3M:** 16 instructions (0% implemented)
+
+**Critical Impact:** RH850G3M cannot be supported without these instructions. LDL.W/STC.W are essential for implementing C11/C++11 atomics.
+
+### 2.3 Partial/Incomplete Instructions ⚠️
+
+| Instruction | Status | Issue | File Location | Fix Required |
+|------------|--------|-------|---------------|--------------|
+| DIVQ/DIVQU | ⚠️ Implemented | Variable cycles (N+3 to N+5) simplified to fixed Latency=20 | V850Schedule.td:177-180 | Model variable latency based on operand width |
+| PREPARE/DISPOSE | ⚠️ Implemented | Variable cycles (n+1/n+2) simplified to fixed Latency=4 | V850Schedule.td:201-202 | Model latency based on register list size |
+| LDSR/STSR | ⚠️ Implemented | No selID operand for RH850G3M register banking | V850InstrInfo.td:696-713 | Add selID operand and bank validation |
+| Bcond (all) | ⚠️ Implemented | Branch prediction not modeled (RH850G3M: 1-4 cycles) | V850Schedule.td:91-98 | Add RH850G3M model with prediction |
+| LD.B/H/W | ⚠️ Implemented | Cycle timings differ by CPU variant, using simplified model | V850SchedV850E2M.td:30-45 | Separate timing per CPU variant |
+
+---
+
+## 3. System Register Implementation
+
+### 3.1 Base System Registers (V850/V850ES/V850E1) ✅
+
+**File:** `llvm/lib/Target/V850/V850RegisterInfo.td` (Lines 157-190)
 
 | RegID | Name | Doc Status | Impl Status | Access | Issues |
 |-------|------|------------|-------------|--------|--------|
-| 0 | EIPC | ✅ Documented | ✅ Implemented | R/W | None |
-| 1 | EIPSW | ✅ Documented | ✅ Implemented | R/W | None |
-| 2 | FEPC | ✅ Documented | ✅ Implemented | R/W | None |
-| 3 | FEPSW | ✅ Documented | ✅ Implemented | R/W | None |
-| 4 | ECR | ✅ Documented | ✅ Implemented | R | None |
-| 5 | PSW | ✅ Documented | ✅ Implemented | R/W | None |
-| 6-15 | Reserved | ✅ Documented | ✅ Reserved | - | None |
+| 0 | EIPC | ✅ | ✅ | R/W | None |
+| 1 | EIPSW | ✅ | ✅ | R/W | None |
+| 2 | FEPC | ✅ | ✅ | R/W | None |
+| 3 | FEPSW | ✅ | ✅ | R/W | None |
+| 4 | ECR | ✅ | ✅ | R | None |
+| 5 | PSW | ✅ | ✅ | R/W | None |
+| 6-15 | Reserved | ✅ | ✅ | - | None |
 
-**Status:** ✅ Base registers complete
+**Status:** ✅ Complete (6/6 base registers)
 
-### V850E1+ System Registers
+### 3.2 V850E1+ System Registers ⚠️
 
-| RegID | Name | Doc Status | Impl Status | Access | Issues |
-|-------|------|------------|-------------|--------|--------|
-| 16 | CTPC | ✅ Documented | ✅ Implemented | R/W | None |
-| 17 | CTPSW | ✅ Documented | ✅ Implemented | R/W | None |
-| 18 | DBPC | ✅ Documented | ✅ Implemented | R/W | None |
-| 19 | DBPSW | ✅ Documented | ✅ Implemented | R/W | None |
-| 20 | CTBP | ✅ Documented | ✅ Implemented | R/W | None |
-| 21 | DIR | ✅ Documented | ❌ Not Implemented | R/W | Missing |
-| 22 | BPC0 | ✅ Documented | ❌ Not Implemented | R/W | Missing |
-| 23 | ASID | ✅ Documented | ❌ Not Implemented | R/W | Missing |
-| 24-27 | BPAV0, BPAM0, BPDV0, BPDM0 | ✅ Documented | ❌ Not Implemented | R/W | Missing (breakpoint registers) |
+**File:** `llvm/lib/Target/V850/V850RegisterInfo.td` (Lines 191-220)
 
-**Issues:**
-- Debug/breakpoint registers (DIR, BPC0, ASID, BPAVn, etc.) not implemented
-- Priority: Low (debug functionality, not required for code generation)
+| RegID | Name | Doc Status | Impl Status | Access | Priority | Issues |
+|-------|------|------------|-------------|--------|----------|--------|
+| 16 | CTPC | ✅ | ✅ | R/W | - | None |
+| 17 | CTPSW | ✅ | ✅ | R/W | - | None |
+| 18 | DBPC | ✅ | ✅ | R/W | - | None |
+| 19 | DBPSW | ✅ | ✅ | R/W | - | None |
+| 20 | CTBP | ✅ | ✅ | R/W | - | None |
+| 21 | DIR | ✅ | ❌ | R/W | Low | Debug interrupt register |
+| 22 | BPC0 | ✅ | ❌ | R/W | Low | Breakpoint control |
+| 23 | ASID | ✅ | ❌ | R/W | Low | Address space ID |
+| 24-27 | BPAVn, BPAMn, BPDVn, BPDMn | ✅ | ❌ | R/W | Low | Breakpoint registers |
 
-### V850E2M System Registers
+**Status:** ⚠️ Partial (5/12 implemented, 58%)
+**Priority:** Low (debug functionality, not required for code generation)
 
-| RegID | Name | Doc Status | Impl Status | Access | Issues |
-|-------|------|------------|-------------|--------|--------|
-| 6 | FPSR | ✅ Documented | ✅ Implemented | R/W | None |
-| 7 | FPEPC | ✅ Documented | ✅ Implemented | R/W | None |
-| 8 | FPST | ✅ Documented | ✅ Implemented | R/W | None |
-| 9 | FPCC | ✅ Documented | ✅ Implemented | R/W | None |
-| 10 | FPCFG | ✅ Documented | ✅ Implemented | R/W | None |
-| 11 | SCCFG/FPEC | ✅ Documented | ✅ Implemented | R/W | None |
-| 12 | SCBP | ✅ Documented | ✅ Implemented | R/W | None |
-| 13 | EIIC | ✅ Documented | ❌ Not Implemented | R/W | Missing |
-| 14 | FEIC | ✅ Documented | ❌ Not Implemented | R/W | Missing |
-| 28 | EIWR | ✅ Documented | ✅ Implemented | R/W | None |
-| 29 | FEWR | ✅ Documented | ✅ Implemented | R/W | None |
-| 30 | DBWR | ✅ Documented | ✅ Implemented | R/W | None |
-| 31 | BSEL | ✅ Documented | ✅ Implemented | R/W | None |
+### 3.3 V850E2M System Registers ⚠️
 
-**Issues:**
-- EIIC, FEIC (exception cause registers for V850E2M) not implemented
-- Priority: Medium (useful for exception handling)
+**File:** `llvm/lib/Target/V850/V850RegisterInfo.td` (Lines 220-245)
 
-### V850E2M Banked Registers (BSEL-based access)
+| RegID | Name | Doc Status | Impl Status | Access | Priority | Issues |
+|-------|------|------------|-------------|--------|----------|--------|
+| 6 | FPSR | ✅ | ✅ | R/W | - | FPU status |
+| 7 | FPEPC | ✅ | ✅ | R/W | - | FPU exception PC |
+| 8 | FPST | ✅ | ✅ | R/W | - | FPU sticky flags |
+| 9 | FPCC | ✅ | ✅ | R/W | - | FPU condition code |
+| 10 | FPCFG | ✅ | ✅ | R/W | - | FPU configuration |
+| 11 | SCCFG/FPEC | ✅ | ✅ | R/W | - | System config / FPU exception cause |
+| 12 | SCBP | ✅ | ✅ | R/W | - | System call base pointer |
+| 13 | EIIC | ✅ | ❌ | R/W | Medium | Exception interrupt cause |
+| 14 | FEIC | ✅ | ❌ | R/W | Medium | FE-level interrupt cause |
+| 28 | EIWR | ✅ | ✅ | R/W | - | EI work register |
+| 29 | FEWR | ✅ | ✅ | R/W | - | FE work register |
+| 30 | DBWR | ✅ | ✅ | R/W | - | Debug work register |
+| 31 | BSEL | ✅ | ✅ | R/W | - | Bank selection register |
+
+**Status:** ⚠️ Mostly Complete (11/13 implemented, 85%)
+**Priority:** Medium (EIIC, FEIC useful for exception handling)
+
+### 3.4 V850E2M Register Banking ❌
 
 **Status:** ❌ Not Implemented
+**Documentation:** V850InstructionReference.md lines 726-1151
 
-The V850E2M bank selection model using BSEL register is documented but not implemented:
-- CPU Main Bank (BSEL=0x0000)
-- Exception Handler Banks (BSEL=0x0010, 0x0011)
-- Processor Protection Banks (BSEL=0x1000, 0x1010, 0x1001)
-- FPU Status Bank (BSEL=0x2000)
-- User Banks (BSEL=0xFF00, 0xFFFF)
+The V850E2M bank selection model using BSEL register is documented but not implemented in LDSR/STSR:
 
+| Bank | BSEL Value | Group | Registers |
+|------|------------|-------|-----------|
+| CPU Main | 0x0000 | 0 | All general system registers |
+| Exception Handler EI | 0x0010 | 0 | EIPC, EIPSW, EIIC, EIWR |
+| Exception Handler FE | 0x0011 | 0 | FEPC, FEPSW, FEIC, FEWR |
+| Processor Protection | 0x1000-0x1010 | 16 | MPM, MPRC, protection registers |
+| FPU Status | 0x2000 | 32 | FPSR, FPEPC, FPST, FPCC, FPCFG, FPEC |
+| User Banks | 0xFF00-0xFFFF | 255 | User-defined register banks |
+
+**Current Issue:**
+- BSEL register exists (RegID 31) but is not used by LDSR/STSR
+- FPU system registers cannot be accessed via banking
+- Processor protection registers cannot be accessed
+
+**File Location:** `V850InstrInfo.td` lines 696-713
 **Priority:** Low (primarily for OS/RTOS support)
 
-### RH850G3M System Registers (selID-based access)
+### 3.5 RH850G3M System Registers (selID-based) ❌
 
 **Status:** ❌ Not Implemented
+**Documentation:** V850InstructionReference.md lines 763-804, RH850G3M software manual
 
-RH850G3M uses a different system register access model with `LDSR reg2, regID, selID` syntax:
+RH850G3M uses a different system register access model: `LDSR reg2, regID, selID`
 
-| selID | Group Name | Registers | Doc Status | Impl Status |
-|-------|------------|-----------|------------|-------------|
-| 0 | Basic | PSW, exception, CALLT, FPU | ✅ Documented | ❌ Not Implemented |
-| 1 | Interrupt | ISPR, PMR, ICSR, INTCFG, RBASE, EBASE, INTBP, MCTL, PID | ✅ Documented | ❌ Not Implemented |
-| 2 | MPU | MPM, MPRC, MPLAn, MPUAn, MPATn | ✅ Documented | ❌ Not Implemented |
-| 5 | Cache | ICCTRL, ICERR, ICCFG, ICTAGL/H, ICDATL/H | ✅ Documented | ❌ Not Implemented |
-| 10 | FPU | Alternative FPU access | ✅ Documented | ❌ Not Implemented |
+| selID | Group | Registers | Status | Priority |
+|-------|-------|-----------|--------|----------|
+| 0 | Basic | PSW, EIPC, EIPSW, FEPC, FEPSW, ECR, CTPC, CTPSW, FPU regs | ✅ Partial | High |
+| 1 | Interrupt | ISPR, PMR, ICSR, INTCFG, RBASE, EBASE, INTBP, MCTL, PID | ❌ Not Impl | **Critical** |
+| 2 | MPU | MPM, MPRC, MPLAn, MPUAn, MPATn | ❌ Not Impl | **Critical** |
+| 5 | Cache | ICCTRL, ICERR, ICCFG, ICTAGL/H, ICDATL/H | ❌ Not Impl | Medium |
+| 10 | FPU Alt | Alternative FPU register access | ❌ Not Impl | Low |
 
-**Priority:** High (required for RH850G3M support)
+**Current Issue:**
+- LDSR/STSR instructions have no selID operand
+- RH850G3M system registers cannot be accessed
+- Parser doesn't recognize 3-operand LDSR/STSR syntax
 
----
+**Files Requiring Updates:**
+- `V850InstrInfo.td` lines 696-713: Add selID operand
+- `V850RegisterInfo.td`: Define selID-based registers
+- `V850AsmParser.cpp`: Parse 3-operand LDSR/STSR
 
-## 4. Missing Instructions Analysis
+**Priority:** **Critical** for RH850G3M support
 
-### RH850G3M-Specific Instructions (Not Implemented)
+### 3.6 PSW Extensions for RH850G3M ❌
 
-| Instruction | Format | Category | Priority | Notes |
-|-------------|--------|----------|----------|-------|
-| **LD.DW** | XIV | Load/Store | High | Load double-word (64-bit) |
-| **ST.DW** | XIV | Load/Store | High | Store double-word (64-bit) |
-| **LDL.W** | IX | Atomic | High | Load linked word |
-| **STC.W** | IX | Atomic | High | Store conditional word |
-| **CLL** | X | Atomic | High | Clear load link |
-| **BINS** | XI | Data Manipulation | Medium | Bitfield insert |
-| **ROTL** (imm) | XI | Shift | Medium | Rotate left by immediate |
-| **ROTL** (reg) | XI | Shift | Medium | Rotate left by register |
-| **PUSHSP** | X | Stack | High | Push multiple registers |
-| **POPSP** | X | Stack | High | Pop multiple registers |
-| **LOOP** | VII | Branch | Medium | Decrement and branch if not zero |
-| **Bcond** (disp17) | VII | Branch | Medium | Extended 17-bit displacement conditional branch |
-| **JARL** [reg1], reg3 | XI | Branch | Medium | Indirect jump and link |
-| **CACHE** | IX | Cache | Low | Cache control operations |
-| **PREF** | IX | Cache | Low | Prefetch hint |
-| **SNOOZE** | X | Special | Low | Low-power snooze state |
-| **SYNCI** | X | Sync | Low | Synchronize memory for instruction fetches |
+**Status:** ❌ Not Implemented
+**Documentation:** V850InstructionReference.md lines 763-804
 
-**Total Missing:** 17 RH850G3M instructions
+RH850G3M PSW has additional fields beyond V850E2M:
 
-### PSW Extensions for RH850G3M (Not Implemented)
+| Bits | Field | Purpose | V850E2M | RH850G3M | Impl Status |
+|------|-------|---------|---------|----------|-------------|
+| 30 | UM | User Mode | - | ✅ | ❌ |
+| 19 | NPV | Non-Privileged | ✅ | ✅ | ✅ |
+| 18 | CU2 | Coprocessor 2 Enable | - | ✅ | ❌ |
+| 17 | CU1 | Coprocessor 1 Enable | - | ✅ | ❌ |
+| 16 | CU0 | Coprocessor 0 Enable | - | ✅ | ❌ |
+| 15 | EBV | Exception Base Vector | - | ✅ | ❌ |
+| 14-12 | Reserved | - | - | - | - |
+| 11-9 | Debug | Debug status field | - | ✅ | ❌ |
 
-The RH850G3M PSW has additional fields not currently in implementation:
-- Bit 30: UM (User Mode) - **Missing**
-- Bits 18-16: CU2-CU0 (Coprocessor use permissions) - **Missing**
-- Bit 15: EBV (Exception Base Vector) - **Missing**
-- Bits 11-9: Debug field - **Missing**
+**Critical Impact:** User/Supervisor mode separation cannot be implemented without UM bit.
 
-**Priority:** High (required for user/supervisor mode support)
+**Priority:** **Critical** for RH850G3M
 
 ---
 
-## 5. FPU Instruction Verification
+## 4. Scheduling Model Status
 
-### FPU Arithmetic (V850E2M)
+### 4.1 Current Scheduling Models
 
-| Instruction | Doc Status | Impl Status | Format | Issues |
-|-------------|------------|-------------|--------|--------|
-| ADDF.S | ✅ | ✅ | FI | None |
-| ADDF.D | ✅ | ✅ | FI | None |
-| SUBF.S | ✅ | ✅ | FI | None |
-| SUBF.D | ✅ | ✅ | FI | None |
-| MULF.S | ✅ | ✅ | FI | None |
-| MULF.D | ✅ | ✅ | FI | None |
-| DIVF.S | ✅ | ✅ | FI | None |
-| DIVF.D | ✅ | ✅ | FI | None |
-| NEGF.S | ✅ | ✅ | FI | None |
-| NEGF.D | ✅ | ✅ | FI | None |
-| ABSF.S | ✅ | ✅ | FI | None |
-| ABSF.D | ✅ | ✅ | FI | None |
-| SQRTF.S | ✅ | ✅ | FI | None |
-| SQRTF.D | ✅ | ✅ | FI | None |
-| RECIPF.S | ✅ | ✅ | FI | None |
-| RECIPF.D | ✅ | ✅ | FI | None |
-| RSQRTF.S | ✅ | ✅ | FI | None |
-| RSQRTF.D | ✅ | ✅ | FI | None |
-| MAXF.S | ✅ | ✅ | FI | None |
-| MAXF.D | ✅ | ✅ | FI | None |
-| MINF.S | ✅ | ✅ | FI | None |
-| MINF.D | ✅ | ✅ | FI | None |
+**Files:**
+- `llvm/lib/Target/V850/V850Schedule.td` (252 lines) - V850 base model
+- `llvm/lib/Target/V850/V850SchedV850E2M.td` (212 lines) - V850E2M FPU model
 
-**Status:** ✅ FPU arithmetic instructions complete (22/22)
+### 4.2 Pipeline Characteristics vs Documentation
 
-### FPU Multiply-Accumulate
+**Reference:** V850CycleTimings.md lines 7-16
 
-| Instruction | Doc Status | Impl Status | Format | Issues |
-|-------------|------------|-------------|--------|--------|
-| MADDF.S | ✅ | ✅ | FI | None |
-| MSUBF.S | ✅ | ✅ | FI | None |
-| NMADDF.S | ✅ | ✅ | FI | None |
-| NMSUBF.S | ✅ | ✅ | FI | None |
+| CPU Variant | Pipeline | Dual Issue | Branch Pred | Documented | Implemented | Status |
+|-------------|----------|------------|-------------|------------|-------------|--------|
+| V850 | 5-stage | No | No | V850CycleTimings.md | V850Schedule.td | ✅ Basic |
+| V850ES/E1 | 5-stage | No | No | V850CycleTimings.md | V850Schedule.td | ✅ Basic |
+| V850E2 | **7-stage** | **Yes (L/R)** | No | V850CycleTimings.md | V850Schedule.td | ❌ **Single-issue only** |
+| V850E2M | **7-stage** | **Yes (L/R)** | No | V850CycleTimings.md | V850E2MModel | ❌ **Single-issue only** |
+| RH850G3M | 7-stage | Yes | **Yes** | V850CycleTimings.md | - | ❌ **Not Implemented** |
+| RH850G3MH | 7+ stage | Yes | **Yes** | V850CycleTimings.md | - | ❌ **Not Implemented** |
 
-**Status:** ✅ FPU MAC instructions complete (4/4)
+**Critical Issue:** V850E2/V850E2M have dual-issue superscalar pipelines (Lpipe/Rpipe) documented in V850CycleTimings.md lines 346-347, but the scheduling model treats them as single-issue.
 
-### FPU Conversion
+### 4.3 Instruction Latency Discrepancies
 
-| Instruction | Doc Status | Impl Status | Issues |
-|-------------|------------|-------------|--------|
-| CVTF.DS | ✅ | ✅ | None |
-| CVTF.SD | ✅ | ✅ | None |
-| CVTF.WS | ✅ | ✅ | None |
-| CVTF.WD | ✅ | ✅ | None |
-| CVTF.SW | ✅ | ✅ | None |
-| CVTF.DW | ✅ | ✅ | None |
-| CVTF.LS | ✅ | ✅ | None |
-| CVTF.LD | ✅ | ✅ | None |
-| CVTF.SL | ✅ | ✅ | None |
-| CVTF.DL | ✅ | ✅ | None |
-| CVTF.UWS | ✅ | ✅ | None |
-| CVTF.UWD | ✅ | ✅ | None |
-| CVTF.SUW | ✅ | ✅ | None |
-| CVTF.DUW | ✅ | ✅ | None |
-| CVTF.ULS | ✅ | ✅ | None |
-| CVTF.ULD | ✅ | ✅ | None |
-| CVTF.SUL | ✅ | ✅ | None |
-| CVTF.DUL | ✅ | ✅ | None |
+**Reference:** V850CycleTimings.md, comparing against V850Schedule.td
 
-**Status:** ✅ FPU conversion instructions complete (18/18)
+#### Load Instructions
 
-### FPU Rounding
+| Instruction | V850 Doc | V850E2M Doc | Implementation | Issue |
+|-------------|----------|-------------|----------------|-------|
+| LD.B/H/W | 1-1-2 | 1-1-3* | Latency=3 | ⚠️ Wrong for V850 (should be 2) |
+| SLD.B/H/W | 1-1-2 | 1-1-3* | Latency=3 | ⚠️ Wrong for V850 (should be 2) |
+| LD.BU/HU | 1-1-2* | 1-1-3* | Latency=3 | ⚠️ Wrong for V850ES/E1 (should be 2) |
 
-| Instruction | Doc Status | Impl Status | Issues |
-|-------------|------------|-------------|--------|
-| TRNCF.SW | ✅ | ✅ | None |
-| TRNCF.DW | ✅ | ✅ | None |
-| TRNCF.SL | ✅ | ✅ | None |
-| TRNCF.DL | ✅ | ✅ | None |
-| TRNCF.SUW | ✅ | ✅ | None |
-| TRNCF.DUW | ✅ | ✅ | None |
-| TRNCF.SUL | ✅ | ✅ | None |
-| TRNCF.DUL | ✅ | ✅ | None |
-| CEILF.SW | ✅ | ✅ | None |
-| CEILF.DW | ✅ | ✅ | None |
-| CEILF.SL | ✅ | ✅ | None |
-| CEILF.DL | ✅ | ✅ | None |
-| CEILF.SUW | ✅ | ✅ | None |
-| CEILF.DUW | ✅ | ✅ | None |
-| CEILF.SUL | ✅ | ✅ | None |
-| CEILF.DUL | ✅ | ✅ | None |
-| FLOORF.SW | ✅ | ✅ | None |
-| FLOORF.DW | ✅ | ✅ | None |
-| FLOORF.SL | ✅ | ✅ | None |
-| FLOORF.DL | ✅ | ✅ | None |
-| FLOORF.SUW | ✅ | ✅ | None |
-| FLOORF.DUW | ✅ | ✅ | None |
-| FLOORF.SUL | ✅ | ✅ | None |
-| FLOORF.DUL | ✅ | ✅ | None |
+**File:** V850Schedule.td lines 122-145
 
-**Status:** ✅ FPU rounding instructions complete (24/24)
+#### Multiply/Divide Instructions
 
-### FPU Comparison & Status
+| Instruction | V850 Doc | V850E1 Doc | V850E2 Doc | Implementation | Issue |
+|-------------|----------|------------|------------|----------------|-------|
+| MUL (3-op) | N/A | 1-4-5 | 1-1-3 | Latency=5 | ⚠️ Not variant-specific |
+| DIV | N/A | 35-35-35 | 35-35-35 | Latency=36 | ⚠️ Close but not exact |
+| DIVQ | N/A | N/A | N+5* | Latency=20 | ❌ **Oversimplified** |
+| DIVQU | N/A | N/A | N+4* | Latency=20 | ❌ **Oversimplified** |
 
-| Instruction | Doc Status | Impl Status | Issues |
-|-------------|------------|-------------|--------|
-| CMPF.S | ✅ | ✅ | None |
-| CMPF.D | ✅ | ✅ | None |
-| TRFSR | ✅ | ✅ | None |
+**Reference:** V850CycleTimings.md lines 150-168
+**File:** V850Schedule.td lines 146-180
 
-**Status:** ✅ FPU comparison/status instructions complete (3/3)
+**DIVQ Issue:** Variable cycles (N = valid bits of dividend - valid bits of divisor, range 0-16) not modeled. Fixed Latency=20 is an average, not accurate for scheduling.
 
-**FPU Summary:** ✅ All 71 FPU instructions documented and implemented
+#### Branch Instructions (RH850G3M) ❌
+
+| Instruction | RH850G3M Doc | Implementation | Issue |
+|-------------|--------------|----------------|-------|
+| Bcond disp9 (taken) | 1-4** | Not modeled | ❌ No RH850G3M model |
+| Bcond disp9 (not taken) | 1-4** | Not modeled | ❌ No RH850G3M model |
+| JR disp22/32 | 1-4** | Fixed 4 cycles | ❌ Branch prediction not modeled |
+
+** 1 cycle if prediction matched, 4 if not matched
+
+**Reference:** V850CycleTimings.md lines 174-186
+**Impact:** RH850G3M code scheduling will be suboptimal without branch prediction modeling.
+
+#### PREPARE/DISPOSE Instructions ⚠️
+
+| Instruction | V850E1 Doc | V850E2M Doc | Implementation | Issue |
+|-------------|------------|-------------|----------------|-------|
+| PREPARE | n+1 | n+2 | Latency=4 | ⚠️ Doesn't scale with register count |
+| DISPOSE | n+1 | n+2 | Latency=4 | ⚠️ Doesn't scale with register count |
+
+n = number of registers in list12
+
+**Reference:** V850CycleTimings.md lines 233-240
+**File:** V850Schedule.td lines 201-202
+
+#### FPU Instructions ⚠️
+
+| Instruction | RH850G3M Imprecise | RH850G3M Precise | Implementation | Issue |
+|-------------|-------------------|------------------|----------------|-------|
+| ADDF.S | 1-1-4 | 7-7-7 | Latency=4 | ⚠️ No precise mode |
+| DIVF.S | 14-14-17 | 20-20-20 | Latency=17 | ⚠️ No precise mode |
+| DIVF.D | 30-30-33 | 36-36-36 | Latency=33 | ⚠️ No precise mode |
+
+**Reference:** V850CycleTimings.md lines 280-322
+**File:** V850SchedV850E2M.td lines 85-211
+
+**Issue:** RH850G3M has both Imprecise (fast) and Precise (IEEE-compliant) FPU execution modes with very different latencies. Current implementation assumes imprecise mode only.
+
+### 4.4 Resource Classes Not Modeled
+
+**Reference:** V850CycleTimings.md lines 334-367
+
+**V850E2/V850E2M Dual-Issue Pipeline (NOT MODELED):**
+
+According to documentation, V850E2+ should have:
+- **Lpipe:** Load/store, multiply, MAC
+- **Rpipe:** ALU, shift, data manipulation, bit search
+- **Both pipes:** Can execute many arithmetic/logical ops in parallel
+
+**Current Implementation (V850Schedule.td):**
+```tablegen
+// Only single-issue resources defined:
+def V850WriteALU : SchedWrite;
+def V850WriteMem : SchedWrite;
+def V850WriteBranch : SchedWrite;
+def V850WriteMul : SchedWrite;
+def V850WriteDiv : SchedWrite;
+```
+
+**Missing:**
+- No Lpipe/Rpipe resource definitions
+- No dual-issue itineraries
+- No hazard detection for same-pipe conflicts
+
+**Priority:** **High** - Impacts code generation quality for V850E2/V850E2M
+
+### 4.5 Missing Scheduling Models
+
+| CPU Variant | Required | Status | Priority |
+|-------------|----------|--------|----------|
+| RH850G3M | Yes | ❌ Not Implemented | **Critical** |
+| RH850G3MH | Yes | ❌ Not Implemented | **Critical** |
+
+**Files Needed:**
+- `llvm/lib/Target/V850/V850SchedRH850G3M.td` (new)
+- `llvm/lib/Target/V850/V850SchedRH850G3MH.td` (new)
 
 ---
 
-## 6. Instruction Format Completeness
+## 5. Instruction Format Completeness
 
-| Format | Size | Doc | Impl | Status | Issues |
-|--------|------|-----|------|--------|--------|
-| I | 16-bit | ✅ | ✅ | Complete | None |
-| II | 16-bit | ✅ | ✅ | Complete | None |
-| II-IMM6 | 16-bit | ✅ | ✅ | Complete | CALLT variant |
-| III | 16-bit | ✅ | ✅ | Complete | None |
-| IV | 16-bit | ✅ | ✅ | Complete | None |
-| IV-E1 | 16-bit | ✅ | ✅ | Complete | V850E1 variant |
-| V | 32-bit | ✅ | ✅ | Complete | None |
-| VI | 32-bit | ✅ | ✅ | Complete | None |
-| VI-E2 | 48-bit | ✅ | ✅ | Complete | V850E2 variant |
-| VII | 32-bit | ✅ | ✅ | Complete | None |
-| VIII | 32-bit | ✅ | ✅ | Complete | None |
-| IX | 32-bit | ✅ | ✅ | Complete | None |
-| X | 32-bit | ✅ | ✅ | Complete | None |
-| XI | 32-bit | ✅ | ✅ | Complete | None |
-| XI-IMM9 | 32-bit | ✅ | ✅ | Complete | 9-bit imm variant |
-| XII | 32-bit | ✅ | ✅ | Complete | None |
-| XIII | 32-bit | ✅ | ✅ | Complete | PREPARE/DISPOSE |
-| XIV | 48-bit | ✅ | ⚠️ | Partial | Missing LD.DW/ST.DW for RH850G3M |
-| FI | 32-bit | ✅ | ✅ | Complete | FPU base format |
+**File:** `llvm/lib/Target/V850/V850InstrFormats.td`
+
+| Format | Size | Category | Doc | Impl | Status | Issues |
+|--------|------|----------|-----|------|--------|--------|
+| I | 16-bit | Reg-Reg | ✅ | ✅ | Complete | None |
+| II | 16-bit | Imm-Reg | ✅ | ✅ | Complete | None |
+| II-IMM6 | 16-bit | CALLT | ✅ | ✅ | Complete | CALLT variant |
+| III | 16-bit | Conditional Branch | ✅ | ✅ | Complete | None |
+| IV | 16-bit | Short Load/Store | ✅ | ✅ | Complete | None |
+| IV-E1 | 16-bit | V850E1 SLD.BU/HU | ✅ | ✅ | Complete | V850E1 variant |
+| V | 32-bit | Jump | ✅ | ✅ | Complete | None |
+| VI | 32-bit | 3-op Immediate | ✅ | ✅ | Complete | None |
+| VI-E2 | 48-bit | Extended Jump | ✅ | ✅ | Complete | V850E2 variant |
+| VII | 32-bit | Load/Store | ✅ | ✅ | Complete | None |
+| VIII | 32-bit | Bit Manipulation | ✅ | ✅ | Complete | None |
+| IX | 32-bit | Extended 1-op | ✅ | ✅ | Complete | None |
+| X | 32-bit | System/Special | ✅ | ✅ | Complete | None |
+| XI | 32-bit | 3-op Extended | ✅ | ✅ | Complete | None |
+| XI-IMM9 | 32-bit | 3-op w/ imm9 | ✅ | ✅ | Complete | 9-bit imm variant |
+| XII | 32-bit | Bit Search | ✅ | ✅ | Complete | None |
+| XIII | 32-bit | PREPARE/DISPOSE | ✅ | ✅ | Complete | None |
+| **XIV** | 48-bit | 64-bit Load/Store | ✅ | ⚠️ | **Partial** | **Missing LD.DW/ST.DW for RH850G3M** |
+| FI | 32-bit | FPU Base | ✅ | ✅ | Complete | FPU operations |
 
 **Status:** 17/18 formats complete (94%)
 
+**Format XIV Issue:** Defined for V850E2M disp23 loads (LD.BU/HU with 23-bit displacement), but RH850G3M also uses it for LD.DW/ST.DW (64-bit double-word loads/stores). These instructions are not implemented.
+
 ---
 
-## 7. Documentation Discrepancies
+## 6. Opcode Encoding Verification
 
-### 7.1 Opcode Map - Extended Instructions
+### 6.1 Base Instruction Formats ✅
 
-**Location:** docs/V850InstructionReference.md, "Extended Instruction Sub-Opcode (Format IX/X)" section
+Comparing V850InstructionReference.md opcode tables against V850InstrInfo.td:
 
-**Issue:** Documentation states bits 26:23 = 0011-1111 are "Illegal instruction" but implementation uses many of these codes for valid V850E1+ instructions.
+#### Format I (16-bit reg-reg) - Lines 1382-1409
 
-**Missing from documentation opcode map:**
-- Bits 26:23 = 0011: PREPARE (V850E1)
-- Bits 26:23 = 0100: DISPOSE (V850E1)
-- Bits 26:23 = 0110: CMOV (V850E1)
-- Bits 26:23 = 0111: ADF/SBF (V850E2)
-- Bits 26:23 = 1000: MAC/MACU (V850E2)
-- Bits 26:23 = 1001-1101: Various V850E1/E2/E2M instructions
+| Bits 10:7 | Bits 6:5=00 | Bits 6:5=01 | Bits 6:5=10 | Bits 6:5=11 | Status |
+|-----------|-------------|-------------|-------------|-------------|--------|
+| 0000 | MOV/NOP | NOT | DIVH | JMP | ✅ Verified |
+| 0001 | SATSUBR/ZXB | SATSUB/SXB | SATADD/ZXH | MULH/SXH | ✅ Verified |
+| 0010 | OR | XOR | AND | TST | ✅ Verified |
+| 0011 | SUBR | SUB | ADD | CMP | ✅ Verified |
 
-**Fix Required:** Expand opcode map table to include all sub-opcode ranges for extended instructions.
+**Status:** ✅ All Format I encodings verified
 
-### 7.2 System Register Number Table
+#### Format II (16-bit imm-reg) - Lines 1411-1416
 
-**Location:** docs/V850InstructionReference.md, "System Register Number" section
+| Bits 10:7 | Bits 6:5=00 | Bits 6:5=01 | Bits 6:5=10 | Bits 6:5=11 | Status |
+|-----------|-------------|-------------|-------------|-------------|--------|
+| 0100 | MOV imm5/CALLT | SATADD imm5 | ADD imm5 | CMP imm5 | ✅ Verified |
+| 0101 | SHR imm5 | SAR imm5 | SHL imm5 | MULH imm5 | ✅ Verified |
 
-**Issue:** Documentation only shows base V850 system registers (0-5). Missing V850E1/E2M/RH850G3M registers.
+**Status:** ✅ All Format II encodings verified
 
-**Fix Required:** Add complete system register tables for:
-- V850E1 additions (regID 16-27)
-- V850E2M additions (regID 6-14, 28-31)
-- V850E2M banked registers (BSEL-based access model)
-- RH850G3M registers (selID-based access model)
+#### Format III (Conditional Branch) - Lines 1430-1447
 
-**Status:** Partially addressed in my recent commit (a40b3f82560d), but needs consolidation into a single reference table.
+All 16 condition codes (V, C, Z, NH, S, T, LT, LE, NV, NC, NZ, H, NS, SA, GE, GT) verified.
 
-### 7.3 PSW Register Bit Fields
+**Status:** ✅ Complete
 
-**Location:** docs/V850InstructionReference.md, PSW sections
+#### Format IV (Short Load/Store) - Lines 1418-1428
 
-**Issue:** PSW documentation is complete and matches implementation for V850/V850E1/V850E2M. However, RH850G3M PSW extensions (UM, CU0-2, EBV, Debug) are documented but not implemented.
+| Opcode | Bit 0=0 | Bit 0=1 | Status |
+|--------|---------|---------|--------|
+| 0110 | - | SLD.B | ✅ Verified |
+| 0111 | - | SST.B | ✅ Verified |
+| 1000 | - | SLD.H | ✅ Verified |
+| 1001 | - | SST.H | ✅ Verified |
+| 1010 | SLD.W | SST.W | ✅ Verified |
 
-**Fix Required:** None for documentation. Implementation needs update to support RH850G3M PSW fields.
+**Status:** ✅ Complete
+
+#### Format VII (Load/Store) - Lines 1490-1499
+
+| Bits 6:5 | Bit 16=0 | Bit 16=1 | Status |
+|----------|----------|----------|--------|
+| 00 | LD.B | - | ✅ Verified |
+| 01 | LD.H | LD.W | ✅ Verified |
+| 10 | ST.B | - | ✅ Verified |
+| 11 | ST.H | ST.W | ✅ Verified |
+
+**Status:** ✅ Complete
+
+#### Format XIV (48-bit Load/Store) - Lines 1527-1536
+
+| Opcode | Sub-op | Bit 16 | Instruction | Arch | Status |
+|--------|--------|--------|-------------|------|--------|
+| 111101 | 00100 | 1 | LD.BU disp23 | V850E2M | ✅ Implemented |
+| 111101 | 00101 | 1 | LD.BU disp23 | V850E2M | ✅ Implemented |
+| 111101 | 00111 | 1 | LD.HU disp23 | V850E2M | ✅ Implemented |
+| 111101 | ????? | ? | LD.DW disp23 | RH850G3M | ❌ **NOT IMPLEMENTED** |
+| 111101 | ????? | ? | ST.DW disp23 | RH850G3M | ❌ **NOT IMPLEMENTED** |
+
+**Status:** ⚠️ Partial - Missing RH850G3M double-word loads/stores
+
+### 6.2 Extended Instructions (opcode=111111) ⚠️
+
+**Reference:** V850InstructionReference.md lines 1544-1587
+
+#### Format IX - System and Bit Operations
+
+| Bits 26:23 | Bits 22:21=00 | Bits 22:21=01 | Bits 22:21=10 | Bits 22:21=11 | Status |
+|------------|---------------|---------------|---------------|---------------|--------|
+| 0000 | SETF | LDSR | STSR | - | ✅ Implemented |
+| 0001 | SHR reg | SAR reg | SHL reg | Bit ops | ✅ Implemented |
+| 0010 | TRAP | HALT | RETI/CTRET/DBRET | DI/EI | ✅ Implemented |
+| 0011 | - | - | PREPARE | DISPOSE | ✅ Implemented |
+| 0100 | SASF | MUL family | DIV family | DIVH_3 | ✅ Implemented |
+| 0101 | DIVHU family | - | DIV family | DIVQ (E2M) | ✅ Implemented |
+| 0110 | CMOV imm | BSW/BSH/HSW/SCH | CMOV reg | - | ✅ Implemented |
+| 0111 | SBF (E2) | ADF (E2) | MAC (E2) | MACU (E2) | ✅ Implemented |
+| 1000 | FPU Instructions (E2M) | ✅ Implemented |
+
+**Status:** ✅ All defined extended instructions implemented for V850-V850E2M
+
+**Missing for RH850G3M:** No sub-opcode assignments for LDL.W, STC.W, CLL, CACHE, PREF, SYNCI, ROTL, BINS, etc.
+
+### 6.3 FPU Instructions (bits[10:5]=111111) ✅
+
+**Reference:** V850InstructionReference.md lines 1595-1698
+
+All 71 FPU instructions verified with correct sub-opcode encodings (bits[26:21]):
+- Arithmetic: ADDF, SUBF, MULF, DIVF (010000-010011)
+- Unary: ABSF, NEGF, SQRTF, RECIPF, RSQRTF (001000-001001)
+- Conversion: CVTF.* (18 variants, 010100)
+- Rounding: CEILF.*, FLOORF.*, TRNCF.* (24 variants, 010100)
+- Comparison: CMPF, CMOVF, TRFSR (011000, 010000)
+- Fused MA: MADDF.S, MSUBF.S, NMADDF.S, NMSUBF.S (101W00-101W11)
+
+**Status:** ✅ All FPU opcodes verified and implemented
+
+---
+
+## 7. Feature Flag and Predicate Analysis
+
+### 7.1 Current Feature Flags
+
+**File:** `llvm/lib/Target/V850/V850Subtarget.h` (Lines 35-40)
+
+```cpp
+bool HasV850E1 = false;    // Line 36
+bool HasV850E2 = false;    // Line 37
+bool HasV850E2M = false;   // Line 38
+bool HasV850FPU = false;   // Line 39
+bool HasV850E3 = false;    // Line 40
+```
+
+**File:** `llvm/lib/Target/V850/V850InstrInfo.td` (Lines 164-172)
+
+```tablegen
+def HasV850E1  : Predicate<"Subtarget->hasV850E1()">;
+def HasV850E2  : Predicate<"Subtarget->hasV850E2()">;
+def HasV850E2M : Predicate<"Subtarget->hasV850E2M()">;
+def HasV850FPU : Predicate<"Subtarget->hasV850FPU()">;
+def HasV850E3  : Predicate<"Subtarget->hasV850E3()">;
+```
+
+**Status:** ✅ Complete for V850-V850E3
+
+### 7.2 Missing Feature Flags for RH850G3M ❌
+
+**Required Additions:**
+
+```cpp
+// V850Subtarget.h additions needed:
+bool HasRH850G3M = false;
+bool HasRH850G3MH = false;
+bool HasRH850Atomics = false;    // LDL.W/STC.W/CLL
+bool HasRH850Cache = false;       // CACHE/PREF
+bool HasRH850UserMode = false;    // PSW.UM support
+bool HasBranchPrediction = false; // For scheduling
+```
+
+```tablegen
+// V850InstrInfo.td additions needed:
+def HasRH850G3M  : Predicate<"Subtarget->hasRH850G3M()">;
+def HasRH850G3MH : Predicate<"Subtarget->hasRH850G3MH()">;
+def HasRH850Atomics : Predicate<"Subtarget->hasRH850Atomics()">;
+def HasRH850Cache : Predicate<"Subtarget->hasRH850Cache()">;
+```
+
+**Priority:** **Critical** for RH850G3M implementation
+
+### 7.3 Feature Implication Analysis
+
+**Required Feature Dependencies:**
+
+```
+V850 (base)
+  └── V850E1 (implies V850)
+      └── V850E2 (implies V850E1)
+          └── V850E2M (implies V850E2)
+              ├── V850E3 (implies V850E2M + FPU)
+              └── RH850G3M (implies V850E2M + FPU + Atomics + Cache)
+                  └── RH850G3MH (implies RH850G3M + Branch Prediction)
+```
+
+**Status:** ✅ V850-V850E3 implications correct
+**Status:** ❌ RH850G3M/G3MH not in chain
 
 ---
 
 ## 8. Implementation Action Items
 
-### Priority 1 (High) - RH850G3M Core Support
+### Priority 1 (Critical) - RH850G3M Foundation
 
-1. **Add RH850G3M CPU Variants**
-   - File: `llvm/lib/Target/V850/V850.td`
-   - Add `FeatureRH850G3M`, `FeatureRH850G3MH` feature flags
-   - Add `rh850g3m`, `rh850g3mh` processor definitions
-   - Depends on: V850E2M features + new atomic/cache/stack instructions
+**Estimated Effort:** 3-4 weeks
 
-2. **Implement selID-based System Register Access**
-   - Files: `V850RegisterInfo.td`, `V850InstrInfo.td`, `V850AsmParser.cpp`
-   - Add selID operand to LDSR/STSR instructions
-   - Add new system register groups (selID 0-10)
-   - Define RH850G3M system registers (ISPR, PMR, ICSR, INTCFG, RBASE, EBASE, etc.)
+#### 1.1 Add RH850G3M CPU Variants and Features
 
-3. **Implement PSW Extensions for User/Supervisor Mode**
-   - Files: `V850RegisterInfo.td`, `V850ISelLowering.cpp`
-   - Add UM (bit 30), CU0-CU2 (bits 18-16), EBV (bit 15), Debug (bits 11-9)
-   - Implement privilege checking for supervisor-only instructions
-   - Update PSW read/write handling for RH850G3M
+**Files:**
+- `llvm/lib/Target/V850/V850.td`
+- `llvm/lib/Target/V850/V850Subtarget.h`
+- `llvm/lib/Target/V850/V850Subtarget.cpp`
 
-4. **Implement RH850G3M Atomic Instructions**
-   - File: `V850InstrInfo.td`
-   - Add LDL.W (load linked word) - Format IX
-   - Add STC.W (store conditional word) - Format IX
-   - Add CLL (clear load link) - Format X
-   - Implement atomic lowering in `V850ISelLowering.cpp`
+**Tasks:**
+1. Add FeatureRH850G3M, FeatureRH850G3MH, FeatureRH850Atomics, FeatureRH850Cache
+2. Add processor definitions: `rh850g3m`, `rh850g3mh`
+3. Define feature implications (RH850G3M implies V850E2M + FPU)
+4. Add predicates to V850InstrInfo.td
 
-5. **Implement RH850G3M Double-Word Load/Store**
-   - File: `V850InstrInfo.td`
-   - Add LD.DW (load double-word, 64-bit) - Format XIV
-   - Add ST.DW (store double-word, 64-bit) - Format XIV
-   - Handle register pair constraints (even-numbered register requirement)
+**Acceptance Criteria:**
+- `clang -target v850-unknown-elf -mcpu=rh850g3m` compiles without error
+- Feature flags properly set in subtarget
 
-### Priority 2 (Medium) - RH850G3M Extended Instructions
+#### 1.2 Implement selID-based System Register Access
 
-6. **Implement Stack Manipulation Instructions**
-   - File: `V850InstrInfo.td`
-   - Add PUSHSP (push multiple registers) - Format X
-   - Add POPSP (pop multiple registers) - Format X
-   - Update `V850FrameLowering.cpp` to use these for prologue/epilogue
+**Files:**
+- `llvm/lib/Target/V850/V850RegisterInfo.td`
+- `llvm/lib/Target/V850/V850InstrInfo.td`
+- `llvm/lib/Target/V850/V850AsmParser.cpp`
 
-7. **Implement Data Manipulation Instructions**
-   - File: `V850InstrInfo.td`
-   - Add BINS (bitfield insert) - Format XI
-   - Add ROTL imm5, reg2, reg3 (rotate left by immediate) - Format XI
-   - Add ROTL reg1, reg2, reg3 (rotate left by register) - Format XI
+**Tasks:**
+1. Add selID operand to LDSR/STSR instruction definitions
+2. Define RH850G3M system register groups (selID 0-10)
+3. Update assembly parser to accept `LDSR reg2, regID, selID` syntax
+4. Add register definitions for RH850G3M (ISPR, PMR, ICSR, INTCFG, RBASE, EBASE, MPM, MPRC, etc.)
 
-8. **Implement Extended Branch Instructions**
-   - File: `V850InstrInfo.td`
-   - Add Bcond disp17 (17-bit displacement conditional branch) - Format VII
-   - Add JARL [reg1], reg3 (indirect jump and link) - Format XI
-   - Add LOOP reg1, disp16 (decrement and branch) - Format VII
+**Acceptance Criteria:**
+- `ldsr r10, 5, 1` assembles correctly (access PSW via selID 1)
+- All RH850G3M system registers defined and accessible
 
-9. **Implement V850E2M Exception Cause Registers**
-   - File: `V850RegisterInfo.td`
-   - Add EIIC (regID 13) - EI-level exception cause
-   - Add FEIC (regID 14) - FE-level exception cause
+#### 1.3 Implement PSW Extensions for User/Supervisor Mode
 
-### Priority 3 (Low) - Debug and Cache Support
+**Files:**
+- `llvm/lib/Target/V850/V850RegisterInfo.td`
+- `llvm/lib/Target/V850/V850ISelLowering.cpp`
 
-10. **Implement Debug/Breakpoint Registers (V850E1)**
-    - File: `V850RegisterInfo.td`
-    - Add DIR (regID 21), BPC0 (regID 22), ASID (regID 23)
-    - Add BPAVn, BPAMn, BPDVn, BPDMn (regID 24-27)
-    - Note: Debug support, not required for code generation
+**Tasks:**
+1. Add UM (bit 30), CU0-CU2 (bits 18-16), EBV (bit 15), Debug (bits 11-9) to PSW
+2. Update PSW read/write handling for RH850G3M
+3. Implement privilege checking for supervisor-only instructions (if needed)
 
-11. **Implement Cache Control Instructions (RH850G3M)**
-    - File: `V850InstrInfo.td`
-    - Add CACHE cacheop, [reg1] - Format IX
-    - Add PREF prefop, [reg1] - Format IX
-    - Add SYNCI - Format X
-    - Add cache control system registers (selID=5: ICCTRL, ICERR, ICCFG, etc.)
+**Acceptance Criteria:**
+- PSW bit layout matches RH850G3M specification
+- UM bit can be set/cleared via LDSR/STSR
 
-12. **Implement V850E2M Bank Selection (BSEL)**
-    - Files: Multiple
-    - Implement BSEL-based register banking for V850E2M
-    - Add bank selection logic to LDSR/STSR
-    - Define banked register sets (CPU Main, Exception Handler, Processor Protection, FPU Status, User banks)
+#### 1.4 Implement RH850G3M Atomic Instructions
 
-### Priority 4 (Low) - Special Purpose
+**Files:**
+- `llvm/lib/Target/V850/V850InstrInfo.td`
+- `llvm/lib/Target/V850/V850ISelLowering.cpp`
 
-13. **Implement Special Instructions**
-    - File: `V850InstrInfo.td`
-    - Add SNOOZE (low-power state) - Format X, RH850G3M
+**Tasks:**
+1. Add LDL.W (load linked word) instruction - Format IX
+2. Add STC.W (store conditional word) instruction - Format IX
+3. Add CLL (clear load link) instruction - Format X
+4. Implement atomic lowering (C11/C++11 atomic operations → LDL.W/STC.W sequences)
+5. Add test cases for atomic operations
+
+**Acceptance Criteria:**
+- LDL.W/STC.W assemble and encode correctly
+- Atomic compare-exchange lowers to LDL.W/STC.W sequence
+- C11 `_Atomic` operations compile correctly
+
+#### 1.5 Implement RH850G3M Load/Store Instructions
+
+**Files:**
+- `llvm/lib/Target/V850/V850InstrInfo.td`
+
+**Tasks:**
+1. Add LD.DW (load double-word, 64-bit) - Format XIV
+2. Add ST.DW (store double-word, 64-bit) - Format XIV
+3. Handle register pair constraints (even-numbered register requirement)
+4. Add instruction selection patterns for 64-bit loads/stores
+
+**Acceptance Criteria:**
+- `ld.dw 0x100[r10], r2` assembles correctly (r2 must be even-numbered)
+- 64-bit loads/stores selected correctly in codegen
+
+### Priority 2 (High) - RH850G3M Remaining Instructions
+
+**Estimated Effort:** 2-3 weeks
+
+#### 2.1 Data Manipulation Instructions
+
+**Files:** `llvm/lib/Target/V850/V850InstrInfo.td`
+
+**Tasks:**
+1. Add BINS (bitfield insert) - Format XI
+2. Add ROTL imm5, reg2, reg3 (rotate left by immediate) - Format XI
+3. Add ROTL reg1, reg2, reg3 (rotate left by register) - Format XI
+4. Add instruction selection patterns
+
+**Acceptance Criteria:**
+- All 3 instructions assemble correctly
+- ROTL selected for appropriate IR patterns
+
+#### 2.2 Stack Management Instructions
+
+**Files:** `llvm/lib/Target/V850/V850InstrInfo.td`
+
+**Tasks:**
+1. Add PUSHSP rh-rt (push multiple registers) - Format X
+2. Add POPSP rh-rt (pop multiple registers) - Format X
+3. Add instruction selection patterns for function prologue/epilogue
+
+**Acceptance Criteria:**
+- PUSHSP/POPSP assemble correctly
+- Prologue/epilogue can use PUSHSP/POPSP for efficient register saves
+
+#### 2.3 Branch and Loop Instructions
+
+**Files:** `llvm/lib/Target/V850/V850InstrInfo.td`
+
+**Tasks:**
+1. Add Bcond disp17 (extended conditional branch) - Format VII
+2. Add JARL [reg1], reg3 (indirect jump and link) - Format XI
+3. Add LOOP reg1, disp16 (decrement and branch) - Format VII
+4. Add branch selection patterns
+
+**Acceptance Criteria:**
+- All branch variants assemble correctly
+- Long-distance branches use disp17 variant when needed
+
+#### 2.4 Cache and Synchronization Instructions
+
+**Files:** `llvm/lib/Target/V850/V850InstrInfo.td`
+
+**Tasks:**
+1. Add CACHE cacheop, [reg1] - Format IX
+2. Add PREF prefop, [reg1] - Format IX
+3. Add SYNCI - Format X
+4. Add SNOOZE - Format X
+
+**Acceptance Criteria:**
+- All instructions assemble correctly
+- CACHE/PREF can be used in inline assembly
+
+### Priority 3 (Medium) - Scheduling Model Improvements
+
+**Estimated Effort:** 2-3 weeks
+
+#### 3.1 V850E2/V850E2M Dual-Issue Pipeline Model
+
+**Files:**
+- `llvm/lib/Target/V850/V850SchedV850E2M.td`
+- `llvm/lib/Target/V850/V850Schedule.td`
+
+**Tasks:**
+1. Define Lpipe and Rpipe resources
+2. Update instruction definitions with pipe assignments:
+   - Lpipe: Load/store, multiply, MAC
+   - Rpipe: ALU, shift, data manipulation, bit search
+   - Both: Many arithmetic/logical ops
+3. Define dual-issue constraints (same pipe cannot dual-issue)
+4. Add itineraries for parallel execution
+
+**Reference:** V850CycleTimings.md lines 334-367
+
+**Acceptance Criteria:**
+- Instructions correctly assigned to pipes
+- Dual-issue scheduling observed in generated code
+- Performance improvement measurable on V850E2/V850E2M
+
+#### 3.2 Variable-Latency Instruction Modeling
+
+**Files:**
+- `llvm/lib/Target/V850/V850Schedule.td`
+- `llvm/lib/Target/V850/V850SchedV850E2M.td`
+
+**Tasks:**
+1. Model DIVQ/DIVQU variable latency (N+3 to N+5 based on operand width)
+2. Model PREPARE/DISPOSE variable latency (n+1 to n+2 based on register count)
+3. Model load latency differences by CPU variant (V850: 1-1-2, V850E2M: 1-1-3)
+
+**Reference:** V850CycleTimings.md lines 166-168, 233-240
+
+**Acceptance Criteria:**
+- DIVQ latency varies based on operand analysis
+- PREPARE/DISPOSE latency accounts for register list size
+
+#### 3.3 RH850G3M/G3MH Scheduling Models
+
+**Files:**
+- `llvm/lib/Target/V850/V850SchedRH850G3M.td` (new)
+- `llvm/lib/Target/V850/V850SchedRH850G3MH.td` (new)
+- `llvm/lib/Target/V850/V850.td`
+
+**Tasks:**
+1. Create RH850G3M scheduling model with branch prediction
+2. Model prediction-dependent branch latencies (1-4 cycles)
+3. Create RH850G3MH scheduling model with advanced out-of-order features
+4. Update instruction latencies per V850CycleTimings.md:
+   - Improved divide latencies (19 cycles vs 35-36)
+   - Dual-mode FPU (imprecise vs precise)
+   - Cache instruction timings
+
+**Reference:** V850CycleTimings.md lines 161-168, 174-189, 280-331
+
+**Acceptance Criteria:**
+- RH850G3M processor model defined
+- Branch prediction effects observable in scheduling
+- FPU imprecise/precise modes modeled
+
+#### 3.4 FPU Imprecise/Precise Mode Modeling
+
+**Files:** `llvm/lib/Target/V850/V850SchedV850E2M.td`
+
+**Tasks:**
+1. Add FPU mode selection (imprecise vs precise)
+2. Update FPU instruction latencies per mode:
+   - Imprecise: ADDF.S 1-1-4, DIVF.S 14-14-17
+   - Precise: ADDF.S 7-7-7, DIVF.S 20-20-20
+3. Provide compiler option to select FPU mode
+
+**Reference:** V850CycleTimings.md lines 280-331
+
+**Acceptance Criteria:**
+- `-mfpu-mode=imprecise` and `-mfpu-mode=precise` flags work
+- Scheduling uses correct latencies per mode
+
+### Priority 4 (Low) - Debug and Enhancement
+
+**Estimated Effort:** 1-2 weeks
+
+#### 4.1 Complete V850E1 Debug Registers
+
+**Files:** `llvm/lib/Target/V850/V850RegisterInfo.td`
+
+**Tasks:**
+1. Add DIR (Debug Interrupt Register) - RegID 21
+2. Add BPC0 (Breakpoint Control) - RegID 22
+3. Add ASID (Address Space ID) - RegID 23
+4. Add BPAV0-3, BPAM0-3, BPDV0-3, BPDM0-3 (Breakpoint Address/Data/Mask registers)
+
+**Acceptance Criteria:**
+- All debug registers accessible via LDSR/STSR
+- Debug register values preserved across context switches
+
+#### 4.2 Complete V850E2M Exception Registers
+
+**Files:** `llvm/lib/Target/V850/V850RegisterInfo.td`
+
+**Tasks:**
+1. Add EIIC (EI-level Interrupt Cause) - RegID 13
+2. Add FEIC (FE-level Exception Cause) - RegID 14
+
+**Acceptance Criteria:**
+- EIIC/FEIC accessible via LDSR/STSR
+- Exception handlers can read cause codes
+
+#### 4.3 Implement V850E2M Register Banking
+
+**Files:**
+- `llvm/lib/Target/V850/V850InstrInfo.td`
+- `llvm/lib/Target/V850/V850ISelLowering.cpp`
+
+**Tasks:**
+1. Use BSEL register to select register banks
+2. Implement bank switching for FPU registers (BSEL=0x2000)
+3. Implement bank switching for protection registers (BSEL=0x1000-0x1010)
+4. Update LDSR/STSR to validate bank selection
+
+**Acceptance Criteria:**
+- FPU system registers accessible via BSEL=0x2000
+- Protection registers accessible via BSEL=0x1000
 
 ---
 
-## 9. Documentation Action Items
+## 9. Testing Requirements
 
-### Priority 1 (High)
+### 9.1 RH850G3M Instruction Tests
 
-1. **Update Extended Instruction Opcode Map**
-   - File: `docs/V850InstructionReference.md`
-   - Section: "Extended Instruction Sub-Opcode (Format IX/X)"
-   - Action: Expand table to include all sub-opcode ranges (bits 26:23 = 0011-1111)
-   - Add entries for PREPARE, DISPOSE, CMOV, ADF, SBF, MAC, MACU, etc.
+**Directory:** `llvm/test/CodeGen/V850/`
 
-2. **Add Complete System Register Reference Table**
-   - File: `docs/V850InstructionReference.md`
-   - Section: "System Interface" → "System Register Access Models"
-   - Action: Create consolidated table showing all system registers across all CPU variants
-   - Include regID, selID (for RH850G3M), name, access permissions, CPU variant availability
+Required test files:
+1. `rh850g3m-atomics.ll` - LDL.W/STC.W/CLL atomic operations
+2. `rh850g3m-double-word.ll` - LD.DW/ST.DW 64-bit loads/stores
+3. `rh850g3m-branches.ll` - Bcond disp17, JARL [reg1], LOOP
+4. `rh850g3m-data-manip.ll` - BINS, ROTL variants
+5. `rh850g3m-stack.ll` - PUSHSP/POPSP
+6. `rh850g3m-cache.ll` - CACHE/PREF/SYNCI
+7. `rh850g3m-sysregs.ll` - selID-based LDSR/STSR
 
-### Priority 2 (Medium)
+### 9.2 Assembly Syntax Tests
 
-3. **Add RH850G3M Instruction Reference Section**
-   - File: `docs/V850InstructionReference.md`
-   - Section: "RH850G3M/G3MH Instructions"
-   - Action: Verify all RH850G3M instructions are documented with correct encodings
-   - Add any missing instructions (currently complete per my review)
+**Directory:** `llvm/test/MC/V850/`
 
-4. **Add Instruction Encoding Examples**
-   - File: `docs/V850InstructionReference.md`
-   - Action: Add concrete encoding examples for each format
-   - Show bit patterns for representative instructions
+Required test files:
+1. `rh850g3m-atomics.s` - Atomic instruction encoding
+2. `rh850g3m-sysreg-selid.s` - 3-operand LDSR/STSR syntax
+3. `rh850g3m-branches.s` - Extended branch encoding
+4. `rh850g3m-double-word.s` - LD.DW/ST.DW encoding
 
-### Priority 3 (Low)
+### 9.3 Scheduling Tests
 
-5. **Cross-Reference Implementation Status**
-   - File: `docs/V850InstructionReference.md`
-   - Action: Add implementation status markers to instruction tables
-   - Note which instructions are LLVM backend implemented vs. documented only
+**Directory:** `llvm/test/CodeGen/V850/`
 
----
+Required test files:
+1. `sched-v850e2-dual-issue.ll` - Dual-issue pipeline verification
+2. `sched-rh850g3m-branch-prediction.ll` - Branch prediction effects
+3. `sched-divq-variable.ll` - Variable DIVQ latency
+4. `sched-prepare-dispose-variable.ll` - Variable PREPARE/DISPOSE latency
 
-## 10. Testing Requirements
+### 9.4 C/C++ Integration Tests
 
-### Unit Tests Needed
+**Directory:** `clang/test/CodeGen/`
 
-1. **Opcode Encoding Tests**
-   - Verify all Format I-XIV encodings match documentation
-   - Test special cases (reg2=0 alternatives, sub-opcode selection)
-
-2. **System Register Access Tests**
-   - Test LDSR/STSR with all valid regIDs
-   - Test RH850G3M selID-based access (when implemented)
-   - Test V850E2M BSEL-based banking (when implemented)
-
-3. **PSW Bit Field Tests**
-   - Test PSW read/write for all CPU variants
-   - Test privilege checking (RH850G3M UM mode)
-   - Test coprocessor permission (CU0-2)
-
-4. **RH850G3M Instruction Tests**
-   - Assembly/disassembly tests for all new instructions
-   - Code generation tests for atomics (LDL.W/STC.W)
-   - Code generation tests for double-word load/store
-
-### Integration Tests Needed
-
-1. **CPU Variant Selection Tests**
-   - Test feature flag propagation for each -mcpu variant
-   - Verify instruction availability per CPU variant
-
-2. **Exception Handling Tests**
-   - Test exception cause register updates (EIIC/FEIC)
-   - Test PSW save/restore in exception handlers
+Required test files:
+1. `v850-rh850g3m-atomic.c` - C11 atomic operations
+2. `v850-rh850g3m-fpu-modes.c` - FPU imprecise/precise mode selection
+3. `v850-rh850g3m-cache-hints.c` - __builtin_prefetch lowering
 
 ---
 
-## 11. Summary Statistics
+## 10. Documentation Updates Required
 
-### Implementation Coverage
+### 10.1 V850InstructionReference.md
 
-- **CPU Variants:** 8/12 (67%) - Missing RH850G3M/G3MH/G4M/G4MH
-- **Instructions:** 318/358+ (89%) - Missing 40+ RH850G3M instructions
-- **Instruction Formats:** 17/18 (94%) - Format XIV partial (missing LD.DW/ST.DW)
-- **System Registers:** 20/50+ (40%) - Missing RH850G3M selID-based registers
-- **FPU Instructions:** 71/71 (100%) - Complete
-- **Opcode Mappings:** Core V850-V850E2M complete; RH850G3M partial
+**Status:** ✅ Mostly Complete (updated in commit 96e8a965174e)
 
-### Documentation Coverage
+Remaining updates:
+1. ✅ Complete opcode summary for all instructions (DONE)
+2. ✅ Add FPU instruction opcode tables (DONE)
+3. ⚠️ Add RH850G3M instruction descriptions when implemented
+4. ⚠️ Update system register table with selID-based access model
 
-- **Instruction Reference:** ✅ Complete for all variants
-- **Opcode Maps:** ⚠️ Incomplete - needs extended instruction expansion
-- **System Registers:** ⚠️ Incomplete - needs selID-based register table
-- **PSW Layouts:** ✅ Complete for all variants
-- **Bitfield Semantics:** ✅ Complete with recent updates
+### 10.2 V850CycleTimings.md
 
----
+**Status:** ✅ Complete
 
-## 12. Recommended Implementation Sequence
+No updates needed. This document accurately reflects all CPU variant timing specifications.
 
-### Phase 1: RH850G3M Foundation (2-3 weeks)
-1. Add RH850G3M CPU variants and feature flags
-2. Implement selID-based system register access
-3. Add PSW extensions (UM, CU0-CU2, EBV)
-4. Add RH850G3M system register definitions
+### 10.3 LLVM User Documentation
 
-### Phase 2: RH850G3M Critical Instructions (2 weeks)
-5. Implement atomic instructions (LDL.W, STC.W, CLL)
-6. Implement double-word load/store (LD.DW, ST.DW)
-7. Implement stack manipulation (PUSHSP, POPSP)
-8. Add exception cause registers (EIIC, FEIC)
+**Files to Create/Update:**
+1. `llvm/docs/V850TargetGuide.rst` (new) - V850 backend user guide
+2. `clang/docs/V850Options.rst` (new) - Clang V850-specific options
 
-### Phase 3: RH850G3M Extended Features (1-2 weeks)
-9. Implement data manipulation (BINS, ROTL)
-10. Implement extended branches (Bcond disp17, JARL indirect, LOOP)
-11. Add cache control instructions
-12. Add special instructions (SNOOZE, SYNCI)
-
-### Phase 4: Documentation and Testing (1 week)
-13. Update documentation opcode maps
-14. Add system register reference tables
-15. Create comprehensive test suite
-16. Validate all encodings against documentation
-
-### Phase 5: V850E2M Banking (Optional, 1 week)
-17. Implement BSEL-based register banking
-18. Add banked register sets
-19. Update LDSR/STSR for bank selection
-
-**Total Estimated Effort:** 6-9 weeks for complete RH850G3M support
+Content needed:
+- Supported CPU variants (v850, v850e1, v850e2, v850e2m, rh850g3m, rh850g3mh)
+- Feature flags (-mv850e2m, -mfpu, -mrh850g3m)
+- FPU mode selection (-mfpu-mode=imprecise/precise)
+- Atomic operation support
+- Inline assembly constraints
+- System register access
 
 ---
 
-## 13. Open Questions
+## 11. Estimated Implementation Timeline
 
-1. **RH850G3M Scheduler Model:** Does RH850G3M require a different scheduling model than V850E2M?
-2. **Atomic Instruction Lowering:** Should we use LLVM's standard atomic lowering or custom patterns for LDL.W/STC.W?
-3. **BSEL Banking:** Is V850E2M bank selection actually used in practice by compilers, or is it OS/firmware-only?
-4. **Debug Registers:** Should we implement DIR/BPC/ASID registers for completeness, or defer until needed?
-5. **RH850G4M:** What are the specific differences between RH850G3M and RH850G4M? Documentation not yet reviewed.
+### Phase 1: RH850G3M Foundation (4 weeks)
+- Week 1-2: CPU variants, feature flags, predicates, selID-based system registers
+- Week 3: PSW extensions, atomic instructions (LDL.W/STC.W/CLL)
+- Week 4: LD.DW/ST.DW, testing
+
+### Phase 2: RH850G3M Remaining Instructions (3 weeks)
+- Week 5: Data manipulation (BINS, ROTL), stack (PUSHSP/POPSP)
+- Week 6: Branches (Bcond disp17, JARL [reg1], LOOP)
+- Week 7: Cache/sync (CACHE, PREF, SYNCI, SNOOZE), testing
+
+### Phase 3: Scheduling Model Improvements (3 weeks)
+- Week 8: V850E2/V850E2M dual-issue pipeline modeling
+- Week 9: Variable-latency instructions, RH850G3M scheduling model
+- Week 10: RH850G3MH scheduling model, FPU imprecise/precise modes
+
+### Phase 4: Debug and Polish (2 weeks)
+- Week 11: Debug registers, V850E2M register banking
+- Week 12: Documentation, final testing, code review
+
+**Total Estimated Effort:** 12 weeks (3 months) for complete RH850G3M/G3MH support
 
 ---
 
-## 14. References
+## 12. Risk Assessment
 
-- **Implementation:** `/home/lfazio/Projects/llvm-project/llvm/lib/Target/V850/`
-- **Documentation:** `/home/lfazio/Projects/llvm-project/docs/V850InstructionReference.md`
-- **Specs:**
-  - V850 Architecture Manual (docs/v850.txt)
-  - V850E1 Architecture Manual (docs/v850e1.txt)
-  - V850E2 Architecture Manual (docs/v850e2.txt)
-  - V850E2M Architecture Manual (docs/v850e2m.txt)
-  - RH850G3M Software Manual (docs/rh850g3m.txt)
-  - RH850G3MH Software Manual (docs/rh850g3mh.txt)
+| Risk | Probability | Impact | Mitigation |
+|------|------------|--------|------------|
+| selID-based register access breaks existing code | Low | High | Maintain backward compatibility with 2-operand LDSR/STSR |
+| RH850G3M opcode conflicts with existing instructions | Medium | High | Thorough opcode map verification before implementation |
+| Dual-issue scheduling complexity | High | Medium | Implement incrementally, validate with benchmarks |
+| Variable-latency modeling performance overhead | Medium | Low | Use heuristics for DIVQ, optimize for common cases |
+| Insufficient RH850G3M documentation | Medium | High | Request additional documentation from Renesas |
+| Testing coverage gaps | High | Medium | Comprehensive test plan, automated validation |
 
 ---
 
-**Document Version:** 1.0
-**Last Updated:** 2026-01-10
-**Status:** Initial verification complete, action items identified
+## Summary
+
+**Current State:**
+- V850-V850E2M: 95% complete, production-ready
+- RH850G3M/G3MH: 0% complete, requires significant work
+
+**Critical Path:**
+1. RH850G3M CPU variants and feature flags
+2. selID-based system register access
+3. Atomic instructions (LDL.W/STC.W/CLL)
+4. LD.DW/ST.DW 64-bit loads/stores
+5. Dual-issue scheduling model (V850E2+)
+6. RH850G3M scheduling model with branch prediction
+
+**Recommended Approach:**
+- Prioritize RH850G3M foundation (Phase 1) for immediate usability
+- Defer scheduling optimizations (Phase 3) until basic functionality complete
+- Implement incrementally with comprehensive testing at each stage
+- Maintain backward compatibility with existing V850-V850E2M code
