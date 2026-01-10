@@ -1377,60 +1377,325 @@ For Extension 2 instructions (bits 26:21 = 001011), bits 15:13 determine the ope
 
 ### Format I (16-bit, reg-reg)
 
-| Bits | Field | Size | Description |
-|------|-------|------|-------------|
-| 15:11 | reg2 | 5 | Destination/source register |
-| 10:5 | opcode | 6 | Operation code |
-| 4:0 | reg1 | 5 | Source register |
+**Encoding:** bits[15:11] = reg2, bits[10:5] = opcode, bits[4:0] = reg1
 
-| Opcode | Instruction |
-|--------|-------------|
-| 000000 | MOV reg1, reg2 (NOP when reg1=reg2=0) |
-| 000001 | NOT reg1, reg2 |
-| 000010 | DIVH reg1, reg2 (SWITCH when reg2=0) |
-| 000011 | JMP [reg1] |
-| 000100 | SATSUBR reg1, reg2 (ZXB when reg2=0) |
-| 000101 | SATSUB reg1, reg2 (SXB when reg2=0) |
-| 000110 | SATADD reg1, reg2 (ZXH when reg2=0) |
-| 000111 | MULH reg1, reg2 (SXH when reg2=0) |
-| 001000 | OR reg1, reg2 |
-| 001001 | XOR reg1, reg2 |
-| 001010 | AND reg1, reg2 |
-| 001011 | TST reg1, reg2 |
-| 001100 | SUBR reg1, reg2 |
-| 001101 | SUB reg1, reg2 |
-| 001110 | ADD reg1, reg2 |
-| 001111 | CMP reg1, reg2 |
+| Opcode (bits 10:5) | Instruction | Special Encoding | Arch |
+|--------------------|-------------|------------------|------|
+| 000000 | MOV reg1, reg2 | NOP when reg1=0, reg2=0 | V850 |
+| 000001 | NOT reg1, reg2 | | V850 |
+| 000010 | DIVH reg1, reg2 | SWITCH reg1 when reg2=0 (V850E1) | V850/V850E1 |
+| 000011 | JMP [reg1] | DBTRAP when reg1=0, reg2≠0 (V850E1)<br>SLD.BU disp4[ep], reg2 when reg1[4]=0 (V850E1)<br>SLD.HU disp5[ep], reg2 when reg1[4]=1 (V850E1) | V850/V850E1 |
+| 000100 | SATSUBR reg1, reg2 | ZXB reg1 when reg2=0 (V850E1) | V850/V850E1 |
+| 000101 | SATSUB reg1, reg2 | SXB reg1 when reg2=0 (V850E1) | V850/V850E1 |
+| 000110 | SATADD reg1, reg2 | ZXH reg1 when reg2=0 (V850E1) | V850/V850E1 |
+| 000111 | MULH reg1, reg2 | SXH reg1 when reg2=0 (V850E1) | V850/V850E1 |
+| 001000 | OR reg1, reg2 | | V850 |
+| 001001 | XOR reg1, reg2 | | V850 |
+| 001010 | AND reg1, reg2 | | V850 |
+| 001011 | TST reg1, reg2 | | V850 |
+| 001100 | SUBR reg1, reg2 | | V850 |
+| 001101 | SUB reg1, reg2 | | V850 |
+| 001110 | ADD reg1, reg2 | | V850 |
+| 001111 | CMP reg1, reg2 | | V850 |
+
+**V850E2M Synchronization Instructions (Format I-like, 16-bit fixed encodings):**
+
+| Full Encoding | Instruction | Arch |
+|--------------|-------------|------|
+| 0x0000 | NOP (MOV r0, r0) | V850 |
+| 0x001D | SYNCE | V850E2M |
+| 0x001E | SYNCM | V850E2M |
+| 0x001F | SYNCP | V850E2M |
+| 0x0040 + bits[8:5] | RIE / FETRAP vector4 | V850E2M |
 
 ### Format II (16-bit, imm-reg)
 
-| Opcode | Instruction |
-|--------|-------------|
-| 010000 | MOV imm5, reg2 (CALLT when reg2=0) |
-| 010001 | SATADD imm5, reg2 |
-| 010010 | ADD imm5, reg2 |
-| 010011 | CMP imm5, reg2 |
-| 010100 | SHR imm5, reg2 |
-| 010101 | SAR imm5, reg2 |
-| 010110 | SHL imm5, reg2 |
-| 010111 | MULH imm5, reg2 |
+**Encoding:** bits[15:11] = reg2, bits[10:5] = opcode, bits[4:0] = imm5
 
-### Format VI (32-bit, 3-operand with immediate)
+| Opcode (bits 10:5) | Instruction | Special Encoding | Arch |
+|--------------------|-------------|------------------|------|
+| 010000 | MOV imm5, reg2 | CALLT imm6 when reg2=0 (V850E1, bits[5:0]=imm6) | V850/V850E1 |
+| 010001 | SATADD imm5, reg2 | | V850 |
+| 010010 | ADD imm5, reg2 | | V850 |
+| 010011 | CMP imm5, reg2 | | V850 |
+| 010100 | SHR imm5, reg2 | | V850 |
+| 010101 | SAR imm5, reg2 | | V850 |
+| 010110 | SHL imm5, reg2 | | V850 |
+| 010111 | MULH imm5, reg2 | | V850 |
 
-| Opcode | Instruction |
-|--------|-------------|
-| 110000 | ADDI imm16, reg1, reg2 |
-| 110001 | MOVEA imm16, reg1, reg2 |
-| 110010 | MOVHI imm16, reg1, reg2 |
-| 110011 | SATSUBI imm16, reg1, reg2 |
-| 110100 | ORI imm16, reg1, reg2 |
-| 110101 | XORI imm16, reg1, reg2 |
-| 110110 | ANDI imm16, reg1, reg2 |
-| 110111 | MULHI imm16, reg1, reg2 |
+### Format III (16-bit, conditional branch)
+
+**Encoding:** bits[15:11,6:4] = disp9, bits[10:7] = 1011, bits[3:0] = condition
+
+| Condition (bits 3:0) | Mnemonic(s) | Condition Test | Arch |
+|---------------------|-------------|----------------|------|
+| 0000 | BV | OV = 1 | V850 |
+| 0001 | BC / BL | CY = 1 | V850 |
+| 0010 | BZ / BE | Z = 1 | V850 |
+| 0011 | BNH | (CY or Z) = 1 | V850 |
+| 0100 | BN | S = 1 | V850 |
+| 0101 | BR | Always (unconditional) | V850 |
+| 0110 | BLT | (S xor OV) = 1 | V850 |
+| 0111 | BLE | ((S xor OV) or Z) = 1 | V850 |
+| 1000 | BNV | OV = 0 | V850 |
+| 1001 | BNC / BNL | CY = 0 | V850 |
+| 1010 | BNZ / BNE | Z = 0 | V850 |
+| 1011 | BH | (CY or Z) = 0 | V850 |
+| 1100 | BP | S = 0 | V850 |
+| 1101 | BSA | SAT = 1 | V850 |
+| 1110 | BGE | (S xor OV) = 0 | V850 |
+| 1111 | BGT | ((S xor OV) or Z) = 0 | V850 |
+
+### Format IV (16-bit, short load/store EP-relative)
+
+**Encoding:** bits[15:11] = reg2, bits[10:7] = opcode, bits[6:0] = displacement
+
+| Opcode (bits 10:7) | Bit 0 | Instruction | Displacement | Arch |
+|--------------------|-------|-------------|--------------|------|
+| 0110 | 1 | SLD.B disp7[ep], reg2 | disp7 (byte) | V850 |
+| 0111 | 1 | SST.B reg2, disp7[ep] | disp7 (byte) | V850 |
+| 1000 | 1 | SLD.H disp8[ep], reg2 | disp8 (halfword, bit 0 ignored) | V850 |
+| 1001 | 1 | SST.H reg2, disp8[ep] | disp8 (halfword, bit 0 ignored) | V850 |
+| 1010 | 0 | SLD.W disp8[ep], reg2 | disp8 (word, bits 1:0 ignored) | V850 |
+| 1010 | 1 | SST.W reg2, disp8[ep] | disp8 (word, bits 1:0 ignored) | V850 |
+
+### Format V (32-bit, jump with 22-bit displacement)
+
+**Encoding:** bits[15:11] = reg2, bits[10:6] = 11110, bits[5:0,31:17,16] = disp22
+
+| Opcode (bits 10:6) | reg2 Value | Instruction | Arch |
+|--------------------|------------|-------------|------|
+| 11110 | r0 | JR disp22 | V850 |
+| 11110 | ≠ r0 | JARL disp22, reg2 | V850 |
+
+### Format VI (32-bit, 3-operand with 16-bit immediate)
+
+**Encoding:** bits[15:11] = reg2, bits[10:5] = opcode, bits[4:0] = reg1, bits[31:16] = imm16
+
+| Opcode (bits 10:5) | Instruction | Arch |
+|--------------------|-------------|------|
+| 110000 | ADDI imm16, reg1, reg2 | V850 |
+| 110001 | MOVEA imm16, reg1, reg2 | V850 |
+| 110010 | MOVHI imm16, reg1, reg2 | V850 |
+| 110011 | SATSUBI imm16, reg1, reg2 | V850 |
+| 110100 | ORI imm16, reg1, reg2 | V850 |
+| 110101 | XORI imm16, reg1, reg2 | V850 |
+| 110110 | ANDI imm16, reg1, reg2 | V850 |
+| 110111 | MULHI imm16, reg1, reg2 | V850 |
+
+### Format VII (32-bit, load/store with 16-bit displacement)
+
+**Encoding:** bits[15:11] = reg2, bits[10:5] = opcode, bits[4:0] = reg1, bits[31:17,16] = disp16
+
+| Opcode (bits 10:5) | Bits 6:5 | Bit 16 | Instruction | Arch |
+|--------------------|----------|--------|-------------|------|
+| 111000 | 00 | - | LD.B disp16[reg1], reg2 | V850 |
+| 111001 | 01 | 0 | LD.H disp16[reg1], reg2 | V850 |
+| 111001 | 01 | 1 | LD.W disp16[reg1], reg2 | V850 |
+| 111010 | 10 | - | ST.B reg2, disp16[reg1] | V850 |
+| 111011 | 11 | 0 | ST.H reg2, disp16[reg1] | V850 |
+| 111011 | 11 | 1 | ST.W reg2, disp16[reg1] | V850 |
+| 111100 | - | - | LD.BU disp16[reg1], reg2 | V850E1 |
+| 111111 | - | 1 | LD.HU disp16[reg1], reg2 | V850E1 |
+
+### Format VIII (32-bit, bit manipulation)
+
+**Encoding:** bits[15:14] = sub-op, bits[13:11] = bit#, bits[10:5] = 111110, bits[4:0] = reg1, bits[31:16] = disp16
+
+| Sub-op (bits 15:14) | Instruction | Arch |
+|---------------------|-------------|------|
+| 00 | SET1 bit#3, disp16[reg1] | V850 |
+| 01 | NOT1 bit#3, disp16[reg1] | V850 |
+| 10 | CLR1 bit#3, disp16[reg1] | V850 |
+| 11 | TST1 bit#3, disp16[reg1] | V850 |
+
+### Format XIII (32-bit, PREPARE/DISPOSE)
+
+**Encoding varies - see individual instruction descriptions in main table**
+
+| Instruction | Encoding Pattern | Arch |
+|-------------|------------------|------|
+| PREPARE list12, imm5 | bits[10:6] = 11110, bits[5:1] = imm5, bit 0 + bits[31:21] = list12 | V850E1 |
+| PREPARE list12, imm5, sp | Similar with additional sp setup | V850E1 |
+| DISPOSE imm5, list12 | Uses MOVHI opcode space with special encoding | V850E1 |
+| DISPOSE imm5, list12, [reg1] | Dispose with tail call | V850E1 |
+
+### Format XIV (48-bit, load/store with 23-bit displacement)
+
+**Encoding:** 3 halfwords, bits[10:5] = opcode, bits[47:17] = disp23
+
+| Opcode (bits 10:5) | Bits 20:16 | Bit 11 | Instruction | Arch |
+|--------------------|------------|--------|-------------|------|
+| 111110 | 00101 | 0 | LD.B disp23[reg1], reg3 | V850E2M |
+| 111110 | 00111 | 0 | LD.H disp23[reg1], reg3 | V850E2M |
+| 111110 | 01001 | 0 | LD.W disp23[reg1], reg3 | V850E2M |
+| 111110 | 11101 | 0 | ST.B reg3, disp23[reg1] | V850E2M |
+| 111101 | 01101 | 1 | ST.H reg3, disp23[reg1] | V850E2M |
+| 111110 | 01111 | 0 | ST.W reg3, disp23[reg1] | V850E2M |
+| 111101 | 00101 | 1 | LD.BU disp23[reg1], reg3 | V850E2M |
+| 111101 | 00111 | 1 | LD.HU disp23[reg1], reg3 | V850E2M |
 
 ### Extended Instructions (opcode=111111)
 
-Extended instructions use opcode 111111 with sub-opcodes in the second word.
+Extended instructions use opcode 111111 with sub-opcodes in the second word. The complete mapping is provided below.
+
+**Extended Format IX - System and Bit Operations**
+
+| Bits 26:23 | Bits 22:21 = 00 | Bits 22:21 = 01 | Bits 22:21 = 10 | Bits 22:21 = 11 | Arch |
+|------------|-----------------|-----------------|-----------------|-----------------|------|
+| 0000 | SETF | LDSR | STSR | - | V850 |
+| 0001 | SHR reg | SAR reg | SHL reg | SET1r/NOT1r/CLR1r/TST1r | V850/V850E1 |
+| 0010 | TRAP | HALT | RETI/CTRET/DBRET | DI/EI | V850/V850E1 |
+| 0011 | - | - | PREPARE | DISPOSE | V850E1 |
+| 0100 | SASF (V850E1) | MUL family | DIV family | DIVH_3 | V850E1 |
+| 0101 | DIVHU family | - | DIV family (V850E1) | DIVQ (V850E2M) | V850E1/V850E2M |
+| 0110 | CMOV imm | BSW/BSH/HSW/SCH0/SCH1 | CMOV reg | - | V850E1/V850E2 |
+| 0111 | SBF (V850E2) | ADF (V850E2) | MAC (V850E2) | MACU (V850E2) | V850E2 |
+| 1000 | FPU Instructions (V850E2M) | V850E2M+FPU |
+
+**Extended Format XI - V850E1+ 3-Operand Instructions**
+
+| Sub-opcode (bits 26:21) | Instruction | Operands | Arch |
+|------------------------|-------------|----------|------|
+| 000010 11010 | SHR | reg1, reg2, reg3 | V850E2 |
+| 000100 11010 | SAR | reg1, reg2, reg3 | V850E2 |
+| 000110 11010 | SHL | reg1, reg2, reg3 | V850E2 |
+| 000111 01110 | CAXI | [reg1], reg2, reg3 | V850E2M |
+| 010001 01010 | MUL | reg1, reg2, reg3 | V850E1 |
+| 010001 10010 | MULi | imm9, reg2, reg3 | V850E1 |
+| 010001 11010 | MULU | reg1, reg2, reg3 | V850E1 |
+| 010010 11010 | MULUi | imm9, reg2, reg3 | V850E1 |
+| 010100 01010 | DIVH | reg1, reg2, reg3 | V850E1 |
+| 010100 11010 | DIV | reg1, reg2, reg3 | V850E1 |
+| 010101 01010 | DIVHU | reg1, reg2, reg3 | V850E1 |
+| 010110 11010 | DIVU | reg1, reg2, reg3 | V850E1 |
+| 010111 11100 | DIVQ | reg1, reg2, reg3 | V850E2M |
+| 010111 11110 | DIVQU | reg1, reg2, reg3 | V850E2M |
+| 011000 11010 | CMOVi | cccc, imm5, reg2, reg3 | V850E1 |
+| 011001 00010 | CMOVr | cccc, reg1, reg2, reg3 | V850E1 |
+| 011010 11010 | BSW/BSH/HSW/HSH | reg2, reg3 | V850E1/V850E2 |
+| 011010 01000 | SCH0R | reg2, reg3 | V850E2 |
+| 011010 01010 | SCH1R | reg2, reg3 | V850E2 |
+| 011010 01100 | SCH0L | reg2, reg3 | V850E2 |
+| 011010 01110 | SCH1L | reg2, reg3 | V850E2 |
+| 011100 xxxxx | SBF | cccc, reg1, reg2, reg3 | V850E2 |
+| 011100 11010 | SATSUB | reg1, reg2, reg3 | V850E2 |
+| 011101 xxxxx | ADF | cccc, reg1, reg2, reg3 | V850E2 |
+| 011101 11010 | SATADD | reg1, reg2, reg3 | V850E2 |
+| 011110 xxxxx | MAC | reg1, reg2, reg3, reg4 | V850E2 |
+| 011111 xxxxx | MACU | reg1, reg2, reg3, reg4 | V850E2 |
+
+**FPU Instructions (V850E2M+FPU) - bits[10:5]=111111**
+
+All FPU instructions use the extended opcode 111111 (bits 10:5). Format FI encoding:
+- bit 4: Precision (0=Double, 1=Single)
+- bits [26:21]: Sub-opcode (6 bits)
+- bits [20:16], [15:11]: Additional operand/encoding fields
+
+#### FPU Arithmetic Operations
+
+| Mnemonic | Operands | Precision | Bits[26:21] | Bits[20:16] | Notes |
+|----------|----------|-----------|-------------|-------------|-------|
+| ADDF.D | reg1, reg2, reg3 | Double (bit4=0) | 010000 | reg1[4:0] | Floating-point add |
+| ADDF.S | reg1, reg2, reg3 | Single (bit4=1) | 010000 | reg1[4:0] | Floating-point add |
+| SUBF.D | reg1, reg2, reg3 | Double (bit4=0) | 010001 | reg1[4:0] | Floating-point subtract |
+| SUBF.S | reg1, reg2, reg3 | Single (bit4=1) | 010001 | reg1[4:0] | Floating-point subtract |
+| MULF.D | reg1, reg2, reg3 | Double (bit4=0) | 010010 | reg1[4:0] | Floating-point multiply |
+| MULF.S | reg1, reg2, reg3 | Single (bit4=1) | 010010 | reg1[4:0] | Floating-point multiply |
+| DIVF.D | reg1, reg2, reg3 | Double (bit4=0) | 010011 | reg1[4:0] | Floating-point divide |
+| DIVF.S | reg1, reg2, reg3 | Single (bit4=1) | 010011 | reg1[4:0] | Floating-point divide |
+| MAXF.D | reg1, reg2, reg3 | Double (bit4=0) | 011110 | reg1[4:0] | Floating-point maximum |
+| MAXF.S | reg1, reg2, reg3 | Single (bit4=1) | 011110 | reg1[4:0] | Floating-point maximum |
+| MINF.D | reg1, reg2, reg3 | Double (bit4=0) | 011111 | reg1[4:0] | Floating-point minimum |
+| MINF.S | reg1, reg2, reg3 | Single (bit4=1) | 011111 | reg1[4:0] | Floating-point minimum |
+
+#### FPU Unary Operations
+
+| Mnemonic | Operands | Precision | Bits[26:21] | Bits[20:16] | Notes |
+|----------|----------|-----------|-------------|-------------|-------|
+| ABSF.D | reg2, reg3 | Double (bit4=0) | 001000 | 00000 | Floating-point absolute value |
+| ABSF.S | reg2, reg3 | Single (bit4=1) | 001000 | reg2[0] | Floating-point absolute value |
+| NEGF.D | reg2, reg3 | Double (bit4=0) | 001000 | 00001 | Floating-point negate |
+| NEGF.S | reg2, reg3 | Single (bit4=1) | 001000 | reg2[0] | Floating-point negate |
+| SQRTF.D | reg2, reg3 | Double (bit4=0) | 001001 | 00000 | Floating-point square root |
+| SQRTF.S | reg2, reg3 | Single (bit4=1) | 001001 | reg2[0] | Floating-point square root |
+| RECIPF.D | reg2, reg3 | Double (bit4=0) | 001001 | 00001 | Floating-point reciprocal |
+| RECIPF.S | reg2, reg3 | Single (bit4=1) | 001001 | reg2[0] | Floating-point reciprocal |
+| RSQRTF.D | reg2, reg3 | Double (bit4=0) | 001001 | 00010 | Floating-point reciprocal sqrt |
+| RSQRTF.S | reg2, reg3 | Single (bit4=1) | 001001 | reg2[0] | Floating-point reciprocal sqrt |
+
+#### FPU Type Conversion
+
+| Mnemonic | Operands | Precision | Bits[26:21] | Bits[20:16] | Notes |
+|----------|----------|-----------|-------------|-------------|-------|
+| CVTF.DL | reg2, reg3 | Double→Long | 010100 | 00000 | Convert double to signed 64-bit |
+| CVTF.DS | reg2, reg3 | Double→Single | 010100 | 00011 | Convert double to single |
+| CVTF.DUL | reg2, reg3 | Double→ULong | 010100 | 10000 | Convert double to unsigned 64-bit |
+| CVTF.DUW | reg2, reg3 | Double→UWord | 010100 | reg2[0] | Convert double to unsigned 32-bit |
+| CVTF.DW | reg2, reg3 | Double→Word | 010100 | reg2[0] | Convert double to signed 32-bit |
+| CVTF.LD | reg2, reg3 | Long→Double | 010100 | 00001 | Convert signed 64-bit to double |
+| CVTF.LS | reg2, reg3 | Long→Single | 010100 | reg2[0] | Convert signed 64-bit to single |
+| CVTF.SD | reg2, reg3 | Single→Double | 010100 | 00010 | Convert single to double |
+| CVTF.SL | reg2, reg3 | Single→Long | 010100 | 00000 | Convert single to signed 64-bit |
+| CVTF.SUL | reg2, reg3 | Single→ULong | 010100 | 10000 | Convert single to unsigned 64-bit |
+| CVTF.SUW | reg2, reg3 | Single→UWord | 010100 | reg2[0] | Convert single to unsigned 32-bit |
+| CVTF.SW | reg2, reg3 | Single→Word | 010100 | reg2[0] | Convert single to signed 32-bit |
+| CVTF.ULD | reg2, reg3 | ULong→Double | 010100 | 10001 | Convert unsigned 64-bit to double |
+| CVTF.ULS | reg2, reg3 | ULong→Single | 010100 | reg2[0] | Convert unsigned 64-bit to single |
+| CVTF.UWD | reg2, reg3 | UWord→Double | 010100 | 10000 | Convert unsigned 32-bit to double |
+| CVTF.UWS | reg2, reg3 | UWord→Single | 010100 | reg2[0] | Convert unsigned 32-bit to single |
+| CVTF.WD | reg2, reg3 | Word→Double | 010100 | 00000 | Convert signed 32-bit to double |
+| CVTF.WS | reg2, reg3 | Word→Single | 010100 | reg2[0] | Convert signed 32-bit to single |
+
+#### FPU Rounding Operations
+
+| Mnemonic | Operands | Precision | Bits[26:21] | Bits[20:16] | Notes |
+|----------|----------|-----------|-------------|-------------|-------|
+| CEILF.DL | reg2, reg3 | Double→Long | 010100 | 00010 | Round toward +infinity to signed 64-bit |
+| CEILF.DUL | reg2, reg3 | Double→ULong | 010100 | 10010 | Round toward +infinity to unsigned 64-bit |
+| CEILF.DUW | reg2, reg3 | Double→UWord | 010100 | reg2[0] | Round toward +infinity to unsigned 32-bit |
+| CEILF.DW | reg2, reg3 | Double→Word | 010100 | reg2[0] | Round toward +infinity to signed 32-bit |
+| CEILF.SL | reg2, reg3 | Single→Long | 010100 | 00010 | Round toward +infinity to signed 64-bit |
+| CEILF.SUL | reg2, reg3 | Single→ULong | 010100 | 10010 | Round toward +infinity to unsigned 64-bit |
+| CEILF.SUW | reg2, reg3 | Single→UWord | 010100 | reg2[0] | Round toward +infinity to unsigned 32-bit |
+| CEILF.SW | reg2, reg3 | Single→Word | 010100 | reg2[0] | Round toward +infinity to signed 32-bit |
+| FLOORF.DL | reg2, reg3 | Double→Long | 010100 | 00011 | Round toward -infinity to signed 64-bit |
+| FLOORF.DUL | reg2, reg3 | Double→ULong | 010100 | 10011 | Round toward -infinity to unsigned 64-bit |
+| FLOORF.DUW | reg2, reg3 | Double→UWord | 010100 | reg2[0] | Round toward -infinity to unsigned 32-bit |
+| FLOORF.DW | reg2, reg3 | Double→Word | 010100 | reg2[0] | Round toward -infinity to signed 32-bit |
+| FLOORF.SL | reg2, reg3 | Single→Long | 010100 | 00011 | Round toward -infinity to signed 64-bit |
+| FLOORF.SUL | reg2, reg3 | Single→ULong | 010100 | 10011 | Round toward -infinity to unsigned 64-bit |
+| FLOORF.SUW | reg2, reg3 | Single→UWord | 010100 | reg2[0] | Round toward -infinity to unsigned 32-bit |
+| FLOORF.SW | reg2, reg3 | Single→Word | 010100 | reg2[0] | Round toward -infinity to signed 32-bit |
+| TRNCF.DL | reg2, reg3 | Double→Long | 010100 | 00001 | Round toward zero to signed 64-bit |
+| TRNCF.DUL | reg2, reg3 | Double→ULong | 010100 | 10001 | Round toward zero to unsigned 64-bit |
+| TRNCF.DUW | reg2, reg3 | Double→UWord | 010100 | reg2[0] | Round toward zero to unsigned 32-bit |
+| TRNCF.DW | reg2, reg3 | Double→Word | 010100 | reg2[0] | Round toward zero to signed 32-bit |
+| TRNCF.SL | reg2, reg3 | Single→Long | 010100 | 00001 | Round toward zero to signed 64-bit |
+| TRNCF.SUL | reg2, reg3 | Single→ULong | 010100 | 10001 | Round toward zero to unsigned 64-bit |
+| TRNCF.SUW | reg2, reg3 | Single→UWord | 010100 | reg2[0] | Round toward zero to unsigned 32-bit |
+| TRNCF.SW | reg2, reg3 | Single→Word | 010100 | reg2[0] | Round toward zero to signed 32-bit |
+
+#### FPU Comparison and Conditional Operations
+
+| Mnemonic | Operands | Precision | Bits[26:21] | Bits[20:16] | Notes |
+|----------|----------|-----------|-------------|-------------|-------|
+| CMPF.D | cond, reg1, reg2, cc#3 | Double | 011000 | 0FFFF (cond) | Compare double and set cc |
+| CMPF.S | cond, reg1, reg2, cc#3 | Single | 011000 | 0FFFF (cond) | Compare single and set cc |
+| CMOVF.D | cc, reg1, reg2, reg3 | Double | 010000 | reg1[4:0] | Conditional move double |
+| CMOVF.S | cc, reg1, reg2, reg3 | Single | 010000 | reg1[4:0] | Conditional move single |
+| TRFSR | cc#3 | - | 010000 | 00000 | Transfer PSW.S to FPU cc |
+
+#### FPU Fused Multiply-Add Operations (Single Precision Only)
+
+| Mnemonic | Operands | Precision | Bits[26:21] | Bits[20:16] | Notes |
+|----------|----------|-----------|-------------|-------------|-------|
+| MADDF.S | reg1, reg2, reg3, reg4 | Single | 101W00 | reg1[4:0] | reg4 = reg1*reg2 + reg3 |
+| MSUBF.S | reg1, reg2, reg3, reg4 | Single | 101W01 | reg1[4:0] | reg4 = reg1*reg2 - reg3 |
+| NMADDF.S | reg1, reg2, reg3, reg4 | Single | 101W10 | reg1[4:0] | reg4 = -(reg1*reg2 + reg3) |
+| NMSUBF.S | reg1, reg2, reg3, reg4 | Single | 101W11 | reg1[4:0] | reg4 = -(reg1*reg2 - reg3) |
+
+Note: In fused multiply-add instructions, 'W' bits encode reg4 register field.
 
 ---
 
