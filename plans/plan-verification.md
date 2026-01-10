@@ -12,10 +12,13 @@ This document compares the current V850 LLVM backend implementation against the 
 
 ## Executive Summary
 
-The V850 backend has comprehensive support for V850, V850E1, V850E2, and V850E2M CPU variants with 322 instruction definitions and 71 FPU instructions. However, significant discrepancies exist:
+The V850 backend has comprehensive support for V850, V850ES, V850E1, V850E2, and V850E2M CPU variants with 322 instruction definitions and 71 FPU instructions. However, significant discrepancies exist:
 
 **Overall Backend Completeness:**
-- **V850/V850E1/V850E2/V850E2M:** ~95% complete ✅
+- **V850:** ~95% complete ✅ (base 74 instructions, 6 system registers)
+- **V850ES:** ~95% complete ✅ (same ISA as V850E1, limited to 6 base system registers)
+- **V850E1:** ~95% complete ✅ (V850ES ISA + 12 additional system registers)
+- **V850E2/V850E2M:** ~95% complete ✅ (all instructions implemented)
 - **RH850G3M:** 0% implemented ❌ (16 critical instructions missing)
 - **RH850G3MH:** 0% implemented ❌ (design variant of G3M)
 - **Scheduling Models:** ~40% complete ⚠️ (missing dual-issue, branch prediction)
@@ -38,9 +41,9 @@ The V850 backend has comprehensive support for V850, V850E1, V850E2, and V850E2M
 
 | Variant | Status | Features | Implementation Quality |
 |---------|--------|----------|----------------------|
-| v850 | ✅ Complete | Base ISA (74 instructions) | 95% - Missing scheduling refinements |
-| v850es | ✅ Complete | V850ES extensions | 95% - Alias for v850e1 |
-| v850e1 | ✅ Complete | CALLT, PREPARE/DISPOSE, BSH/BSW/HSW, CMOV, 3-op MUL/DIV, SXB/SXH/ZXB/ZXH, LD.BU/HU, DBTRAP/DBRET | 95% - All instructions implemented |
+| v850 | ✅ Complete | Base ISA (74 instructions), 6 system registers (EIPC, EIPSW, FEPC, FEPSW, ECR, PSW) | 95% - Missing scheduling refinements |
+| v850es | ✅ Complete | Same ISA as V850E1 (extended instruction set), 6 base system registers | 95% - Same as v850e1 for instructions |
+| v850e1 | ✅ Complete | CALLT, PREPARE/DISPOSE, BSH/BSW/HSW, CMOV, 3-op MUL/DIV, SXB/SXH/ZXB/ZXH, LD.BU/HU, DBTRAP/DBRET + additional system registers (CTPC, CTPSW, DBPC, DBPSW, CTBP, DIR, BPC, ASID, breakpoint regs) | 95% - All instructions implemented |
 | v850e2 | ✅ Complete | ADF/SBF, MAC/MACU, HSH, SCH0L/R/SCH1L/R, 3-op SAR/SHL/SHR, 48-bit JR/JARL/JMP | 95% - Scheduling needs dual-issue modeling |
 | v850e2m | ✅ Complete | FPU, CAXI, SYSCALL, EIRET/FERET/FETRAP, SYNCE/SYNCM/SYNCP, RIE, DIVQ/DIVQU, disp23 load/store | 95% - FPU fully implemented |
 | v850e2v3 | ✅ Complete | Same as v850e2m | 95% - Alias for v850e2m |
@@ -143,20 +146,25 @@ The V850 backend has comprehensive support for V850, V850E1, V850E2, and V850E2M
 
 **File:** `llvm/lib/Target/V850/V850RegisterInfo.td` (Lines 191-220)
 
+**Important Note - V850ES vs V850E1:**
+- **V850ES** supports the same instruction set as V850E1 but has only the 6 base system registers (EIPC, EIPSW, FEPC, FEPSW, ECR, PSW)
+- **V850E1** adds 12 additional system registers below for CALLT and debug functionality
+
 | RegID | Name | Doc Status | Impl Status | Access | Priority | Issues |
 |-------|------|------------|-------------|--------|----------|--------|
-| 16 | CTPC | ✅ | ✅ | R/W | - | None |
-| 17 | CTPSW | ✅ | ✅ | R/W | - | None |
-| 18 | DBPC | ✅ | ✅ | R/W | - | None |
-| 19 | DBPSW | ✅ | ✅ | R/W | - | None |
-| 20 | CTBP | ✅ | ✅ | R/W | - | None |
-| 21 | DIR | ✅ | ❌ | R/W | Low | Debug interrupt register |
-| 22 | BPC0 | ✅ | ❌ | R/W | Low | Breakpoint control |
-| 23 | ASID | ✅ | ❌ | R/W | Low | Address space ID |
-| 24-27 | BPAVn, BPAMn, BPDVn, BPDMn | ✅ | ❌ | R/W | Low | Breakpoint registers |
+| 16 | CTPC | ✅ | ✅ | R/W | - | CALLT saved PC (V850E1 only) |
+| 17 | CTPSW | ✅ | ✅ | R/W | - | CALLT saved PSW (V850E1 only) |
+| 18 | DBPC | ✅ | ✅ | R/W | - | Debug saved PC (V850E1 only) |
+| 19 | DBPSW | ✅ | ✅ | R/W | - | Debug saved PSW (V850E1 only) |
+| 20 | CTBP | ✅ | ✅ | R/W | - | CALLT base pointer (V850E1 only) |
+| 21 | DIR | ✅ | ❌ | R/W | Low | Debug interrupt register (V850E1 only) |
+| 22 | BPC0 | ✅ | ❌ | R/W | Low | Breakpoint control (V850E1 only) |
+| 23 | ASID | ✅ | ❌ | R/W | Low | Address space ID (V850E1 only) |
+| 24-27 | BPAVn, BPAMn, BPDVn, BPDMn | ✅ | ❌ | R/W | Low | Breakpoint registers (V850E1 only) |
 
-**Status:** ⚠️ Partial (5/12 implemented, 58%)
+**Status:** ⚠️ Partial (5/12 V850E1 registers implemented, 42%)
 **Priority:** Low (debug functionality, not required for code generation)
+**V850ES Status:** ✅ Complete (uses only base 6 registers from Section 3.1)
 
 ### 3.3 V850E2M System Registers ⚠️
 
@@ -578,14 +586,19 @@ def HasRH850Cache : Predicate<"Subtarget->hasRH850Cache()">;
 **Required Feature Dependencies:**
 
 ```
-V850 (base)
-  └── V850E1 (implies V850)
-      └── V850E2 (implies V850E1)
-          └── V850E2M (implies V850E2)
-              ├── V850E3 (implies V850E2M + FPU)
-              └── RH850G3M (implies V850E2M + FPU + Atomics + Cache)
-                  └── RH850G3MH (implies RH850G3M + Branch Prediction)
+V850 (base - 74 instructions, 6 system registers)
+  └── V850ES (same ISA as V850E1, 6 system registers only)
+      └── V850E1 (same ISA as V850ES + additional system registers: CTPC, CTPSW, DBPC, DBPSW, CTBP, DIR, BPC, ASID, breakpoint regs)
+          └── V850E2 (implies V850E1)
+              └── V850E2M (implies V850E2)
+                  ├── V850E3 (implies V850E2M + FPU)
+                  └── RH850G3M (implies V850E2M + FPU + Atomics + Cache)
+                      └── RH850G3MH (implies RH850G3M + Branch Prediction)
 ```
+
+**Key Distinction - V850ES vs V850E1:**
+- **V850ES:** Extended instruction set (same as V850E1) but limited to 6 base system registers
+- **V850E1:** Same instruction set as V850ES + full set of system registers (12 additional registers for debug/CALLT)
 
 **Status:** ✅ V850-V850E3 implications correct
 **Status:** ❌ RH850G3M/G3MH not in chain
@@ -991,8 +1004,16 @@ Content needed:
 ## Summary
 
 **Current State:**
-- V850-V850E2M: 95% complete, production-ready
-- RH850G3M/G3MH: 0% complete, requires significant work
+- **V850:** 95% complete, production-ready (base 74 instructions, 6 system registers)
+- **V850ES:** 95% complete, production-ready (same ISA as V850E1, 6 system registers only)
+- **V850E1:** 95% complete, production-ready (V850ES ISA + 12 additional system registers)
+- **V850E2/V850E2M:** 95% complete, production-ready (all instructions and features)
+- **RH850G3M/G3MH:** 0% complete, requires significant work
+
+**Key Architecture Distinction:**
+V850ES and V850E1 share the same instruction set architecture (ISA). The difference is:
+- V850ES: Extended ISA with only 6 base system registers
+- V850E1: Same extended ISA + 12 additional system registers for CALLT and debug features
 
 **Critical Path:**
 1. RH850G3M CPU variants and feature flags
