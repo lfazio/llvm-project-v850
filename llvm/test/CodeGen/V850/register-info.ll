@@ -8,9 +8,10 @@
 ; CHECK: extern const MCRegisterDesc V850RegDesc[]
 
 ; Check register classes exist
+; CHECK: // SysReg Register Class
+; CHECK: // FPR Register Class
 ; CHECK: // GPR Register Class
 ; CHECK: // GPRnoR0 Register Class
-; CHECK: // SysReg Register Class
 
 ; Check DWARF register mappings are generated
 ; CHECK: V850 Dwarf<->LLVM register mappings

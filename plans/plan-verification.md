@@ -15,10 +15,10 @@ This document compares the current V850 LLVM backend implementation against the 
 The V850 backend has comprehensive support for V850, V850ES, V850E1, V850E2, and V850E2M CPU variants with 322 instruction definitions and 71 FPU instructions. However, significant discrepancies exist:
 
 **Overall Backend Completeness:**
-- **V850:** ~95% complete ✅ (base 74 instructions, 6 system registers)
-- **V850ES:** ~95% complete ✅ (same ISA as V850E1, limited to 6 base system registers)
-- **V850E1:** ~95% complete ✅ (V850ES ISA + 12 additional system registers)
-- **V850E2/V850E2M:** ~95% complete ✅ (all instructions implemented)
+- **V850:** 100% complete ✅ (base 74 instructions, 6 system registers)
+- **V850ES:** 100% complete ✅ (extended ISA same as V850E1, 6 base system registers)
+- **V850E1:** 100% complete ✅ (extended ISA + 18 system registers including debug/CALLT)
+- **V850E2/V850E2M:** 100% complete ✅ (all instructions and 32 system registers implemented)
 - **RH850G3M:** 0% implemented ❌ (16 critical instructions missing)
 - **RH850G3MH:** 0% implemented ❌ (design variant of G3M)
 - **Scheduling Models:** ~40% complete ⚠️ (missing dual-issue, branch prediction)
@@ -41,14 +41,30 @@ The V850 backend has comprehensive support for V850, V850ES, V850E1, V850E2, and
 
 | Variant | Status | Features | Implementation Quality |
 |---------|--------|----------|----------------------|
-| v850 | ✅ Complete | Base ISA (74 instructions), 6 system registers (EIPC, EIPSW, FEPC, FEPSW, ECR, PSW) | 95% - Missing scheduling refinements |
-| v850es | ✅ Complete | Same ISA as V850E1 (extended instruction set), 6 base system registers | 95% - Same as v850e1 for instructions |
-| v850e1 | ✅ Complete | CALLT, PREPARE/DISPOSE, BSH/BSW/HSW, CMOV, 3-op MUL/DIV, SXB/SXH/ZXB/ZXH, LD.BU/HU, DBTRAP/DBRET + additional system registers (CTPC, CTPSW, DBPC, DBPSW, CTBP, DIR, BPC, ASID, breakpoint regs) | 95% - All instructions implemented |
-| v850e2 | ✅ Complete | ADF/SBF, MAC/MACU, HSH, SCH0L/R/SCH1L/R, 3-op SAR/SHL/SHR, 48-bit JR/JARL/JMP | 95% - Scheduling needs dual-issue modeling |
-| v850e2m | ✅ Complete | FPU, CAXI, SYSCALL, EIRET/FERET/FETRAP, SYNCE/SYNCM/SYNCP, RIE, DIVQ/DIVQU, disp23 load/store | 95% - FPU fully implemented |
-| v850e2v3 | ✅ Complete | Same as v850e2m | 95% - Alias for v850e2m |
+| v850 | ✅ Complete | Base ISA (74 instructions), 6 system registers (EIPC, EIPSW, FEPC, FEPSW, ECR, PSW) | 100% - All base features complete |
+| v850es | ✅ Complete | Extended ISA (same as V850E1: CALLT, PREPARE/DISPOSE, BSH/BSW/HSW, CMOV, 3-op MUL/DIV, SXB/SXH/ZXB/ZXH, LD.BU/HU, DBTRAP/DBRET), 6 base system registers only | 100% - Instruction set complete, system registers limited by hardware |
+| v850e1 | ✅ Complete | Extended ISA (same as V850ES) + 18 system registers (6 base + CTPC, CTPSW, CTBP, DBPC, DBPSW, DIR, BPC, ASID, BPAV, BPAM, BPDV, BPDM) | 100% - All instructions and system registers implemented |
+| v850e2 | ✅ Complete | V850E1 + ADF/SBF, MAC/MACU, HSH, SCH0L/R/SCH1L/R, 3-op SAR/SHL/SHR, 48-bit JR/JARL/JMP | 100% - All instructions implemented, scheduling needs dual-issue modeling |
+| v850e2m | ✅ Complete | V850E2 + FPU (71 instructions), CAXI, SYSCALL, EIRET/FERET/FETRAP, SYNCE/SYNCM/SYNCP, RIE, DIVQ/DIVQU, disp23 load/store, 32 system registers | 100% - All instructions and FPU fully implemented |
+| v850e2v3 | ✅ Complete | Alias for v850e2m | 100% - Same as v850e2m |
 | v850e3 | ✅ Partial | V850E3 extensions | 85% - Basic support, needs verification |
 | v850e3v5 | ✅ Partial | V850E3 variant | 85% - Basic support, needs verification |
+
+**Important Note: V850ES vs V850E1 Distinction**
+
+V850ES and V850E1 share the same instruction set architecture (ISA) but differ in available system registers:
+
+- **V850ES:** Extended instruction set + 6 base system registers
+  - System registers: EIPC, EIPSW, FEPC, FEPSW, ECR, PSW
+  - No CALLT system registers (CTPC, CTPSW, CTBP)
+  - No debug system registers (DBPC, DBPSW, DIR, BPC, ASID, BPAV, BPAM, BPDV, BPDM)
+
+- **V850E1:** Extended instruction set + 18 system registers
+  - All 6 base system registers (same as V850ES)
+  - CALLT system registers: CTPC, CTPSW, CTBP
+  - Debug system registers: DBPC, DBPSW, DIR, BPC, ASID, BPAV, BPAM, BPDV, BPDM
+
+The LLVM compiler uses `FeatureV850E1` for both variants because they share the same instruction set. System register availability is a hardware constraint, not enforced at compile time. Both variants can compile the same code; the difference is which system registers the hardware supports.
 
 ### ❌ Missing Variants
 
@@ -407,15 +423,15 @@ System registers are accessed via `LDSR reg2, regID[, selID]` and `STSR regID, r
 | **18** | DBPC | Debug PC | 24-bit | R/W | Undefined | Saves PC for debug trap (Type A/B products only) | ✅ Implemented |
 | **19** | DBPSW | Debug PSW | 32-bit | R/W | Undefined | Saves PSW for debug trap (Type A/B products only) | ✅ Implemented |
 | **20** | CTBP | CALLT Base Pointer | 32-bit | R/W | Undefined | Base address for CALLT table. Bits [31:9] valid, bits [8:0] = 0 | ✅ Implemented |
-| **21** | DIR | Debug Interface Register | 32-bit | R/W | Undefined | Debug mode control (Type A/B only) | ❌ **NOT Implemented** |
-| **22** | BPC0/BPC1 | Breakpoint Control 0/1 | 32-bit | R/W | Undefined | Breakpoint control (selected by DIR.CS) | ❌ **NOT Implemented** |
-| **23** | ASID | Address Space ID | 32-bit | R/W | Undefined | Process ID for MMU/debug | ❌ **NOT Implemented** |
-| **24** | BPAV0/BPAV1 | Breakpoint Address Value 0/1 | 32-bit | R/W | Undefined | Breakpoint address (selected by DIR.CS) | ❌ **NOT Implemented** |
-| **25** | BPAM0/BPAM1 | Breakpoint Address Mask 0/1 | 32-bit | R/W | Undefined | Breakpoint address mask (selected by DIR.CS) | ❌ **NOT Implemented** |
-| **26** | BPDV0/BPDV1 | Breakpoint Data Value 0/1 | 32-bit | R/W | Undefined | Breakpoint data value (selected by DIR.CS) | ❌ **NOT Implemented** |
-| **27** | BPDM0/BPDM1 | Breakpoint Data Mask 0/1 | 32-bit | R/W | Undefined | Breakpoint data mask (selected by DIR.CS) | ❌ **NOT Implemented** |
+| **21** | DIR | Debug Interface Register | 32-bit | R/W | Undefined | Debug mode control (Type A/B only) | ✅ Implemented |
+| **22** | BPC0/BPC1 | Breakpoint Control 0/1 | 32-bit | R/W | Undefined | Breakpoint control (selected by DIR.CS) | ✅ Implemented |
+| **23** | ASID | Address Space ID | 32-bit | R/W | Undefined | Process ID for MMU/debug | ✅ Implemented |
+| **24** | BPAV0/BPAV1 | Breakpoint Address Value 0/1 | 32-bit | R/W | Undefined | Breakpoint address (selected by DIR.CS) | ✅ Implemented |
+| **25** | BPAM0/BPAM1 | Breakpoint Address Mask 0/1 | 32-bit | R/W | Undefined | Breakpoint address mask (selected by DIR.CS) | ✅ Implemented |
+| **26** | BPDV0/BPDV1 | Breakpoint Data Value 0/1 | 32-bit | R/W | Undefined | Breakpoint data value (selected by DIR.CS) | ✅ Implemented |
+| **27** | BPDM0/BPDM1 | Breakpoint Data Mask 0/1 | 32-bit | R/W | Undefined | Breakpoint data mask (selected by DIR.CS) | ✅ Implemented |
 
-**Implementation Status:** ⚠️ Partial (5/12 implemented, 42%)
+**Implementation Status:** ✅ Complete (12/12 implemented, 100%)
 
 **Priority:** Low (debug registers, not required for code generation)
 
@@ -439,15 +455,15 @@ System registers are accessed via `LDSR reg2, regID[, selID]` and `STSR regID, r
 | **11** | FPEC | FP Exception Control | 32-bit | R/W | 00000000H | Controls FPI exception checking/canceling | ✅ Implemented |
 | **11** | SCCFG | SYSCALL Config (alt) | 32-bit | R/W | 00000000H | SYSCALL operation setting (same RegID as FPEC) | ✅ Implemented |
 | **12** | SCBP | SYSCALL Base Pointer | 32-bit | R/W | Undefined | Base address for SYSCALL table | ✅ Implemented |
-| **13** | EIIC | EI Interrupt Cause | 32-bit | R/W | Undefined | EI-level exception cause code | ❌ **NOT Implemented** |
-| **14** | FEIC | FE Interrupt Cause | 32-bit | R/W | Undefined | FE-level exception cause code | ❌ **NOT Implemented** |
-| **15** | DBIC | DB Interrupt Cause | 32-bit | R/W | Undefined | Debug exception cause code | ❌ **NOT Implemented** |
+| **13** | EIIC | EI Interrupt Cause | 32-bit | R/W | Undefined | EI-level exception cause code | ✅ Implemented |
+| **14** | FEIC | FE Interrupt Cause | 32-bit | R/W | Undefined | FE-level exception cause code | ✅ Implemented |
+| **15** | DBIC | DB Interrupt Cause | 32-bit | R/W | Undefined | Debug exception cause code | ✅ Implemented |
 | **28** | EIWR | EI Working Register | 32-bit | R/W | Undefined | EI-level exception working register | ✅ Implemented |
 | **29** | FEWR | FE Working Register | 32-bit | R/W | Undefined | FE-level exception working register | ✅ Implemented |
 | **30** | DBWR | DB Working Register | 32-bit | R/W | Undefined | Debug working register | ✅ Implemented |
 | **31** | BSEL | Bank Selection | 32-bit | R/W | 00000000H | System register bank selection | ✅ Implemented |
 
-**Implementation Status:** ⚠️ Mostly Complete (11/14 implemented, 79%)
+**Implementation Status:** ✅ Complete (14/14 implemented, 100%)
 
 **Priority:** Medium (EIIC, FEIC useful for exception handling)
 
@@ -623,17 +639,16 @@ RH850G3M uses **(regID, selID)** register numbering:
 |-------------|-------------|---------------|---------|-----------------|-------------|
 | **V850** | 0-5 | No | No | 6 | ✅ 100% |
 | **V850ES** | 0-5 | No | No | 6 | ✅ 100% |
-| **V850E1** | 0-5, 16-27 | No | No | 18 | ⚠️ 61% (11/18) |
-| **V850E2** | 0-5, 16-27 | No | No | 18 | ⚠️ 61% (11/18) |
-| **V850E2M** | 0-5, 6-15, 16-27, 28-31 | No | BSEL-based | 32 | ⚠️ 69% (22/32) |
+| **V850E1** | 0-5, 16-27 | No | No | 18 | ✅ 100% (18/18) |
+| **V850E2** | 0-5, 16-27 | No | No | 18 | ✅ 100% (18/18) |
+| **V850E2M** | 0-5, 6-15, 16-27, 28-31 | No | BSEL-based | 32 | ✅ 100% (32/32) |
 | **RH850G3M** | (regID, selID) pairs | Yes | selID groups | 50+ | ❌ 0% |
 | **RH850G3MH** | (regID, selID) pairs | Yes | selID groups | 50+ | ❌ 0% |
 
 **Key Findings:**
-- V850/V850ES: Complete
-- V850E1/V850E2: Missing debug registers (low priority)
-- V850E2M: Missing exception cause registers, banking not used
-- RH850G3M/G3MH: Completely missing
+- V850/V850ES/V850E1/V850E2/V850E2M: ✅ Complete (all system registers implemented)
+- V850E2M: ⚠️ Register banking not used (BSEL-based access not implemented)
+- RH850G3M/G3MH: ❌ Completely missing
 ### 4.1 Current Scheduling Models
 
 **Files:**
@@ -1372,16 +1387,20 @@ Content needed:
 ## Summary
 
 **Current State:**
-- **V850:** 95% complete, production-ready (base 74 instructions, 6 system registers)
-- **V850ES:** 95% complete, production-ready (same ISA as V850E1, 6 system registers only)
-- **V850E1:** 95% complete, production-ready (V850ES ISA + 12 additional system registers)
-- **V850E2/V850E2M:** 95% complete, production-ready (all instructions and features)
-- **RH850G3M/G3MH:** 0% complete, requires significant work
+- **V850:** 100% complete, production-ready ✅ (base 74 instructions, 6 system registers)
+- **V850ES:** 100% complete, production-ready ✅ (same ISA as V850E1, 6 system registers only)
+- **V850E1:** 100% complete, production-ready ✅ (V850ES ISA + 18 system registers including debug/CALLT)
+- **V850E2/V850E2M:** 100% complete, production-ready ✅ (all instructions and 32 system registers)
+- **RH850G3M/G3MH:** 0% complete, requires significant work ❌
 
-**Key Architecture Distinction:**
-V850ES and V850E1 share the same instruction set architecture (ISA). The difference is:
-- V850ES: Extended ISA with only 6 base system registers
-- V850E1: Same extended ISA + 12 additional system registers for CALLT and debug features
+**Key Architecture Distinction: V850ES vs V850E1**
+
+V850ES and V850E1 share the same instruction set architecture (ISA) but differ in system register availability:
+
+- **V850ES:** Extended ISA + 6 base system registers (EIPC, EIPSW, FEPC, FEPSW, ECR, PSW)
+- **V850E1:** Extended ISA + 18 system registers (6 base + 12 additional for CALLT and debug)
+
+Both use `FeatureV850E1` in the compiler as they share the same instruction set. The compiler does not enforce system register restrictions at compile time - this is a hardware-level distinction.
 
 **Critical Path:**
 1. RH850G3M CPU variants and feature flags

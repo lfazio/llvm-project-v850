@@ -162,6 +162,10 @@ class V850SysReg<bits<5> Enc, string n> : Register<n> {
   let Namespace = "V850";
 }
 
+//===----------------------------------------------------------------------===//
+// Base System Registers (All V850 variants: V850, V850ES, V850E1, V850E2, V850E2M)
+//===----------------------------------------------------------------------===//
+
 // Exception/Interrupt PC - saved PC when exception/interrupt occurs
 def EIPC  : V850SysReg<0, "eipc">;
 
@@ -180,7 +184,12 @@ def ECR   : V850SysReg<4, "ecr">;
 // Program Status Word - contains flags (Z, S, OV, CY, SAT) and control bits
 def PSW   : V850SysReg<5, "psw">;
 
-// CALLT caller status saving registers (V850E+)
+//===----------------------------------------------------------------------===//
+// V850E1 Additional System Registers (V850E1, V850E2, V850E2M, V850E3)
+// NOTE: These are NOT available on V850ES
+//===----------------------------------------------------------------------===//
+
+// CALLT caller status saving registers
 // CTPC - CALLT caller PC (return address)
 def CTPC  : V850SysReg<16, "ctpc">;
 
@@ -190,14 +199,45 @@ def CTPSW : V850SysReg<17, "ctpsw">;
 // CTBP - CALLT base pointer
 def CTBP  : V850SysReg<20, "ctbp">;
 
-// Debug registers (V850E1+)
+// Debug registers (for Type A/B products with debug function)
 // DBPC - Debug PC (return address from debug trap)
 def DBPC  : V850SysReg<18, "dbpc">;
 
 // DBPSW - Debug PSW
 def DBPSW : V850SysReg<19, "dbpsw">;
 
-// V850E2M System Registers
+// DIR - Debug Interface Register
+// Controls debug mode and breakpoint channel selection (DIR.CS)
+def DIR   : V850SysReg<21, "dir">;
+
+// BPC - Breakpoint Control
+// Note: There are two breakpoint channels (BPC0/BPC1) selected by DIR.CS bit
+// This represents the currently selected channel
+def BPC   : V850SysReg<22, "bpc">;
+
+// ASID - Address Space ID
+// Used for process identification in MMU and debug operations
+def ASID  : V850SysReg<23, "asid">;
+
+// BPAV - Breakpoint Address Value
+// Contains address to match for breakpoint (BPAV0/BPAV1 selected by DIR.CS)
+def BPAV  : V850SysReg<24, "bpav">;
+
+// BPAM - Breakpoint Address Mask
+// Mask for breakpoint address matching (BPAM0/BPAM1 selected by DIR.CS)
+def BPAM  : V850SysReg<25, "bpam">;
+
+// BPDV - Breakpoint Data Value
+// Data value to match for data breakpoint (BPDV0/BPDV1 selected by DIR.CS)
+def BPDV  : V850SysReg<26, "bpdv">;
+
+// BPDM - Breakpoint Data Mask
+// Mask for breakpoint data matching (BPDM0/BPDM1 selected by DIR.CS)
+def BPDM  : V850SysReg<27, "bpdm">;
+
+//===----------------------------------------------------------------------===//
+// V850E2M System Registers (V850E2M, V850E3)
+// NOTE: These are NOT available on V850 or V850ES or V850E1
 //===----------------------------------------------------------------------===//
 
 // SYSCALL registers (V850E2M+)
@@ -206,6 +246,16 @@ def SCCFG : V850SysReg<11, "sccfg">;
 
 // SCBP - SYSCALL base pointer
 def SCBP  : V850SysReg<12, "scbp">;
+
+// Exception cause registers (V850E2M+)
+// EIIC - EI-level exception cause code
+def EIIC  : V850SysReg<13, "eiic">;
+
+// FEIC - FE-level exception cause code
+def FEIC  : V850SysReg<14, "feic">;
+
+// DBIC - Debug exception cause code
+def DBIC  : V850SysReg<15, "dbic">;
 
 // Exception handler working registers (V850E2M+)
 // EIWR - EI level working register
@@ -247,6 +297,8 @@ def FPEC  : V850SysReg<11, "fpec">;
 // System register class - not allocatable, accessed via LDSR/STSR only
 def SysReg : RegisterClass<"V850", [i32], 32,
     (add EIPC, EIPSW, FEPC, FEPSW, ECR, PSW, CTPC, CTPSW, CTBP, DBPC, DBPSW,
-     SCCFG, SCBP, EIWR, FEWR, DBWR, BSEL, FPSR, FPEPC, FPST, FPCC, FPCFG, FPEC)> {
+     DIR, BPC, ASID, BPAV, BPAM, BPDV, BPDM,
+     SCCFG, SCBP, EIIC, FEIC, DBIC, EIWR, FEWR, DBWR, BSEL,
+     FPSR, FPEPC, FPST, FPCC, FPCFG, FPEC)> {
   let isAllocatable = 0;
 }

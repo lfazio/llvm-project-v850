@@ -20,10 +20,20 @@ include "llvm/Target/Target.td"
 // V850 subtarget features and instruction predicates
 //===----------------------------------------------------------------------===//
 
-// V850E1 feature - adds CALLT, DISPOSE, PREPARE, SXB, SXH, ZXB, ZXH, BSH, BSW,
-// HSW, CMOV, 3-op DIV/MUL, SASF, LD.BU, LD.HU, SLD.BU, SLD.HU, DBTRAP/DBRET
+// V850E1/V850ES feature - adds extended instruction set:
+// CALLT, DISPOSE, PREPARE, SXB, SXH, ZXB, ZXH, BSH, BSW, HSW, CMOV,
+// 3-op DIV/MUL, SASF, LD.BU, LD.HU, SLD.BU, SLD.HU, DBTRAP/DBRET
+//
+// Note: V850ES and V850E1 share the same instruction set architecture (ISA).
+// The difference is in available system registers:
+// - V850ES: 6 base system registers (EIPC, EIPSW, FEPC, FEPSW, ECR, PSW)
+// - V850E1: 6 base + 12 additional system registers (CTPC, CTPSW, DBPC, DBPSW,
+//           CTBP, DIR, BPC, ASID, BPAV, BPAM, BPDV, BPDM)
+//
+// The compiler does not enforce system register restrictions at compile time.
+// System register availability is a hardware/documentation concern.
 def FeatureV850E1 : SubtargetFeature<"v850e1", "HasV850E1", "true",
-                                      "Enable V850E1 extensions",
+                                      "Enable V850E1/ES instruction extensions",
                                       []>;
 
 // V850E2 feature - adds ADF, SBF, 32-bit branches, MAC, MACU, search bit ops
@@ -65,8 +75,13 @@ def V850InstrInfo : InstrInfo;
 // Base V850 processors use V850Model (no FPU)
 def : ProcessorModel<"generic", V850Model, []>;
 def : ProcessorModel<"v850", V850Model, []>;
+
+// V850ES and V850E1 share the same instruction set but differ in system registers
+// V850ES: Base 6 system registers only
+// V850E1: Base 6 + 12 additional debug/CALLT system registers
+// Both use FeatureV850E1 for instruction set (compiler doesn't enforce register restrictions)
+def : ProcessorModel<"v850es", V850Model, [FeatureV850E1]>;
 def : ProcessorModel<"v850e1", V850Model, [FeatureV850E1]>;
-def : ProcessorModel<"v850es", V850Model, [FeatureV850E1]>;  // V850ES has same ISA as V850E1
 def : ProcessorModel<"v850e2", V850Model, [FeatureV850E2]>;
 
 // V850E2M+ processors use V850E2MModel (includes FPU)
