@@ -200,4 +200,26 @@ let TargetPrefix = "v850" in { // All intrinsics start with "llvm.v850.".
                                 [llvm_i32_ty, llvm_i32_ty, llvm_i32_ty, llvm_i32_ty],
                                 [IntrNoMem]>;
 
+  //===----------------------------------------------------------------------===//
+  // Table-Driven Branch (V850E1+)
+  //
+  // SWITCH provides efficient table-driven branching for switch/case statements.
+  // The instruction reads a halfword offset from a table and branches to it.
+  //
+  // Operation:
+  //   adr = (PC + 2) + (index << 1)           ; Table entry address
+  //   PC = (PC + 2) + sign_extend(mem[adr]) << 1  ; Target address
+  //
+  // The table must immediately follow the SWITCH instruction and contain
+  // signed halfword offsets (divided by 2) from the table base to each target.
+  //===----------------------------------------------------------------------===//
+
+  // SWITCH - Jump with table look up
+  // void @llvm.v850.switch(i32 %index)
+  // Branches to the target specified by table[index], where the table
+  // immediately follows this instruction in memory.
+  // Note: This is an indirect branch - control does not fall through.
+  def int_v850_switch : Intrinsic<[], [llvm_i32_ty],
+                                  [IntrHasSideEffects]>;
+
 } // TargetPrefix = "v850"

@@ -266,19 +266,87 @@ Add `getTargetBuiltins()` implementation.
 - Pattern: `(sext(a) * sext(b)) + acc` → MAC
 - Pattern: `(zext(a) * zext(b)) + acc` → MACU
 
+### C.4 SWITCH Instruction Support
+
+**Status:** ✅ Intrinsic Complete (Jump table lowering pending)
+
+**Description:**
+The V850E1+ SWITCH instruction provides efficient table-driven branching for switch/case statements.
+
+**Instruction Format:**
+```
+SWITCH reg1    ; Jump with table look up
+```
+
+**Operation:**
+```
+adr = (PC + 2) + (GR[reg1] << 1)           ; Table entry address
+PC = (PC + 2) + sign_extend(mem[adr]) << 1  ; Target = table_base + offset
+```
+
+**Usage Pattern:**
+```asm
+    ; switch(index) with table at .Ltable
+    mov     index, r10
+    switch  r10
+.Ltable:
+    .hword  (.Lcase0 - .Ltable) >> 1    ; Entry 0: offset to case 0
+    .hword  (.Lcase1 - .Ltable) >> 1    ; Entry 1: offset to case 1
+    .hword  (.Lcase2 - .Ltable) >> 1    ; Entry 2: offset to case 2
+    ...
+.Lcase0:
+    ; case 0 code
+.Lcase1:
+    ; case 1 code
+```
+
+**Current State:**
+- `BR_JT` is set to `Expand` (jump tables not using SWITCH)
+- SWITCH instruction defined in `V850InstrInfo.td:1106` but not pattern-matched
+
+**Implementation Tasks:**
+
+1. **A.6 SWITCH Intrinsic** (Low priority)
+   - Add `llvm.v850.switch` intrinsic for direct access
+   - Useful for hand-optimized code and compiler exploration
+
+2. **C.5 Jump Table Lowering** (Medium priority, higher complexity)
+   - Change `BR_JT` from `Expand` to `Custom`
+   - Implement `LowerBR_JT` to generate SWITCH + table
+   - Requires emitting jump table data in code section
+
+**Intrinsic Definition:**
+```tablegen
+// SWITCH - Jump with table look up
+// void @llvm.v850.switch(i32 %index, ptr %table)
+// Branches to table[index], where table contains signed halfword offsets
+def int_v850_switch : Intrinsic<[], [llvm_i32_ty],
+                                [IntrNoMem, IntrHasSideEffects, IntrNoReturn]>;
+```
+
+**Benefits:**
+- Reduced code size for large switch statements
+- Faster execution (single instruction vs comparison chain)
+- Cycle timing: 5-5-5 (V850E1), 8-8-8 (V850E2M), 11-18 (RH850G3M+)
+
+**Tests:**
+- `llvm/test/CodeGen/V850/switch-intrinsic.ll` - Direct intrinsic usage
+
 ---
 
 ## Implementation Priority
 
 | Priority | Task | Effort | Impact |
 |----------|------|--------|--------|
-| 1 | A.1 Saturating arithmetic patterns | Low | Medium |
-| 2 | A.2 Memory barrier intrinsics | Low | High (correctness) |
-| 3 | A.3 DI/EI intrinsics | Low | Medium |
-| 4 | B.1-B.3 Clang builtins | Medium | High (usability) |
-| 5 | A.4 Generic LDSR/STSR | Medium | Medium |
-| 6 | A.5 MAC intrinsics | Medium | Low |
-| 7 | C.1-C.3 Optimizations | Medium | Medium |
+| 1 | A.1 Saturating arithmetic patterns | Low | Medium | ✅ |
+| 2 | A.2 Memory barrier intrinsics | Low | High (correctness) | ✅ |
+| 3 | A.3 DI/EI intrinsics | Low | Medium | ✅ |
+| 4 | B.1-B.3 Clang builtins | Medium | High (usability) | ❌ |
+| 5 | A.4 Generic LDSR/STSR | Medium | Medium | ✅ |
+| 6 | A.5 MAC intrinsics | Medium | Low | ✅ |
+| 7 | C.1-C.3 Optimizations | Medium | Medium | ✅ |
+| 8 | A.6 SWITCH intrinsic | Low | Low | ✅ |
+| 9 | C.5 Jump table lowering (BR_JT) | High | Medium | ❌ |
 
 ---
 
@@ -296,6 +364,7 @@ Add `getTargetBuiltins()` implementation.
 | 2026-01-11 | C.3 MAC instruction selection (DAG combine) | ✅ Complete |
 | 2026-01-11 | C.1 Combine patterns (HSW, BSW, SATADD/SATSUB) | ✅ Complete |
 | 2026-01-11 | C.2 Atomic operations (CAXI, atomic RMW) | ✅ Complete |
+| 2026-01-11 | A.6 SWITCH intrinsic (llvm.v850.switch) | ✅ Complete |
 
 ---
 

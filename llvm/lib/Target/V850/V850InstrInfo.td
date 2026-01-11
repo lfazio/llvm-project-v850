@@ -2704,3 +2704,15 @@ def : Pat<(int_v850_mac GPR:$a, GPR:$b, GPR:$acc_hi, GPR:$acc_lo),
 def : Pat<(int_v850_macu GPR:$a, GPR:$b, GPR:$acc_hi, GPR:$acc_lo),
           (MACU GPR:$a, GPR:$b, GPR:$acc_hi, GPR:$acc_lo)>,
       Requires<[HasV850E2M]>;
+
+//===----------------------------------------------------------------------===//
+// SWITCH Intrinsic Pattern (V850E1+)
+//
+// Maps the llvm.v850.switch intrinsic to the SWITCH instruction.
+// The table must immediately follow the SWITCH instruction in memory.
+//===----------------------------------------------------------------------===//
+
+// SWITCH - Jump with table look up intrinsic
+def : Pat<(int_v850_switch GPR:$index),
+          (SWITCH GPR:$index)>,
+      Requires<[HasV850E1]>;
