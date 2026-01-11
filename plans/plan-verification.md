@@ -72,8 +72,8 @@ The LLVM compiler uses `FeatureV850E1` for both variants because they share the 
 |---------|--------|-------------------|----------|
 | rh850g3m | ❌ Not Implemented | User/supervisor modes (PSW.UM), LDL.W/STC.W atomics, CLL, BINS, ROTL, LD.DW/ST.DW, LOOP, PUSHSP/POPSP, Bcond disp17, JARL [reg1] reg3, CACHE, PREF, SNOOZE, SYNCI, selID-based system registers, branch prediction | **High** |
 | rh850g3mh | ❌ Not Implemented | RH850G3M + performance enhancements, simplified FPU exceptions (FPINT replaces FPP/FPI), advanced out-of-order execution | **High** |
-| rh850g4m | ❌ Not Implemented | RH850G4 extensions | Medium |
-| rh850g4mh | ❌ Not Implemented | RH850G4MH variant | Medium |
+| rh850g4mh | ⚠️ Documented | RH850G3MH + LDM.MP/STM.MP for MPU entry load/store, PID[31:24]=06H | Medium |
+| rh850g4mh2 | ⚠️ Documented | RH850G4MH + virtualization support (Guest/Host modes, HVTRAP, LDM.GSR/STM.GSR, EIRET/FERET enhancements), PID[31:24]=07H | Medium |
 
 **Impact:** Automotive and industrial applications using RH850 MCUs cannot use LLVM.
 
@@ -1325,28 +1325,45 @@ Required test files:
 
 ### 10.1 V850InstructionReference.md
 
-**Status:** ✅ Mostly Complete (updated in commit 96e8a965174e)
+**Status:** ✅ Mostly Complete (updated in commit 96e8a965174e, RH850G4MH variants added 2026-01-11)
 
 Remaining updates:
 1. ✅ Complete opcode summary for all instructions (DONE)
 2. ✅ Add FPU instruction opcode tables (DONE)
-3. ⚠️ Add RH850G3M instruction descriptions when implemented
-4. ⚠️ Update system register table with selID-based access model
+3. ✅ Add RH850G4MH/RH850G4MH2 CPU variants to overview (DONE 2026-01-11)
+4. ⚠️ Add RH850G3M instruction descriptions when implemented
+5. ⚠️ Add RH850G4MH-specific instruction descriptions (LDM.MP, STM.MP, HVTRAP, LDM.GSR, STM.GSR) when implemented
+6. ⚠️ Update system register table with selID-based access model
 
 ### 10.2 V850CycleTimings.md
 
-**Status:** ✅ Complete
+**Status:** ✅ Complete (RH850G4MH/RH850G4MH2 columns added 2026-01-11)
 
-No updates needed. This document accurately reflects all CPU variant timing specifications.
+Recent updates:
+- Added RH850G4MH and RH850G4MH2 columns to all instruction timing tables
+- Added MPU Entry Load/Store section with LDM.MP/STM.MP timing information
+- Added Virtualization Instructions section with HVTRAP, LDM.GSR, STM.GSR timings
+- All timing values based on RH850G4MH/RH850G4MH2 User's Manual specifications
 
-### 10.3 LLVM User Documentation
+### 10.3 V850HazardManagement.md
+
+**Status:** ✅ Complete (RH850G4MH/RH850G4MH2 added 2026-01-11)
+
+Recent updates:
+- Added RH850G4MH and RH850G4MH2 to pipeline architecture summary
+- Added RH850G4MH-Specific Hazards section covering:
+  - MPU Entry Load/Store Instructions (LDM.MP/STM.MP) hazards
+  - Virtualization hazards (mode transitions, HVTRAP, LDM.GSR/STM.GSR)
+  - Required synchronization for MPU and virtualization operations
+
+### 10.4 LLVM User Documentation
 
 **Files to Create/Update:**
 1. `llvm/docs/V850TargetGuide.rst` (new) - V850 backend user guide
 2. `clang/docs/V850Options.rst` (new) - Clang V850-specific options
 
 Content needed:
-- Supported CPU variants (v850, v850e1, v850e2, v850e2m, rh850g3m, rh850g3mh)
+- Supported CPU variants (v850, v850e1, v850e2, v850e2m, rh850g3m, rh850g3mh, rh850g4mh, rh850g4mh2)
 - Feature flags (-mv850e2m, -mfpu, -mrh850g3m)
 - FPU mode selection (-mfpu-mode=imprecise/precise)
 - Atomic operation support

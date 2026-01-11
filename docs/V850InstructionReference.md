@@ -34,6 +34,8 @@ evolved through several generations:
 | V850E3/E3V5 | Latest extensions with enhanced FPU and additional features |
 | RH850G3M | V850E2M + user/supervisor modes, LDL.W/STC.W atomics, BINS, ROTL, LD.DW/ST.DW, LOOP, PUSHSP/POPSP, cache/prefetch |
 | RH850G3MH | RH850G3M with performance enhancements, simplified FPU exceptions (FPINT replaces FPP/FPI) |
+| RH850G4MH | RH850G3MH + MPU load/store instructions (LDM.MP/STM.MP) for efficient MPU context switching |
+| RH850G4MH2 | RH850G4MH + hardware virtualization support (Guest/Host modes, HVTRAP, LDM.GSR/STM.GSR, enhanced EIRET/FERET) |
 
 ### CPU Variants
 
@@ -49,6 +51,8 @@ evolved through several generations:
 | v850e3v5 | V850E3 | Same as v850e3 |
 | rh850g3m | RH850G3M | User/supervisor modes, atomics, cache control |
 | rh850g3mh | RH850G3MH | Enhanced performance G3M variant |
+| rh850g4mh | RH850G4MH | RH850G3MH + MPU load/store instructions (LDM.MP/STM.MP), PID[31:24]=06H |
+| rh850g4mh2 | RH850G4MH2 | RH850G4MH + virtualization support (HVTRAP, LDM.GSR/STM.GSR, EIRET/FERET enhancements), PID[31:24]=07H |
 
 ---
 
