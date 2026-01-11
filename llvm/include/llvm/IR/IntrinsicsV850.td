@@ -116,4 +116,44 @@ let TargetPrefix = "v850" in { // All intrinsics start with "llvm.v850.".
   def int_v850_write_fpec
       : Intrinsic<[], [llvm_i32_ty], [IntrNoMem, IntrHasSideEffects]>;
 
+  //===----------------------------------------------------------------------===//
+  // Memory Barrier Operations
+  //
+  // V850 provides three synchronization instructions:
+  // - SYNCP: Pipeline synchronization (full barrier)
+  // - SYNCM: Memory synchronization
+  // - SYNCE: Exception synchronization
+  //===----------------------------------------------------------------------===//
+
+  // SYNCP - Synchronize pipeline (full memory barrier)
+  // void @llvm.v850.syncp()
+  // Use for: __sync_synchronize(), __atomic_thread_fence(__ATOMIC_SEQ_CST)
+  def int_v850_syncp : Intrinsic<[], [], [IntrNoMem, IntrHasSideEffects]>;
+
+  // SYNCM - Synchronize memory
+  // void @llvm.v850.syncm()
+  // Use for: lighter-weight memory barriers (acquire/release semantics)
+  def int_v850_syncm : Intrinsic<[], [], [IntrNoMem, IntrHasSideEffects]>;
+
+  // SYNCE - Synchronize exceptions
+  // void @llvm.v850.synce()
+  // Use for: exception synchronization before exception-related operations
+  def int_v850_synce : Intrinsic<[], [], [IntrNoMem, IntrHasSideEffects]>;
+
+  //===----------------------------------------------------------------------===//
+  // Interrupt Control Operations
+  //
+  // V850 provides instructions to enable/disable interrupts:
+  // - DI: Disable interrupts (sets ID bit in PSW)
+  // - EI: Enable interrupts (clears ID bit in PSW)
+  //===----------------------------------------------------------------------===//
+
+  // DI - Disable interrupts
+  // void @llvm.v850.di()
+  def int_v850_di : Intrinsic<[], [], [IntrNoMem, IntrHasSideEffects]>;
+
+  // EI - Enable interrupts
+  // void @llvm.v850.ei()
+  def int_v850_ei : Intrinsic<[], [], [IntrNoMem, IntrHasSideEffects]>;
+
 } // TargetPrefix = "v850"

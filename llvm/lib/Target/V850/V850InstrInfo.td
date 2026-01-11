@@ -2629,3 +2629,26 @@ def WRITE_FPEC : V850Pseudo<(outs), (ins GPR:$value),
                             [(int_v850_write_fpec GPR:$value)]>;
 
 } // Predicates = [HasV850FPU]
+
+//===----------------------------------------------------------------------===//
+// Memory Barrier Intrinsic Patterns
+//===----------------------------------------------------------------------===//
+
+// SYNCP - Full pipeline synchronization (strongest barrier)
+def : Pat<(int_v850_syncp), (SYNCP)>;
+
+// SYNCM - Memory synchronization
+def : Pat<(int_v850_syncm), (SYNCM)>;
+
+// SYNCE - Exception synchronization
+def : Pat<(int_v850_synce), (SYNCE)>;
+
+//===----------------------------------------------------------------------===//
+// Interrupt Control Intrinsic Patterns
+//===----------------------------------------------------------------------===//
+
+// DI - Disable interrupts
+def : Pat<(int_v850_di), (DI)>;
+
+// EI - Enable interrupts
+def : Pat<(int_v850_ei), (EI)>;
