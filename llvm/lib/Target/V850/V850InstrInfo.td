@@ -2541,4 +2541,91 @@ def FLOORFDUL : FormatFPU_CVT<0b10011, 0b000, 0b10, 0b1010,
                               (outs GPR:$reg3), (ins GPR:$reg2),
                               "floorf.dul\t$reg2, $reg3", []>;
 
+//===----------------------------------------------------------------------===//
+// FPU System Register Access via BSEL Banking (V850E2M+)
+//
+// These pseudo-instructions handle the BSEL register switching required
+// to access FPU system registers on V850E2M. The FPU registers (regID 6-11)
+// are only accessible when BSEL=0x2000 (FPU Status Bank).
+//
+// Expansion sequence for reading:
+//   movhi 0x20, r0, $scratch  ; $scratch = 0x2000
+//   ldsr  $scratch, bsel      ; Select FPU bank
+//   stsr  fpu_reg, $result    ; Read FPU register
+//   mov   r0, $scratch
+//   ldsr  $scratch, bsel      ; Restore CPU main bank
+//
+// Expansion sequence for writing:
+//   movhi 0x20, r0, $scratch  ; $scratch = 0x2000
+//   ldsr  $scratch, bsel      ; Select FPU bank
+//   ldsr  $value, fpu_reg     ; Write FPU register
+//   mov   r0, $scratch
+//   ldsr  $scratch, bsel      ; Restore CPU main bank
+//===----------------------------------------------------------------------===//
+
+// Read FPSR with automatic BSEL handling
+let usesCustomInserter = 1, Predicates = [HasV850E2M, HasV850FPU],
+    Defs = [BSEL], hasSideEffects = 1 in {
+def READ_FPSR : V850Pseudo<(outs GPR:$result), (ins),
+                           "# READ_FPSR -> $result",
+                           [(set GPR:$result, (int_v850_read_fpsr))]>;
+
+def READ_FPEPC : V850Pseudo<(outs GPR:$result), (ins),
+                            "# READ_FPEPC -> $result",
+                            [(set GPR:$result, (int_v850_read_fpepc))]>;
+
+def READ_FPST : V850Pseudo<(outs GPR:$result), (ins),
+                           "# READ_FPST -> $result",
+                           [(set GPR:$result, (int_v850_read_fpst))]>;
+
+def READ_FPCC : V850Pseudo<(outs GPR:$result), (ins),
+                           "# READ_FPCC -> $result",
+                           [(set GPR:$result, (int_v850_read_fpcc))]>;
+
+def READ_FPCFG : V850Pseudo<(outs GPR:$result), (ins),
+                            "# READ_FPCFG -> $result",
+                            [(set GPR:$result, (int_v850_read_fpcfg))]>;
+
+def READ_FPEC : V850Pseudo<(outs GPR:$result), (ins),
+                           "# READ_FPEC -> $result",
+                           [(set GPR:$result, (int_v850_read_fpec))]>;
+}
+
+// Write FPU registers with automatic BSEL handling
+let usesCustomInserter = 1, Predicates = [HasV850E2M, HasV850FPU],
+    Defs = [BSEL, FPSR], hasSideEffects = 1 in
+def WRITE_FPSR : V850Pseudo<(outs), (ins GPR:$value),
+                            "# WRITE_FPSR $value",
+                            [(int_v850_write_fpsr GPR:$value)]>;
+
+let usesCustomInserter = 1, Predicates = [HasV850E2M, HasV850FPU],
+    Defs = [BSEL, FPEPC], hasSideEffects = 1 in
+def WRITE_FPEPC : V850Pseudo<(outs), (ins GPR:$value),
+                             "# WRITE_FPEPC $value",
+                             [(int_v850_write_fpepc GPR:$value)]>;
+
+let usesCustomInserter = 1, Predicates = [HasV850E2M, HasV850FPU],
+    Defs = [BSEL, FPST], hasSideEffects = 1 in
+def WRITE_FPST : V850Pseudo<(outs), (ins GPR:$value),
+                            "# WRITE_FPST $value",
+                            [(int_v850_write_fpst GPR:$value)]>;
+
+let usesCustomInserter = 1, Predicates = [HasV850E2M, HasV850FPU],
+    Defs = [BSEL, FPCC], hasSideEffects = 1 in
+def WRITE_FPCC : V850Pseudo<(outs), (ins GPR:$value),
+                            "# WRITE_FPCC $value",
+                            [(int_v850_write_fpcc GPR:$value)]>;
+
+let usesCustomInserter = 1, Predicates = [HasV850E2M, HasV850FPU],
+    Defs = [BSEL, FPCFG], hasSideEffects = 1 in
+def WRITE_FPCFG : V850Pseudo<(outs), (ins GPR:$value),
+                             "# WRITE_FPCFG $value",
+                             [(int_v850_write_fpcfg GPR:$value)]>;
+
+let usesCustomInserter = 1, Predicates = [HasV850E2M, HasV850FPU],
+    Defs = [BSEL, FPEC], hasSideEffects = 1 in
+def WRITE_FPEC : V850Pseudo<(outs), (ins GPR:$value),
+                            "# WRITE_FPEC $value",
+                            [(int_v850_write_fpec GPR:$value)]>;
+
 } // Predicates = [HasV850FPU]

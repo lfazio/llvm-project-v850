@@ -113,7 +113,7 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::CTTZ, MVT::i32, Expand);
   }
   setOperationAction(ISD::CTPOP, MVT::i32, Expand);
-  setOperationAction(ISD::BSWAP, MVT::i32, Legal);  // V850 has BSW instruction
+  setOperationAction(ISD::BSWAP, MVT::i32, Legal); // V850 has BSW instruction
   setOperationAction(ISD::BITREVERSE, MVT::i32, Expand);
 
   // Saturating arithmetic - V850 has SATADD/SATSUB instructions
@@ -209,7 +209,8 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::FP_TO_SINT, MVT::i32, Legal);
     setOperationAction(ISD::FP_TO_UINT, MVT::i32, Legal);
 
-    // Comparisons - expand to library calls (complex FP compare status handling)
+    // Comparisons - expand to library calls (complex FP compare status
+    // handling)
     setOperationAction(ISD::SETCC, MVT::f32, Expand);
     setOperationAction(ISD::SELECT_CC, MVT::f32, Expand);
     setOperationAction(ISD::BR_CC, MVT::f32, Expand);
@@ -367,7 +368,8 @@ SDValue V850TargetLowering::LowerBR_CC(SDValue Op, SelectionDAG &DAG) const {
                      DAG.getConstant(CC, DL, MVT::i32), Cmp);
 }
 
-SDValue V850TargetLowering::LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const {
+SDValue V850TargetLowering::LowerSELECT_CC(SDValue Op,
+                                           SelectionDAG &DAG) const {
   SDValue LHS = Op.getOperand(0);
   SDValue RHS = Op.getOperand(1);
   SDValue TrueV = Op.getOperand(2);
@@ -382,14 +384,15 @@ SDValue V850TargetLowering::LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const 
 
 SDValue V850TargetLowering::LowerMUL(SDValue Op, SelectionDAG &DAG) const {
   // V850's MUL instruction produces a 64-bit result in two registers.
-  // For simple 32-bit multiply, we use V850ISD::SMUL and take only the low part.
+  // For simple 32-bit multiply, we use V850ISD::SMUL and take only the low
+  // part.
   SDLoc DL(Op);
   SDValue LHS = Op.getOperand(0);
   SDValue RHS = Op.getOperand(1);
 
   // V850ISD::SMUL returns (low, high)
-  SDValue MulLoHi =
-      DAG.getNode(V850ISD::SMUL, DL, DAG.getVTList(MVT::i32, MVT::i32), LHS, RHS);
+  SDValue MulLoHi = DAG.getNode(V850ISD::SMUL, DL,
+                                DAG.getVTList(MVT::i32, MVT::i32), LHS, RHS);
   return MulLoHi.getValue(0); // Return the low 32 bits
 }
 
@@ -400,8 +403,8 @@ SDValue V850TargetLowering::LowerMULHS(SDValue Op, SelectionDAG &DAG) const {
   SDValue RHS = Op.getOperand(1);
 
   // V850ISD::SMUL returns (low, high)
-  SDValue MulLoHi =
-      DAG.getNode(V850ISD::SMUL, DL, DAG.getVTList(MVT::i32, MVT::i32), LHS, RHS);
+  SDValue MulLoHi = DAG.getNode(V850ISD::SMUL, DL,
+                                DAG.getVTList(MVT::i32, MVT::i32), LHS, RHS);
   return MulLoHi.getValue(1); // Return the high 32 bits
 }
 
@@ -412,21 +415,22 @@ SDValue V850TargetLowering::LowerMULHU(SDValue Op, SelectionDAG &DAG) const {
   SDValue RHS = Op.getOperand(1);
 
   // V850ISD::UMUL returns (low, high)
-  SDValue MulLoHi =
-      DAG.getNode(V850ISD::UMUL, DL, DAG.getVTList(MVT::i32, MVT::i32), LHS, RHS);
+  SDValue MulLoHi = DAG.getNode(V850ISD::UMUL, DL,
+                                DAG.getVTList(MVT::i32, MVT::i32), LHS, RHS);
   return MulLoHi.getValue(1); // Return the high 32 bits
 }
 
 SDValue V850TargetLowering::LowerDivRem(SDValue Op, SelectionDAG &DAG) const {
   // V850's DIV/DIVU instructions produce both quotient and remainder.
-  // Convert SDIV/UDIV/SREM/UREM to V850ISD::SDIVREM/UDIVREM and extract the needed part.
+  // Convert SDIV/UDIV/SREM/UREM to V850ISD::SDIVREM/UDIVREM and extract the
+  // needed part.
   SDLoc DL(Op);
   unsigned Opcode = Op.getOpcode();
   SDValue LHS = Op.getOperand(0);
   SDValue RHS = Op.getOperand(1);
 
-  bool IsSigned = (Opcode == ISD::SDIV || Opcode == ISD::SREM ||
-                   Opcode == ISD::SDIVREM);
+  bool IsSigned =
+      (Opcode == ISD::SDIV || Opcode == ISD::SREM || Opcode == ISD::SDIVREM);
   bool WantsQuotient = (Opcode == ISD::SDIV || Opcode == ISD::UDIV);
   bool WantsRemainder = (Opcode == ISD::SREM || Opcode == ISD::UREM);
 
@@ -469,8 +473,9 @@ SDValue V850TargetLowering::LowerFRAMEADDR(SDValue Op,
   return DAG.getCopyFromReg(DAG.getEntryNode(), DL, V850::R29, MVT::i32);
 }
 
-Register V850TargetLowering::getRegisterByName(const char *RegName, LLT VT,
-                                               const MachineFunction &MF) const {
+Register
+V850TargetLowering::getRegisterByName(const char *RegName, LLT VT,
+                                      const MachineFunction &MF) const {
   Register Reg = StringSwitch<Register>(RegName)
                      .Case("sp", V850::SP)
                      .Case("r3", V850::SP)
@@ -487,7 +492,8 @@ Register V850TargetLowering::getRegisterByName(const char *RegName, LLT VT,
   if (Reg)
     return Reg;
 
-  report_fatal_error(Twine("Invalid register name \"" + StringRef(RegName) + "\"."));
+  report_fatal_error(
+      Twine("Invalid register name \"" + StringRef(RegName) + "\"."));
 }
 
 //===----------------------------------------------------------------------===//
@@ -495,7 +501,7 @@ Register V850TargetLowering::getRegisterByName(const char *RegName, LLT VT,
 //===----------------------------------------------------------------------===//
 
 SDValue V850TargetLowering::LowerINTRINSIC_W_CHAIN(SDValue Op,
-                                                    SelectionDAG &DAG) const {
+                                                   SelectionDAG &DAG) const {
   SDLoc DL(Op);
   unsigned IntNo = Op.getConstantOperandVal(1);
 
@@ -967,7 +973,7 @@ static SDValue performADDCombine(SDNode *N, SelectionDAG &DAG,
   // Carry = setcc sum_lo, acc_lo, setult
   // sum_lo should be: add acc_lo, mul_lo
   SDValue SumLo = Carry.getOperand(0);
-  SDValue CompareOp = Carry.getOperand(1);  // Should be acc_lo
+  SDValue CompareOp = Carry.getOperand(1); // Should be acc_lo
 
   if (SumLo.getOpcode() != ISD::ADD)
     return SDValue();
@@ -1020,7 +1026,7 @@ static SDValue performADDCombine(SDNode *N, SelectionDAG &DAG,
 }
 
 SDValue V850TargetLowering::PerformDAGCombine(SDNode *N,
-                                               DAGCombinerInfo &DCI) const {
+                                              DAGCombinerInfo &DCI) const {
   SelectionDAG &DAG = DCI.DAG;
 
   switch (N->getOpcode()) {
@@ -1056,8 +1062,8 @@ V850TargetLowering::getConstraintType(StringRef Constraint) const {
 
 std::pair<unsigned, const TargetRegisterClass *>
 V850TargetLowering::getRegForInlineAsmConstraint(const TargetRegisterInfo *TRI,
-                                                  StringRef Constraint,
-                                                  MVT VT) const {
+                                                 StringRef Constraint,
+                                                 MVT VT) const {
   if (Constraint.size() == 1) {
     switch (Constraint[0]) {
     case 'r':
@@ -1148,17 +1154,103 @@ V850TargetLowering::shouldExpandAtomicRMWInIR(AtomicRMWInst *AI) const {
 // Custom Instruction Insertion
 //===----------------------------------------------------------------------===//
 
+/// EmitReadFPUReg - Emit the instruction sequence to read an FPU system
+/// register with proper BSEL banking.
+///
+/// Expansion:
+///   movhi 0x20, r0, $scratch  ; $scratch = 0x2000 (FPU bank)
+///   ldsr  $scratch, bsel      ; Select FPU bank
+///   stsr  fpu_reg, $result    ; Read FPU register
+///   mov   r0, $scratch        ; $scratch = 0
+///   ldsr  $scratch, bsel      ; Restore CPU main bank
+static void EmitReadFPUReg(MachineInstr &MI, MachineBasicBlock *MBB,
+                           const TargetInstrInfo &TII, unsigned FPURegNo,
+                           Register ResultReg, Register ScratchReg1,
+                           Register ScratchReg2) {
+  DebugLoc DL = MI.getDebugLoc();
+
+  // movhi 0x20, r0, $scratch1  ; $scratch1 = 0x2000 (FPU Status Bank)
+  BuildMI(*MBB, MI, DL, TII.get(V850::MOVHI), ScratchReg1)
+      .addImm(0x20)
+      .addReg(V850::R0);
+
+  // ldsr $scratch1, bsel  ; Select FPU bank
+  BuildMI(*MBB, MI, DL, TII.get(V850::LDSR))
+      .addReg(ScratchReg1)
+      .addReg(V850::BSEL);
+
+  // stsr fpu_reg, $result  ; Read FPU register
+  // Map FPU register number to actual register
+  unsigned FPURegs[] = {V850::FPSR, V850::FPEPC, V850::FPST,
+                        V850::FPCC, V850::FPCFG, V850::FPEC};
+  BuildMI(*MBB, MI, DL, TII.get(V850::STSR), ResultReg)
+      .addReg(FPURegs[FPURegNo]);
+
+  // mov r0, $scratch2  ; $scratch2 = 0
+  BuildMI(*MBB, MI, DL, TII.get(V850::MOV), ScratchReg2).addReg(V850::R0);
+
+  // ldsr $scratch2, bsel  ; Restore CPU main bank
+  BuildMI(*MBB, MI, DL, TII.get(V850::LDSR))
+      .addReg(ScratchReg2)
+      .addReg(V850::BSEL);
+}
+
+/// EmitWriteFPUReg - Emit the instruction sequence to write an FPU system
+/// register with proper BSEL banking.
+///
+/// Expansion:
+///   movhi 0x20, r0, $scratch  ; $scratch = 0x2000 (FPU bank)
+///   ldsr  $scratch, bsel      ; Select FPU bank
+///   ldsr  $value, fpu_reg     ; Write FPU register
+///   mov   r0, $scratch        ; $scratch = 0
+///   ldsr  $scratch, bsel      ; Restore CPU main bank
+static void EmitWriteFPUReg(MachineInstr &MI, MachineBasicBlock *MBB,
+                            const TargetInstrInfo &TII, unsigned FPURegNo,
+                            Register ValueReg, Register ScratchReg1,
+                            Register ScratchReg2) {
+  DebugLoc DL = MI.getDebugLoc();
+
+  // movhi 0x20, r0, $scratch1  ; $scratch1 = 0x2000 (FPU Status Bank)
+  BuildMI(*MBB, MI, DL, TII.get(V850::MOVHI), ScratchReg1)
+      .addImm(0x20)
+      .addReg(V850::R0);
+
+  // ldsr $scratch1, bsel  ; Select FPU bank
+  BuildMI(*MBB, MI, DL, TII.get(V850::LDSR))
+      .addReg(ScratchReg1)
+      .addReg(V850::BSEL);
+
+  // ldsr $value, fpu_reg  ; Write FPU register
+  unsigned FPURegs[] = {V850::FPSR, V850::FPEPC, V850::FPST,
+                        V850::FPCC, V850::FPCFG, V850::FPEC};
+  BuildMI(*MBB, MI, DL, TII.get(V850::LDSR))
+      .addReg(ValueReg)
+      .addReg(FPURegs[FPURegNo]);
+
+  // mov r0, $scratch2  ; $scratch2 = 0
+  BuildMI(*MBB, MI, DL, TII.get(V850::MOV), ScratchReg2).addReg(V850::R0);
+
+  // ldsr $scratch2, bsel  ; Restore CPU main bank
+  BuildMI(*MBB, MI, DL, TII.get(V850::LDSR))
+      .addReg(ScratchReg2)
+      .addReg(V850::BSEL);
+}
+
 MachineBasicBlock *
 V850TargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
-                                                 MachineBasicBlock *MBB) const {
+                                                MachineBasicBlock *MBB) const {
+  const TargetInstrInfo &TII = *Subtarget.getInstrInfo();
+  MachineFunction &MF = *MBB->getParent();
+  MachineRegisterInfo &MRI = MF.getRegInfo();
+
   switch (MI.getOpcode()) {
   default:
     llvm_unreachable("Unexpected instr type to insert");
+
   case V850::TST1_PSEUDO: {
     // Expand: TST1_PSEUDO $result, $bit, [$addr]
     // To:     TST1r $bit, [$addr]    ; Sets Z flag if bit was 0
     //         SETF z, $result        ; $result = Z flag (1 if bit was 0)
-    const TargetInstrInfo &TII = *Subtarget.getInstrInfo();
     DebugLoc DL = MI.getDebugLoc();
 
     Register ResultReg = MI.getOperand(0).getReg();
@@ -1166,15 +1258,97 @@ V850TargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
     Register AddrReg = MI.getOperand(2).getReg();
 
     // TST1r sets Z flag: Z=1 if the tested bit was 0
-    BuildMI(*MBB, MI, DL, TII.get(V850::TST1r))
-        .addReg(BitReg)
-        .addReg(AddrReg);
+    BuildMI(*MBB, MI, DL, TII.get(V850::TST1r)).addReg(BitReg).addReg(AddrReg);
 
     // SETF z, result: result = 1 if Z=1 (bit was 0), else result = 0
     // Condition code 2 = "z" (zero/equal)
-    BuildMI(*MBB, MI, DL, TII.get(V850::SETF), ResultReg)
-        .addImm(2);  // CC_Z = 2
+    BuildMI(*MBB, MI, DL, TII.get(V850::SETF), ResultReg).addImm(2); // CC_Z = 2
 
+    MI.eraseFromParent();
+    return MBB;
+  }
+
+  // FPU System Register Read Pseudo-Instructions
+  // These expand to the BSEL banking sequence for V850E2M
+  case V850::READ_FPSR:
+  case V850::READ_FPEPC:
+  case V850::READ_FPST:
+  case V850::READ_FPCC:
+  case V850::READ_FPCFG:
+  case V850::READ_FPEC: {
+    Register ResultReg = MI.getOperand(0).getReg();
+    // Allocate two scratch registers for BSEL manipulation (SSA form)
+    Register ScratchReg1 = MRI.createVirtualRegister(&V850::GPRRegClass);
+    Register ScratchReg2 = MRI.createVirtualRegister(&V850::GPRRegClass);
+
+    // Map opcode to FPU register index (0=FPSR, 1=FPEPC, etc.)
+    unsigned FPURegNo;
+    switch (MI.getOpcode()) {
+    case V850::READ_FPSR:
+      FPURegNo = 0;
+      break;
+    case V850::READ_FPEPC:
+      FPURegNo = 1;
+      break;
+    case V850::READ_FPST:
+      FPURegNo = 2;
+      break;
+    case V850::READ_FPCC:
+      FPURegNo = 3;
+      break;
+    case V850::READ_FPCFG:
+      FPURegNo = 4;
+      break;
+    case V850::READ_FPEC:
+      FPURegNo = 5;
+      break;
+    default:
+      llvm_unreachable("Invalid READ_FPU pseudo");
+    }
+
+    EmitReadFPUReg(MI, MBB, TII, FPURegNo, ResultReg, ScratchReg1, ScratchReg2);
+    MI.eraseFromParent();
+    return MBB;
+  }
+
+  // FPU System Register Write Pseudo-Instructions
+  case V850::WRITE_FPSR:
+  case V850::WRITE_FPEPC:
+  case V850::WRITE_FPST:
+  case V850::WRITE_FPCC:
+  case V850::WRITE_FPCFG:
+  case V850::WRITE_FPEC: {
+    Register ValueReg = MI.getOperand(0).getReg();
+    // Allocate two scratch registers for BSEL manipulation (SSA form)
+    Register ScratchReg1 = MRI.createVirtualRegister(&V850::GPRRegClass);
+    Register ScratchReg2 = MRI.createVirtualRegister(&V850::GPRRegClass);
+
+    // Map opcode to FPU register index
+    unsigned FPURegNo;
+    switch (MI.getOpcode()) {
+    case V850::WRITE_FPSR:
+      FPURegNo = 0;
+      break;
+    case V850::WRITE_FPEPC:
+      FPURegNo = 1;
+      break;
+    case V850::WRITE_FPST:
+      FPURegNo = 2;
+      break;
+    case V850::WRITE_FPCC:
+      FPURegNo = 3;
+      break;
+    case V850::WRITE_FPCFG:
+      FPURegNo = 4;
+      break;
+    case V850::WRITE_FPEC:
+      FPURegNo = 5;
+      break;
+    default:
+      llvm_unreachable("Invalid WRITE_FPU pseudo");
+    }
+
+    EmitWriteFPUReg(MI, MBB, TII, FPURegNo, ValueReg, ScratchReg1, ScratchReg2);
     MI.eraseFromParent();
     return MBB;
   }

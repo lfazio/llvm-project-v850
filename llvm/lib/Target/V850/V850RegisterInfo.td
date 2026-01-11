@@ -241,7 +241,9 @@ def BPDM  : V850SysReg<27, "bpdm">;
 //===----------------------------------------------------------------------===//
 
 // SYSCALL registers (V850E2M+)
-// SCCFG - SYSCALL operation setting
+// SCCFG - SYSCALL operation setting (CPU Main Bank, regID 11)
+// Note: Same regID as FPEC, but FPEC is in FPU Bank (BSEL=0x2000)
+// Access: Available in CPU Main Bank (BSEL=0x0000, default)
 def SCCFG : V850SysReg<11, "sccfg">;
 
 // SCBP - SYSCALL base pointer
@@ -267,31 +269,84 @@ def FEWR  : V850SysReg<29, "fewr">;
 // DBWR - DB level working register
 def DBWR  : V850SysReg<30, "dbwr">;
 
-// BSEL - Register bank selection
+// BSEL - Register bank selection (V850E2M+)
+// This register selects which bank of system registers (regID 0-27) is active.
+// Registers 28-31 (EIWR, FEWR, DBWR, BSEL) are always accessible regardless of bank.
+//
+// Bank Values:
+//   0x0000 - CPU Main Bank (default): Basic system registers
+//   0x0010 - Exception Handler Switching Bank 0
+//   0x0011 - Exception Handler Switching Bank 1
+//   0x1000 - Processor Protection Violation Bank
+//   0x1010 - Software Paging Bank
+//   0x2000 - FPU Status Bank: FPSR, FPEPC, FPST, FPCC, FPCFG, FPEC at regID 6-11
+//   0xFF00 - User Bank 0
+//   0xFFFF - User Compatible Bank
+//
+// Usage:
+//   movhi 0x20, r0, r10    ; r10 = 0x2000
+//   ldsr  r10, bsel        ; Select FPU Status Bank
+//   stsr  fpsr, r11        ; Read FPSR from FPU bank
+//   mov   r0, r10
+//   ldsr  r10, bsel        ; Restore CPU Main Bank
 def BSEL  : V850SysReg<31, "bsel">;
 
 //===----------------------------------------------------------------------===//
 // FPU System Registers (V850E2M+)
-// Accessed via LDSR/STSR with register banking (GRP=20H, BNK=00H)
+//
+// IMPORTANT: V850E2M Register Banking
+// ====================================
+// On V850E2M, FPU system registers (regID 6-11) are accessed via register
+// banking using the BSEL register (SR31).
+//
+// To access FPU registers, software must:
+//   1. Load BSEL with 0x2000 (FPU Status Bank):
+//        movhi 0x20, r0, r10    ; r10 = 0x20000000 >> 16 = 0x2000
+//        ldsr  r10, bsel        ; Select FPU bank
+//   2. Access FPU registers via LDSR/STSR with regID 6-11
+//   3. Restore BSEL to 0x0000 (CPU Main Bank) when done:
+//        mov   r0, r10
+//        ldsr  r10, bsel        ; Select CPU main bank
+//
+// Bank Summary:
+//   BSEL=0x0000 (CPU Main):  regID 6-10 are undefined, regID 11 is SCCFG
+//   BSEL=0x2000 (FPU Bank):  regID 6-11 are FPSR, FPEPC, FPST, FPCC, FPCFG, FPEC
+//
+// Note: The assembler generates the correct encoding (regID 6-11), but it is
+// the programmer's responsibility to set BSEL appropriately before access.
+// Accessing FPU registers without setting BSEL=0x2000 causes undefined behavior.
+//
+// RH850G3M uses selID-based access instead of BSEL banking.
 //===----------------------------------------------------------------------===//
 
-// FPSR - Floating-point configuration/status
+// FPSR - Floating-point configuration/status (FPU Bank, regID 6)
 // Contains CC (condition codes), rounding mode, and exception flags
+// Access: Set BSEL=0x2000 before LDSR/STSR
 def FPSR  : V850SysReg<6, "fpsr">;
 
-// FPEPC - Floating-point exception PC
+// FPEPC - Floating-point exception PC (FPU Bank, regID 7)
+// Access: Set BSEL=0x2000 before LDSR/STSR
 def FPEPC : V850SysReg<7, "fpepc">;
 
-// FPST - Floating-point status
+// FPST - Floating-point status (FPU Bank, regID 8)
+// Alias for FPSR.RM and FPSR.XE bits
+// Access: Set BSEL=0x2000 before LDSR/STSR
 def FPST  : V850SysReg<8, "fpst">;
 
-// FPCC - Floating-point comparison result (8 condition code bits)
+// FPCC - Floating-point comparison result (FPU Bank, regID 9)
+// Contains 8 condition code bits from FPU comparisons
+// Access: Set BSEL=0x2000 before LDSR/STSR
 def FPCC  : V850SysReg<9, "fpcc">;
 
-// FPCFG - Floating-point configuration
+// FPCFG - Floating-point configuration (FPU Bank, regID 10)
+// Contains rounding mode and flush-to-zero settings
+// Access: Set BSEL=0x2000 before LDSR/STSR
 def FPCFG : V850SysReg<10, "fpcfg">;
 
-// FPEC - Floating-point exception control
+// FPEC - Floating-point exception control (FPU Bank, regID 11)
+// Controls FPI exception checking/canceling
+// Access: Set BSEL=0x2000 before LDSR/STSR
+// Note: Same regID as SCCFG, but SCCFG is in CPU Main Bank (BSEL=0x0000)
 def FPEC  : V850SysReg<11, "fpec">;
 
 // System register class - not allocatable, accessed via LDSR/STSR only
