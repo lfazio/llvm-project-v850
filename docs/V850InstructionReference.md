@@ -633,17 +633,52 @@ single-precision (32-bit) and double-precision (64-bit) operations.
 
 ### General Purpose Registers (r0-r31)
 
-| Register | Alias | Description |
-|----------|-------|-------------|
-| r0 | zero | Always contains 0 (hardwired) |
-| r1 | - | Assembler temporary |
-| r2 | hp | Handler pointer (or general purpose) |
-| r3 | sp | Stack pointer |
-| r4 | gp | Global pointer |
-| r5 | tp | Text pointer |
-| r6-r29 | - | General purpose |
-| r30 | ep | Element pointer (base for SLD/SST) |
-| r31 | lp | Link pointer (return address) |
+The V850 has 32 general-purpose 32-bit registers. All registers except r0 can be used freely.
+
+| Register | Alias | Integer Use | FPU Use (V850E2M+) | Description |
+|----------|-------|-------------|-------------------|-------------|
+| r0 | zero | Always 0 (hardwired) | wr0 (LSB) | Zero register; writes ignored |
+| r1 | - | Assembler temporary | wr0 (MSB) | Paired with r0 for 64-bit FP operations |
+| r2 | hp | Handler pointer | wr1 (LSB) | Handler pointer or general purpose |
+| r3 | sp | Stack pointer | wr1 (MSB) | Stack pointer (critical for function calls) |
+| r4 | gp | Global pointer | wr2 (LSB) | Global data pointer |
+| r5 | tp | Text pointer | wr2 (MSB) | Text/constant data pointer |
+| r6 | - | General purpose | wr3 (LSB) | General purpose |
+| r7 | - | General purpose | wr3 (MSB) | General purpose |
+| r8 | - | General purpose | wr4 (LSB) | General purpose |
+| r9 | - | General purpose | wr4 (MSB) | General purpose |
+| r10 | - | General purpose | wr5 (LSB) | General purpose |
+| r11 | - | General purpose | wr5 (MSB) | General purpose |
+| r12 | - | General purpose | wr6 (LSB) | General purpose |
+| r13 | - | General purpose | wr6 (MSB) | General purpose |
+| r14 | - | General purpose | wr7 (LSB) | General purpose |
+| r15 | - | General purpose | wr7 (MSB) | General purpose |
+| r16 | - | General purpose | wr8 (LSB) | General purpose |
+| r17 | - | General purpose | wr8 (MSB) | General purpose |
+| r18 | - | General purpose | wr9 (LSB) | General purpose |
+| r19 | - | General purpose | wr9 (MSB) | General purpose |
+| r20 | - | General purpose | wr10 (LSB) | General purpose |
+| r21 | - | General purpose | wr10 (MSB) | General purpose |
+| r22 | - | General purpose | wr11 (LSB) | General purpose |
+| r23 | - | General purpose | wr11 (MSB) | General purpose |
+| r24 | - | General purpose | wr12 (LSB) | General purpose |
+| r25 | - | General purpose | wr12 (MSB) | General purpose |
+| r26 | - | General purpose | wr13 (LSB) | General purpose |
+| r27 | - | General purpose | wr13 (MSB) | General purpose |
+| r28 | - | General purpose | wr14 (LSB) | General purpose |
+| r29 | - | General purpose | wr14 (MSB) | General purpose |
+| r30 | ep | Element pointer | wr15 (LSB) | Base register for SLD/SST short load/store |
+| r31 | lp | Link pointer | wr15 (MSB) | Return address for function calls |
+
+**Notes:**
+- **Integer Operations:** All registers r1-r31 can store 32-bit integer values
+- **FPU Operations (V850E2M+):** The FPU uses register pairs for floating-point data:
+  - **Single-precision (32-bit):** Uses even registers (r0, r2, r4, ..., r30) only
+  - **Double-precision (64-bit):** Uses register pairs (r0+r1=wr0, r2+r3=wr1, etc.)
+  - Notation: wr0-wr15 represents 16 logical 64-bit FP registers formed from r0-r31 pairs
+- **Stack Pointer (r3):** Must always point to valid stack memory when making function calls
+- **Element Pointer (r30):** Used as base for short displacement load/store instructions (SLD/SST)
+- **Link Pointer (r31):** Automatically set by JAL/JARL instructions; holds return address
 
 ---
 
@@ -699,7 +734,139 @@ as a third operand to LDSR/STSR instructions.
 | 1 | Interrupt | Interrupt control registers (ISPR, PMR, ICSR, INTCFG) |
 | 2 | MPU | Memory protection registers (MPM, MPLAn, MPUAn, MPATn) |
 | 5 | Cache | Instruction cache control (ICCTRL, ICERR, ICCFG) |
+| 6 | MPU Entry | MPU entry protection area (MPLA, MPUA, MPAT) |
+| 7 | MPU Entry | MPU entry protection area (MPLA, MPUA, MPAT) - alternate bank |
 | 10 | FPU | Floating-point control (alternative access) |
+| 13 | Guest | Guest mode system registers (RH850G4MH2 only) |
+
+**RH850G4MH2 Extensions:**
+- selID 13: Guest mode system registers (GMEIPC, GMEIPSW, GMFEPC, GMFEPSW, GMPSW)
+- Host mode system registers accessible via selID 0 (HMEIPC, HMEIPSW, HMFEPC, HMFEPSW, HMPSW)
+
+---
+
+### System Register Summary by CPU Variant
+
+This table shows which system registers are available for each CPU variant.
+
+**Legend:**
+- ✅ = Available
+- ⚠️ = Available with modifications/extensions
+- ❌ = Not available
+- SV = Supervisor mode only
+- UM = User mode accessible
+
+#### Basic System Registers (selID=0 for RH850)
+
+| Register | regID | V850 | V850ES | V850E1 | V850E2 | V850E2M | RH850G3M | RH850G3MH | RH850G4MH | Description |
+|----------|-------|------|--------|--------|--------|---------|----------|-----------|-----------|-------------|
+| EIPC | 0 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | EI-level exception PC |
+| EIPSW | 1 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | EI-level exception PSW |
+| FEPC | 2 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | FE-level exception PC |
+| FEPSW | 3 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | FE-level exception PSW |
+| PSW | 5 | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | Program status word (extended in later variants) |
+| FPSR | 6 | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | FPU status register |
+| FPEPC | 7 | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | FPU exception PC |
+| FPST | 8 | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | FPU status bits |
+| FPCC | 9 | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | FPU condition code |
+| FPCFG | 10 | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | FPU configuration |
+| FPEC | 11 | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | FPU exception control (removed in G3MH) |
+| EIIC | 13 | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | EI-level exception cause |
+| FEIC | 14 | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | FE-level exception cause |
+| CTPC | 16 | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | CALLT saved PC |
+| CTPSW | 17 | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | CALLT saved PSW |
+| DBPC | 18 | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Debug exception PC |
+| DBPSW | 19 | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Debug exception PSW |
+| CTBP | 20 | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | CALLT base pointer |
+| DIR | 21 | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Debug interface register |
+| EIWR | 28 | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | EI-level working register |
+| FEWR | 29 | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | FE-level working register |
+| BSEL | 31 | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | Bank select (V850E2M only) |
+
+**V850/V850ES/V850E1 Notes:**
+- ECR (regID 4) combines EIIC/FEIC into single register (removed in V850E2M)
+- No FPU registers (FPSR-FPCFG)
+- PSW has basic 8-bit layout
+
+**V850E2M Notes:**
+- BSEL (regID 31) used for bank selection
+- Adds FPU registers
+- PSW extended with memory protection bits
+
+**RH850G3M+ Notes:**
+- BSEL removed; uses selID-based addressing
+- FPEC (regID 11) removed in G3MH/G4MH
+- PSW adds user/supervisor mode and coprocessor control
+
+#### Interrupt Control Registers (RH850G3M+, selID=1)
+
+| Register | regID | selID | RH850G3M | RH850G3MH | RH850G4MH | Description |
+|----------|-------|-------|----------|-----------|-----------|-------------|
+| ISPR | 0 | 1 | ✅ | ✅ | ✅ | Interrupt status pending |
+| PMR | 1 | 1 | ✅ | ✅ | ✅ | Priority mask register |
+| ICSR | 2 | 1 | ✅ | ✅ | ✅ | Interrupt control status |
+| INTCFG | 3 | 1 | ✅ | ✅ | ✅ | Interrupt configuration |
+| FPIPR | 13 | 1 | ✅ | ❌ | ❌ | FPU interrupt priority (removed in G3MH) |
+
+#### MPU Registers (RH850G3M+, selID=2)
+
+| Register | regID | selID | RH850G3M | RH850G3MH | RH850G4MH | Description |
+|----------|-------|-------|----------|-----------|-----------|-------------|
+| MPM | 0 | 2 | ✅ | ✅ | ✅ | MPU operation mode |
+| MPRC | 1 | 2 | ✅ | ✅ | ✅ | MPU region control |
+| MPBRGN | 4 | 2 | ✅ | ✅ | ✅ | MPU base region number (read-only) |
+| MPTRGN | 5 | 2 | ✅ | ✅ | ✅ | MPU total region number (read-only) |
+| MCA | 8 | 2 | ✅ | ✅ | ✅ | Memory check address |
+| MCS | 9 | 2 | ✅ | ✅ | ✅ | Memory check size |
+| MCC | 10 | 2 | ✅ | ✅ | ✅ | Memory check command |
+| MCR | 11 | 2 | ✅ | ✅ | ✅ | Memory check result (read-only) |
+| MPLA0-15 | 16-46 | 2 | ✅ | ✅ | ✅ | Protection area lower address |
+| MPUA0-15 | 17-47 | 2 | ✅ | ✅ | ✅ | Protection area upper address |
+| MPAT0-15 | 18-48 | 2 | ✅ | ✅ | ✅ | Protection area attributes |
+
+**Note:** MPLAn/MPUAn/MPATn registers organized as triplets for regions 0-15
+
+#### Cache Control Registers (RH850G3M+, selID=5)
+
+| Register | regID | selID | RH850G3M | RH850G3MH | RH850G4MH | Description |
+|----------|-------|-------|----------|-----------|-----------|-------------|
+| ICCTRL | 0 | 5 | ✅ | ✅ | ✅ | Instruction cache control |
+| ICTAGL | 8 | 5 | ✅ | ✅ | ✅ | I-cache tag (low) |
+| ICTAGH | 9 | 5 | ✅ | ✅ | ✅ | I-cache tag (high) |
+| ICDATL | 10 | 5 | ✅ | ✅ | ✅ | I-cache data (low) |
+| ICDATH | 11 | 5 | ✅ | ✅ | ✅ | I-cache data (high) |
+| ICERR | 24 | 5 | ✅ | ✅ | ✅ | I-cache error status |
+| ICCFG | 26 | 5 | ✅ | ✅ | ✅ | I-cache configuration (read-only) |
+
+#### Virtualization Registers (RH850G4MH2 Only)
+
+**Host Mode Registers (selID=0):**
+
+| Register | regID | selID | Description |
+|----------|-------|-------|-------------|
+| HMEIPC | 22 | 0 | Host mode EI-level exception PC |
+| HMEIPSW | 23 | 0 | Host mode EI-level exception PSW |
+| HMFEPC | 24 | 0 | Host mode FE-level exception PC |
+| HMFEPSW | 25 | 0 | Host mode FE-level exception PSW |
+| HMPSW | 26 | 0 | Host mode PSW |
+| HVCFG | 27 | 0 | Hypervisor configuration |
+| PSWH | 30 | 0 | PSW high (contains GM bit for Guest/Host mode) |
+
+**Guest Mode Registers (selID=13):**
+
+| Register | regID | selID | Description |
+|----------|-------|-------|-------------|
+| GMEIPC | 0 | 13 | Guest mode EI-level exception PC |
+| GMEIPSW | 1 | 13 | Guest mode EI-level exception PSW |
+| GMFEPC | 2 | 13 | Guest mode FE-level exception PC |
+| GMFEPSW | 3 | 13 | Guest mode FE-level exception PSW |
+| GMPSW | 5 | 13 | Guest mode PSW |
+
+**Notes:**
+- Guest/Host mode controlled by PSWH.GM bit
+- Host mode registers accessible only when PSWH.GM=0
+- Guest mode registers accessible only when PSWH.GM=1 or in Host mode with HV privilege
+- LDM.GSR/STM.GSR instructions provide efficient context switching
 
 ---
 
