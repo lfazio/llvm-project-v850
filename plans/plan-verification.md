@@ -1386,19 +1386,32 @@ V850 (base - 74 instructions, 6 system registers)
 
 #### 4.3 Implement V850E2M Register Banking
 
+**Status:** ✅ FPU bank implemented, ⚠️ Protection banks pending
+
 **Files:**
 - `llvm/lib/Target/V850/V850InstrInfo.td`
 - `llvm/lib/Target/V850/V850ISelLowering.cpp`
+- `llvm/include/llvm/IR/IntrinsicsV850.td`
 
 **Tasks:**
-1. Use BSEL register to select register banks
-2. Implement bank switching for FPU registers (BSEL=0x2000)
-3. Implement bank switching for protection registers (BSEL=0x1000-0x1010)
-4. Update LDSR/STSR to validate bank selection
+1. ✅ Use BSEL register to select register banks
+2. ✅ Implement bank switching for FPU registers (BSEL=0x2000)
+3. ⚠️ Implement bank switching for protection registers (BSEL=0x1000-0x1010)
+4. ✅ Intrinsics for FPU register access (llvm.v850.read/write.fpsr/fpepc/fpst/fpcc/fpcfg/fpec)
+
+**Implementation Details:**
+- 12 intrinsics added for reading/writing 6 FPU system registers
+- Pseudo-instructions with usesCustomInserter for BSEL banking sequence
+- Each intrinsic expands to 5 instructions maintaining proper bank switching
+
+**Tests:**
+- `llvm/test/CodeGen/V850/fpu-bsel-intrinsics.ll` - CodeGen tests
+- `llvm/test/MC/V850/insn/bsel-fpu-banking.s` - MC encoding tests
+- `llvm/test/MC/V850/insn/sysreg-banking.s` - System register banking tests
 
 **Acceptance Criteria:**
-- FPU system registers accessible via BSEL=0x2000
-- Protection registers accessible via BSEL=0x1000
+- ✅ FPU system registers accessible via BSEL=0x2000 (intrinsics)
+- ⚠️ Protection registers accessible via BSEL=0x1000 (not yet implemented)
 
 ---
 
