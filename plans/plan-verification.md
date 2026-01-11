@@ -124,148 +124,361 @@ The V850 backend has comprehensive support for V850, V850ES, V850E1, V850E2, and
 
 ---
 
-## 3. System Register Implementation
+# V850 Complete Register Reference
 
-### 3.1 Base System Registers (V850/V850ES/V850E1) ✅
-
-**File:** `llvm/lib/Target/V850/V850RegisterInfo.td` (Lines 157-190)
-
-| RegID | Name | Doc Status | Impl Status | Access | Issues |
-|-------|------|------------|-------------|--------|--------|
-| 0 | EIPC | ✅ | ✅ | R/W | None |
-| 1 | EIPSW | ✅ | ✅ | R/W | None |
-| 2 | FEPC | ✅ | ✅ | R/W | None |
-| 3 | FEPSW | ✅ | ✅ | R/W | None |
-| 4 | ECR | ✅ | ✅ | R | None |
-| 5 | PSW | ✅ | ✅ | R/W | None |
-| 6-15 | Reserved | ✅ | ✅ | - | None |
-
-**Status:** ✅ Complete (6/6 base registers)
-
-### 3.2 V850E1+ System Registers ⚠️
-
-**File:** `llvm/lib/Target/V850/V850RegisterInfo.td` (Lines 191-220)
-
-**Important Note - V850ES vs V850E1:**
-- **V850ES** supports the same instruction set as V850E1 but has only the 6 base system registers (EIPC, EIPSW, FEPC, FEPSW, ECR, PSW)
-- **V850E1** adds 12 additional system registers below for CALLT and debug functionality
-
-| RegID | Name | Doc Status | Impl Status | Access | Priority | Issues |
-|-------|------|------------|-------------|--------|----------|--------|
-| 16 | CTPC | ✅ | ✅ | R/W | - | CALLT saved PC (V850E1 only) |
-| 17 | CTPSW | ✅ | ✅ | R/W | - | CALLT saved PSW (V850E1 only) |
-| 18 | DBPC | ✅ | ✅ | R/W | - | Debug saved PC (V850E1 only) |
-| 19 | DBPSW | ✅ | ✅ | R/W | - | Debug saved PSW (V850E1 only) |
-| 20 | CTBP | ✅ | ✅ | R/W | - | CALLT base pointer (V850E1 only) |
-| 21 | DIR | ✅ | ❌ | R/W | Low | Debug interrupt register (V850E1 only) |
-| 22 | BPC0 | ✅ | ❌ | R/W | Low | Breakpoint control (V850E1 only) |
-| 23 | ASID | ✅ | ❌ | R/W | Low | Address space ID (V850E1 only) |
-| 24-27 | BPAVn, BPAMn, BPDVn, BPDMn | ✅ | ❌ | R/W | Low | Breakpoint registers (V850E1 only) |
-
-**Status:** ⚠️ Partial (5/12 V850E1 registers implemented, 42%)
-**Priority:** Low (debug functionality, not required for code generation)
-**V850ES Status:** ✅ Complete (uses only base 6 registers from Section 3.1)
-
-### 3.3 V850E2M System Registers ⚠️
-
-**File:** `llvm/lib/Target/V850/V850RegisterInfo.td` (Lines 220-245)
-
-| RegID | Name | Doc Status | Impl Status | Access | Priority | Issues |
-|-------|------|------------|-------------|--------|----------|--------|
-| 6 | FPSR | ✅ | ✅ | R/W | - | FPU status |
-| 7 | FPEPC | ✅ | ✅ | R/W | - | FPU exception PC |
-| 8 | FPST | ✅ | ✅ | R/W | - | FPU sticky flags |
-| 9 | FPCC | ✅ | ✅ | R/W | - | FPU condition code |
-| 10 | FPCFG | ✅ | ✅ | R/W | - | FPU configuration |
-| 11 | SCCFG/FPEC | ✅ | ✅ | R/W | - | System config / FPU exception cause |
-| 12 | SCBP | ✅ | ✅ | R/W | - | System call base pointer |
-| 13 | EIIC | ✅ | ❌ | R/W | Medium | Exception interrupt cause |
-| 14 | FEIC | ✅ | ❌ | R/W | Medium | FE-level interrupt cause |
-| 28 | EIWR | ✅ | ✅ | R/W | - | EI work register |
-| 29 | FEWR | ✅ | ✅ | R/W | - | FE work register |
-| 30 | DBWR | ✅ | ✅ | R/W | - | Debug work register |
-| 31 | BSEL | ✅ | ✅ | R/W | - | Bank selection register |
-
-**Status:** ⚠️ Mostly Complete (11/13 implemented, 85%)
-**Priority:** Medium (EIIC, FEIC useful for exception handling)
-
-### 3.4 V850E2M Register Banking ❌
-
-**Status:** ❌ Not Implemented
-**Documentation:** V850InstructionReference.md lines 726-1151
-
-The V850E2M bank selection model using BSEL register is documented but not implemented in LDSR/STSR:
-
-| Bank | BSEL Value | Group | Registers |
-|------|------------|-------|-----------|
-| CPU Main | 0x0000 | 0 | All general system registers |
-| Exception Handler EI | 0x0010 | 0 | EIPC, EIPSW, EIIC, EIWR |
-| Exception Handler FE | 0x0011 | 0 | FEPC, FEPSW, FEIC, FEWR |
-| Processor Protection | 0x1000-0x1010 | 16 | MPM, MPRC, protection registers |
-| FPU Status | 0x2000 | 32 | FPSR, FPEPC, FPST, FPCC, FPCFG, FPEC |
-| User Banks | 0xFF00-0xFFFF | 255 | User-defined register banks |
-
-**Current Issue:**
-- BSEL register exists (RegID 31) but is not used by LDSR/STSR
-- FPU system registers cannot be accessed via banking
-- Processor protection registers cannot be accessed
-
-**File Location:** `V850InstrInfo.td` lines 696-713
-**Priority:** Low (primarily for OS/RTOS support)
-
-### 3.5 RH850G3M System Registers (selID-based) ❌
-
-**Status:** ❌ Not Implemented
-**Documentation:** V850InstructionReference.md lines 763-804, RH850G3M software manual
-
-RH850G3M uses a different system register access model: `LDSR reg2, regID, selID`
-
-| selID | Group | Registers | Status | Priority |
-|-------|-------|-----------|--------|----------|
-| 0 | Basic | PSW, EIPC, EIPSW, FEPC, FEPSW, ECR, CTPC, CTPSW, FPU regs | ✅ Partial | High |
-| 1 | Interrupt | ISPR, PMR, ICSR, INTCFG, RBASE, EBASE, INTBP, MCTL, PID | ❌ Not Impl | **Critical** |
-| 2 | MPU | MPM, MPRC, MPLAn, MPUAn, MPATn | ❌ Not Impl | **Critical** |
-| 5 | Cache | ICCTRL, ICERR, ICCFG, ICTAGL/H, ICDATL/H | ❌ Not Impl | Medium |
-| 10 | FPU Alt | Alternative FPU register access | ❌ Not Impl | Low |
-
-**Current Issue:**
-- LDSR/STSR instructions have no selID operand
-- RH850G3M system registers cannot be accessed
-- Parser doesn't recognize 3-operand LDSR/STSR syntax
-
-**Files Requiring Updates:**
-- `V850InstrInfo.td` lines 696-713: Add selID operand
-- `V850RegisterInfo.td`: Define selID-based registers
-- `V850AsmParser.cpp`: Parse 3-operand LDSR/STSR
-
-**Priority:** **Critical** for RH850G3M support
-
-### 3.6 PSW Extensions for RH850G3M ❌
-
-**Status:** ❌ Not Implemented
-**Documentation:** V850InstructionReference.md lines 763-804
-
-RH850G3M PSW has additional fields beyond V850E2M:
-
-| Bits | Field | Purpose | V850E2M | RH850G3M | Impl Status |
-|------|-------|---------|---------|----------|-------------|
-| 30 | UM | User Mode | - | ✅ | ❌ |
-| 19 | NPV | Non-Privileged | ✅ | ✅ | ✅ |
-| 18 | CU2 | Coprocessor 2 Enable | - | ✅ | ❌ |
-| 17 | CU1 | Coprocessor 1 Enable | - | ✅ | ❌ |
-| 16 | CU0 | Coprocessor 0 Enable | - | ✅ | ❌ |
-| 15 | EBV | Exception Base Vector | - | ✅ | ❌ |
-| 14-12 | Reserved | - | - | - | - |
-| 11-9 | Debug | Debug status field | - | ✅ | ❌ |
-
-**Critical Impact:** User/Supervisor mode separation cannot be implemented without UM bit.
-
-**Priority:** **Critical** for RH850G3M
+This section documents all registers (program, FPU, and system) for all V850 CPU variants.
 
 ---
 
-## 4. Scheduling Model Status
+## 3. Register Implementation
 
+### 3.1 Program Registers (General Purpose Registers)
+
+**File:** `llvm/lib/Target/V850/V850RegisterInfo.td` (Lines 50-82)
+
+All V850 variants (V850, V850ES, V850E1, V850E2, V850E2M, RH850G3M) share the same 32 general-purpose registers plus PC.
+
+| Register | ABI Name | Size | Usage | Special Constraints |
+|----------|----------|------|-------|-------------------|
+| **r0** | zero | 32-bit | Zero register | Always holds 0, read-only |
+| **r1** | - | 32-bit | Assembler-reserved | Used for address generation |
+| **r2** | - | 32-bit | Variable | May be used by RTOS |
+| **r3** | SP | 32-bit | Stack pointer | Used for stack frame generation |
+| **r4** | GP | 32-bit | Global pointer | Access global variables in data area |
+| **r5** | TP | 32-bit | Text pointer | Points to start of text area |
+| **r6-r29** | - | 32-bit | General purpose | Address/data variable registers |
+| **r30** | EP | 32-bit | Element pointer | Base pointer for SLD/SST instructions |
+| **r31** | LP | 32-bit | Link pointer | Used for function calls |
+| **PC** | - | 24-bit | Program counter | Bits [23:1] valid, bit 0 always 0, bits [31:24] reserved |
+
+**Status:** ✅ Complete (all 32 registers + PC implemented)
+
+**Implementation Quality:**
+- V850-V850E2M: 100% implemented
+- RH850G3M: Needs PSW.UM bit support for user/supervisor mode distinction
+
+---
+
+### 3.2 FPU Registers (V850E2M+)
+
+**File:** `llvm/lib/Target/V850/V850RegisterInfo.td` (Lines 83-115)
+
+The FPU **does not have dedicated register files**. It reuses CPU general-purpose registers (r0-r31):
+
+| Precision | Register Count | Register Pairs | Notes |
+|-----------|----------------|----------------|-------|
+| **Single (32-bit)** | 32 registers | r0-r31 | Each register used independently |
+| **Double (64-bit)** | 16 register pairs | {r1,r0}, {r3,r2}, {r5,r4}, ... {r31,r30} | Specified by even-numbered register |
+
+**Important Constraints:**
+- **r0 zero register**: {r1, r0} cannot be used for double-precision operations (r0 always holds 0)
+- **Even register specification**: Double-precision instructions specify only the even-numbered register of the pair
+- **Register pair alignment**: Odd registers cannot be specified independently for double-precision operations
+
+**Examples:**
+```assembly
+addf.s r5, r6, r7          # Single-precision: r7 = r5 + r6
+addf.d r4, r6, r8          # Double-precision: {r9,r8} = {r5,r4} + {r7,r6}
+```
+
+**Status:** ✅ Complete (FPU register aliasing fully implemented)
+
+---
+
+### 3.3 System Registers - Overview
+
+System registers are accessed via `LDSR reg2, regID[, selID]` and `STSR regID, reg2[, selID]` instructions.
+
+**Register Numbering Models:**
+- **V850/V850ES/V850E1/V850E2/V850E2M:** RegID only (0-31)
+- **RH850G3M/RH850G3MH:** (RegID, selID) pair for extended register space
+
+**Bank Selection Models:**
+- **V850E2M:** BSEL-based banking (group + bank number)
+- **RH850G3M:** selID-based groups (cleaner model)
+
+---
+
+### 3.4 Base System Registers (V850/V850ES/V850E1)
+
+**Variants:** V850, V850ES, V850E1, V850E2, V850E2M, V850E3, RH850G3M
+
+**File:** `llvm/lib/Target/V850/V850RegisterInfo.td` (Lines 157-190)
+
+| RegID | Name | Full Name | Size | Access | Reset Value | Description |
+|-------|------|-----------|------|--------|-------------|-------------|
+| **0** | EIPC | Exception/Interrupt PC | 24-bit | R/W | Undefined | Saves PC when EI-level exception occurs. Bits [23:1] valid, bit 0 ignored on RETI |
+| **1** | EIPSW | Exception/Interrupt PSW | 32-bit | R/W | Undefined | Saves PSW when EI-level exception occurs |
+| **2** | FEPC | Fatal Error PC | 24-bit | R/W | Undefined | Saves PC when FE-level exception (NMI) occurs. Bits [23:1] valid |
+| **3** | FEPSW | Fatal Error PSW | 32-bit | R/W | Undefined | Saves PSW when FE-level exception (NMI) occurs |
+| **4** | ECR | Exception Cause Register | 32-bit | **R** | Undefined | Holds exception/interrupt cause code. **Read-only**. Bits [31:16]=FECC (NMI code), bits [15:0]=EICC (exception/interrupt code) |
+| **5** | PSW | Program Status Word | 32-bit | R/W | 00000020H | CPU status flags. Bits [7:0] = flags (NP, EP, ID, SAT, CY, OV, S, Z) |
+| **6-15** | - | Reserved | - | - | - | Reserved for future expansion |
+
+**PSW Bit Layout (Base V850):**
+```
+31                                8 7  6  5  4   3  2  1  0
+┌────────────────────────────────┬──┬──┬──┬───┬──┬──┬──┬──┐
+│          RFU (0)               │NP│EP│ID│SAT│CY│OV│S │Z │
+└────────────────────────────────┴──┴──┴──┴───┴──┴──┴──┴──┘
+```
+
+**PSW Flag Descriptions:**
+- **Z (bit 0):** Zero flag (1 = result is zero)
+- **S (bit 1):** Sign flag (1 = result is negative)
+- **OV (bit 2):** Overflow flag (1 = overflow occurred)
+- **CY (bit 3):** Carry/borrow flag
+- **SAT (bit 4):** Saturation flag (cumulative, set by saturation operations)
+- **ID (bit 5):** Interrupt disable (1 = interrupts masked)
+- **EP (bit 6):** Exception pending (1 = exception processing in progress)
+- **NP (bit 7):** NMI pending (1 = NMI processing in progress, masks multiple interrupts)
+
+**Implementation Status:** ✅ Complete (6/6 registers, all variants)
+
+**V850ES Note:** V850ES uses **only these 6 registers** (does not have V850E1 additional registers)
+
+---
+
+### 3.5 V850E1 Additional System Registers
+
+**Variants:** V850E1, V850E2, V850E2M, V850E3 (**NOT V850ES**)
+
+**File:** `llvm/lib/Target/V850/V850RegisterInfo.td` (Lines 191-220)
+
+| RegID | Name | Full Name | Size | Access | Reset Value | Description | Impl Status |
+|-------|------|-----------|------|--------|-------------|-------------|-------------|
+| **16** | CTPC | CALLT PC | 24-bit | R/W | Undefined | Saves PC when CALLT executed | ✅ Implemented |
+| **17** | CTPSW | CALLT PSW | 32-bit | R/W | Undefined | Saves PSW when CALLT executed | ✅ Implemented |
+| **18** | DBPC | Debug PC | 24-bit | R/W | Undefined | Saves PC for debug trap (Type A/B products only) | ✅ Implemented |
+| **19** | DBPSW | Debug PSW | 32-bit | R/W | Undefined | Saves PSW for debug trap (Type A/B products only) | ✅ Implemented |
+| **20** | CTBP | CALLT Base Pointer | 32-bit | R/W | Undefined | Base address for CALLT table. Bits [31:9] valid, bits [8:0] = 0 | ✅ Implemented |
+| **21** | DIR | Debug Interface Register | 32-bit | R/W | Undefined | Debug mode control (Type A/B only) | ❌ **NOT Implemented** |
+| **22** | BPC0/BPC1 | Breakpoint Control 0/1 | 32-bit | R/W | Undefined | Breakpoint control (selected by DIR.CS) | ❌ **NOT Implemented** |
+| **23** | ASID | Address Space ID | 32-bit | R/W | Undefined | Process ID for MMU/debug | ❌ **NOT Implemented** |
+| **24** | BPAV0/BPAV1 | Breakpoint Address Value 0/1 | 32-bit | R/W | Undefined | Breakpoint address (selected by DIR.CS) | ❌ **NOT Implemented** |
+| **25** | BPAM0/BPAM1 | Breakpoint Address Mask 0/1 | 32-bit | R/W | Undefined | Breakpoint address mask (selected by DIR.CS) | ❌ **NOT Implemented** |
+| **26** | BPDV0/BPDV1 | Breakpoint Data Value 0/1 | 32-bit | R/W | Undefined | Breakpoint data value (selected by DIR.CS) | ❌ **NOT Implemented** |
+| **27** | BPDM0/BPDM1 | Breakpoint Data Mask 0/1 | 32-bit | R/W | Undefined | Breakpoint data mask (selected by DIR.CS) | ❌ **NOT Implemented** |
+
+**Implementation Status:** ⚠️ Partial (5/12 implemented, 42%)
+
+**Priority:** Low (debug registers, not required for code generation)
+
+**Note:** DIR.CS bit selects between register pair 0 and 1 for BPC, BPAV, BPAM, BPDV, BPDM
+
+---
+
+### 3.6 V850E2M System Registers
+
+**Variants:** V850E2M, V850E3
+
+**File:** `llvm/lib/Target/V850/V850RegisterInfo.td` (Lines 220-245)
+
+| RegID | Name | Full Name | Size | Access | Reset Value | Description | Impl Status |
+|-------|------|-----------|------|--------|-------------|-------------|-------------|
+| **6** | FPSR | FP Configuration/Status | 32-bit | R/W | Note | FPU status and control. CC bits [31:24], exception mode, rounding, cause, enable, preservation | ✅ Implemented |
+| **7** | FPEPC | FP Exception PC | 32-bit | R/W | Undefined | Saves PC when FPU exception occurs | ✅ Implemented |
+| **8** | FPST | FP Status | 32-bit | R/W | 00000000H | Alias for FPSR.RM and FPSR.XE bits | ✅ Implemented |
+| **9** | FPCC | FP Condition Code | 32-bit | R/W | Undefined | Alias for FPSR.CC[7:0] bits | ✅ Implemented |
+| **10** | FPCFG | FP Configuration | 32-bit | R/W | 00000000H | Alias for FPSR.RM and FPSR.FS bits | ✅ Implemented |
+| **11** | FPEC | FP Exception Control | 32-bit | R/W | 00000000H | Controls FPI exception checking/canceling | ✅ Implemented |
+| **11** | SCCFG | SYSCALL Config (alt) | 32-bit | R/W | 00000000H | SYSCALL operation setting (same RegID as FPEC) | ✅ Implemented |
+| **12** | SCBP | SYSCALL Base Pointer | 32-bit | R/W | Undefined | Base address for SYSCALL table | ✅ Implemented |
+| **13** | EIIC | EI Interrupt Cause | 32-bit | R/W | Undefined | EI-level exception cause code | ❌ **NOT Implemented** |
+| **14** | FEIC | FE Interrupt Cause | 32-bit | R/W | Undefined | FE-level exception cause code | ❌ **NOT Implemented** |
+| **15** | DBIC | DB Interrupt Cause | 32-bit | R/W | Undefined | Debug exception cause code | ❌ **NOT Implemented** |
+| **28** | EIWR | EI Working Register | 32-bit | R/W | Undefined | EI-level exception working register | ✅ Implemented |
+| **29** | FEWR | FE Working Register | 32-bit | R/W | Undefined | FE-level exception working register | ✅ Implemented |
+| **30** | DBWR | DB Working Register | 32-bit | R/W | Undefined | Debug working register | ✅ Implemented |
+| **31** | BSEL | Bank Selection | 32-bit | R/W | 00000000H | System register bank selection | ✅ Implemented |
+
+**Implementation Status:** ⚠️ Mostly Complete (11/14 implemented, 79%)
+
+**Priority:** Medium (EIIC, FEIC useful for exception handling)
+
+**PSW Extensions for V850E2M:**
+```
+31   20 19 18 17 16 15   8 7  6  5  4  3  2  1  0
+┌────┬──┬──┬──┬──┬────┬──┬──┬──┬──┬──┬──┬──┬──┐
+│ 0  │PP│NP│DM│IM│  0 │NP│EP│ID│SA│CY│OV│S │Z │
+│    │  │V │P │P │    │  │  │  │T │  │  │  │  │
+└────┴──┴──┴──┴──┴────┴──┴──┴──┴──┴──┴──┴──┴──┘
+```
+
+**New PSW Bits (V850E2M):**
+- **PP (bit 19):** Processor protection mode (interacts with MPM.AUE)
+- **NPV (bit 18):** Non-privileged mode
+- **DMP (bit 17):** Data memory protection enable
+- **IMP (bit 16):** Instruction memory protection enable
+
+---
+
+### 3.7 V850E2M Register Banking (BSEL-based)
+
+**Status:** ❌ Not Implemented (registers defined, but banking not used by LDSR/STSR)
+
+**Documentation:** V850InstructionReference.md lines 726-1151
+
+V850E2M uses BSEL register to select register banks:
+
+| BSEL Value | Group | Bank Label | Description |
+|------------|-------|------------|-------------|
+| **0x0000** | 0 | CPU Main | All standard system registers |
+| **0x0010** | 0 | EHSW0 | Exception Handler Switching Bank 0 |
+| **0x0011** | 0 | EHSW1 | Exception Handler Switching Bank 1 |
+| **0x1000-0x1010** | 16 | Processor Protection | MPM, MPRC, protection registers |
+| **0x2000** | 32 | FPU Status | FPSR, FPEPC, FPST, FPCC, FPCFG, FPEC |
+| **0xFF00-0xFFFF** | 255 | User Banks | User-defined register banks |
+
+**Issue:** BSEL register exists (RegID 31) but LDSR/STSR don't validate or use bank selection. FPU system registers and protection registers cannot be accessed via banking.
+
+**Priority:** Low (primarily for OS/RTOS support)
+
+---
+
+### 3.8 RH850G3M System Registers (selID-based)
+
+**Variants:** RH850G3M, RH850G3MH
+
+**Status:** ❌ **NOT Implemented** (no RH850G3M support in LLVM)
+
+**Documentation:** V850InstructionReference.md lines 763-804, RH850G3M software manual
+
+RH850G3M uses **(regID, selID)** register numbering:
+- **LDSR syntax:** `LDSR reg2, regID, selID`
+- **STSR syntax:** `STSR regID, reg2, selID`
+
+#### 3.8.1 Basic System Registers (selID=0)
+
+| RegID | selID | Symbol | Full Name | Access | Description |
+|-------|-------|--------|-----------|--------|-------------|
+| 0 | 0 | EIPC | EI Exception PC | SV | Status save when acknowledging EI exception |
+| 1 | 0 | EIPSW | EI Exception PSW | SV | Status save when acknowledging EI exception |
+| 2 | 0 | FEPC | FE Exception PC | SV | Status save when acknowledging FE exception |
+| 3 | 0 | FEPSW | FE Exception PSW | SV | Status save when acknowledging FE exception |
+| 5 | 0 | PSW | Program Status Word | Note 1 | CPU status (with RH850G3M extensions) |
+| 6 | 0 | FPSR | FP Configuration/Status | CU0+SV | FPU status and control |
+| 7 | 0 | FPEPC | FP Exception PC | CU0+SV | FPU exception program counter |
+| 8 | 0 | FPST | FP Status | CU0 | Alias for FPSR bits |
+| 9 | 0 | FPCC | FP Condition Code | CU0 | Alias for FPSR.CC bits |
+| 10 | 0 | FPCFG | FP Configuration | CU0 | Alias for FPSR bits |
+| 11 | 0 | FPEC | FP Exception Control | CU0+SV | FPU exception control |
+| 13 | 0 | EIIC | EI Interrupt Cause | SV | EI-level exception cause |
+| 14 | 0 | FEIC | FE Interrupt Cause | SV | FE-level exception cause |
+| 16 | 0 | CTPC | CALLT PC | UM | CALLT execution status save |
+| 17 | 0 | CTPSW | CALLT PSW | UM | CALLT execution status save |
+| 20 | 0 | CTBP | CALLT Base Pointer | UM | CALLT base pointer |
+| 28 | 0 | EIWR | EI Working Register | SV | EI-level exception working register |
+| 29 | 0 | FEWR | FE Working Register | SV | FE-level exception working register |
+| 31 | 0 | BSEL (compat) | Bank Selection (compat) | SV | Reserved for V850E2 compatibility (always 0) |
+
+**Access Permissions:**
+- **SV:** Supervisor mode only
+- **UM:** User mode accessible
+- **CU0:** Requires PSW.CU0=1 (Coprocessor 0 enable)
+
+#### 3.8.2 Basic System Registers (selID=1)
+
+| RegID | selID | Symbol | Full Name | Access | Description |
+|-------|-------|--------|-----------|--------|-------------|
+| 0 | 1 | MCFG0 | Machine Configuration | SV | Machine configuration |
+| 2 | 1 | RBASE | Reset Base Address | SV | Reset vector base address |
+| 3 | 1 | EBASE | Exception Base Address | SV | Exception handler vector address |
+| 4 | 1 | INTBP | Interrupt Base Pointer | SV | Base address of interrupt handler table |
+| 5 | 1 | MCTL | CPU Control | SV | CPU control register |
+| 6 | 1 | PID | Processor ID | SV | Processor ID |
+| 11 | 1 | SCCFG | SYSCALL Config | SV | SYSCALL operation setting |
+| 12 | 1 | SCBP | SYSCALL Base Pointer | SV | SYSCALL base pointer |
+
+#### 3.8.3 Basic System Registers (selID=2)
+
+| RegID | selID | Symbol | Full Name | Access | Description |
+|-------|-------|--------|-----------|--------|-------------|
+| 0 | 2 | HTCFG0 | Thread Configuration | SV | Hardware thread configuration |
+| 6 | 2 | MEA | Memory Error Address | SV | Memory error address |
+| 7 | 2 | ASID | Address Space ID | SV | Address space ID (MMU) |
+| 8 | 2 | MEI | Memory Error Information | SV | Memory error information |
+
+#### 3.8.4 Interrupt Function System Registers (selID=1 or 2)
+
+| RegID | selID | Symbol | Full Name | Access | Description |
+|-------|-------|--------|-----------|--------|-------------|
+| 7 | 1 | FPIPR | FPI Priority | SV | FPI exception interrupt priority setting |
+| 10 | 2 | ISPR | Interrupt Service Priority | SV | Priority of interrupt being serviced |
+| 11 | 2 | PMR | Priority Mask Register | SV | Interrupt priority masking |
+| 12 | 2 | ICSR | Interrupt Control Status | SV | Interrupt control status |
+| 13 | 2 | INTCFG | Interrupt Configuration | SV | Interrupt function setting |
+
+#### 3.8.5 MPU Function System Registers (selID=2)
+
+| RegID | selID | Symbol | Full Name | Access | Description |
+|-------|-------|--------|-----------|--------|-------------|
+| 0 | 2 | MPM | Memory Protection Mode | SV | Memory protection mode control |
+| 1 | 2 | MPRC | Memory Protection Region Count | SV | Number of memory protection regions |
+| 4-15 | 2 | MPLAn | Memory Protection Lower Address | SV | Lower address for protection region n |
+| 16-27 | 2 | MPUAn | Memory Protection Upper Address | SV | Upper address for protection region n |
+| 20-31 | 2 | MPATn | Memory Protection Attributes | SV | Attributes for protection region n |
+
+**Note:** Specific RegIDs vary by region number n (0-15 for different protection regions)
+
+#### 3.8.6 Cache Control System Registers (selID=5)
+
+| RegID | selID | Symbol | Full Name | Access | Description |
+|-------|-------|--------|-----------|--------|-------------|
+| 0 | 5 | ICCTRL | Instruction Cache Control | SV | Instruction cache control |
+| 1 | 5 | ICERR | Instruction Cache Error | SV | Instruction cache error status |
+| 2 | 5 | ICCFG | Instruction Cache Config | SV | Instruction cache configuration |
+| 3 | 5 | ICTAGL | Instruction Cache Tag Low | SV | Instruction cache tag (low) |
+| 4 | 5 | ICTAGH | Instruction Cache Tag High | SV | Instruction cache tag (high) |
+| 5 | 5 | ICDATL | Instruction Cache Data Low | SV | Instruction cache data (low) |
+| 6 | 5 | ICDATH | Instruction Cache Data High | SV | Instruction cache data (high) |
+
+**RH850G3M PSW Extensions:**
+```
+31 30 29   19 18 17 16 15 14 12 11 10 9 8 7  6  5  4  3  2  1  0
+┌──┬──┬────┬──┬──┬──┬──┬────┬─────────┬─┬──┬──┬──┬──┬──┬──┬──┬──┐
+│0 │UM│ 0  │C │C │C │EB│  0 │  Debug  │0│NP│EP│ID│SA│CY│OV│S │Z │
+│  │  │    │U2│U1│U0│V │    │         │ │  │  │  │T │  │  │  │  │
+└──┴──┴────┴──┴──┴──┴──┴────┴─────────┴─┴──┴──┴──┴──┴──┴──┴──┴──┘
+```
+
+**New PSW Bits (RH850G3M):**
+- **UM (bit 30):** User mode (0=Supervisor, 1=User)
+- **CU2 (bit 18):** Coprocessor 2 enable
+- **CU1 (bit 17):** Coprocessor 1 enable
+- **CU0 (bit 16):** Coprocessor 0 enable (FPU access)
+- **EBV (bit 15):** Exception base vector selection
+- **Debug (bits 11-9):** Debug status field
+
+**Implementation Status:** ❌ **0% Implemented** - No RH850G3M support
+
+**Critical Issues:**
+1. LDSR/STSR have no selID operand
+2. RH850G3M system registers not defined
+3. Parser doesn't recognize 3-operand LDSR/STSR syntax
+4. PSW extensions (UM, CU0-CU2, EBV, Debug) not implemented
+
+**Priority:** **Critical** for RH850G3M support
+
+---
+
+## 3.9 System Register Summary by CPU Variant
+
+| CPU Variant | RegID Range | selID Support | Banking | Total Registers | Impl Status |
+|-------------|-------------|---------------|---------|-----------------|-------------|
+| **V850** | 0-5 | No | No | 6 | ✅ 100% |
+| **V850ES** | 0-5 | No | No | 6 | ✅ 100% |
+| **V850E1** | 0-5, 16-27 | No | No | 18 | ⚠️ 61% (11/18) |
+| **V850E2** | 0-5, 16-27 | No | No | 18 | ⚠️ 61% (11/18) |
+| **V850E2M** | 0-5, 6-15, 16-27, 28-31 | No | BSEL-based | 32 | ⚠️ 69% (22/32) |
+| **RH850G3M** | (regID, selID) pairs | Yes | selID groups | 50+ | ❌ 0% |
+| **RH850G3MH** | (regID, selID) pairs | Yes | selID groups | 50+ | ❌ 0% |
+
+**Key Findings:**
+- V850/V850ES: Complete
+- V850E1/V850E2: Missing debug registers (low priority)
+- V850E2M: Missing exception cause registers, banking not used
+- RH850G3M/G3MH: Completely missing
 ### 4.1 Current Scheduling Models
 
 **Files:**
@@ -555,7 +768,7 @@ def HasV850FPU : Predicate<"Subtarget->hasV850FPU()">;
 def HasV850E3  : Predicate<"Subtarget->hasV850E3()">;
 ```
 
-**Status:** ✅ Complete for V850-V850E3
+**Status:** ❌ Missing V850ES feature flag
 
 ### 7.2 Missing Feature Flags for RH850G3M ❌
 
@@ -600,7 +813,7 @@ V850 (base - 74 instructions, 6 system registers)
 - **V850ES:** Extended instruction set (same as V850E1) but limited to 6 base system registers
 - **V850E1:** Same instruction set as V850ES + full set of system registers (12 additional registers for debug/CALLT)
 
-**Status:** ✅ V850-V850E3 implications correct
+**Status:** ❌ V850ES-V850E1 missing in implication chain
 **Status:** ❌ RH850G3M/G3MH not in chain
 
 ---
