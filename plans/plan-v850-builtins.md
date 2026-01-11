@@ -233,17 +233,29 @@ Add `getTargetBuiltins()` implementation.
 
 ### C.1 Combine Patterns
 
-**Status:** ❌ Not started
+**Status:** ✅ Complete
 
 - `(x >> 16) | (x << 16)` → HSW instruction
-- Recognize saturating add/sub in generic code → SATADD/SATSUB
+- `(x << 16) | (x >> 16)` → HSW instruction (both orderings)
+- Saturating add/sub → SATADD/SATSUB (via saddsat/ssubsat intrinsics)
+- `bswap i32` → BSW instruction
+- BSH and HSW intrinsics
+
+**Tests:**
+- `llvm/test/CodeGen/V850/byte-swap.ll` - HSW, BSW, BSH patterns
+- `llvm/test/CodeGen/V850/saturating-arith.ll` - SATADD/SATSUB patterns
+- `llvm/test/CodeGen/V850/saturating-arithmetic.ll` - Additional sat tests
 
 ### C.2 Atomic Operation Improvements
 
-**Status:** ❌ Not started
+**Status:** ✅ Complete
 
-- Ensure CAXI generates optimal code for `__atomic_compare_exchange`
-- Test lock-free atomic operations
+- CAXI generates optimal code for `cmpxchg` (direct pattern match)
+- Atomic RMW operations (add, sub, and, or, xor, xchg) expand to CAXI loops
+- All atomic operations properly use SYNCP for memory barriers
+
+**Tests:**
+- `llvm/test/CodeGen/V850/atomic.ll` - CAXI and atomic RMW operations
 
 ### C.3 MAC Instruction Selection
 
@@ -282,6 +294,8 @@ Add `getTargetBuiltins()` implementation.
 | 2026-01-11 | A.4 Generic LDSR/STSR intrinsics | ✅ Complete |
 | 2026-01-11 | A.5 MAC/MACU intrinsics with pattern matching | ✅ Complete |
 | 2026-01-11 | C.3 MAC instruction selection (DAG combine) | ✅ Complete |
+| 2026-01-11 | C.1 Combine patterns (HSW, BSW, SATADD/SATSUB) | ✅ Complete |
+| 2026-01-11 | C.2 Atomic operations (CAXI, atomic RMW) | ✅ Complete |
 
 ---
 
