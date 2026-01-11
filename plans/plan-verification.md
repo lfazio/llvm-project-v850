@@ -136,52 +136,207 @@ This section documents all registers (program, FPU, and system) for all V850 CPU
 
 **File:** `llvm/lib/Target/V850/V850RegisterInfo.td` (Lines 50-82)
 
-All V850 variants (V850, V850ES, V850E1, V850E2, V850E2M, RH850G3M) share the same 32 general-purpose registers plus PC.
+**Variants:** All V850 variants (V850, V850ES, V850E1, V850E2, V850E2M, V850E3, RH850G3M, RH850G3MH)
 
-| Register | ABI Name | Size | Usage | Special Constraints |
-|----------|----------|------|-------|-------------------|
-| **r0** | zero | 32-bit | Zero register | Always holds 0, read-only |
-| **r1** | - | 32-bit | Assembler-reserved | Used for address generation |
-| **r2** | - | 32-bit | Variable | May be used by RTOS |
-| **r3** | SP | 32-bit | Stack pointer | Used for stack frame generation |
-| **r4** | GP | 32-bit | Global pointer | Access global variables in data area |
-| **r5** | TP | 32-bit | Text pointer | Points to start of text area |
-| **r6-r29** | - | 32-bit | General purpose | Address/data variable registers |
-| **r30** | EP | 32-bit | Element pointer | Base pointer for SLD/SST instructions |
-| **r31** | LP | 32-bit | Link pointer | Used for function calls |
-| **PC** | - | 24-bit | Program counter | Bits [23:1] valid, bit 0 always 0, bits [31:24] reserved |
+All V850 CPU variants share the same 32 general-purpose registers plus PC.
 
-**Status:** ✅ Complete (all 32 registers + PC implemented)
+#### 3.1.1 General-Purpose Registers (r0-r31)
 
-**Implementation Quality:**
-- V850-V850E2M: 100% implemented
-- RH850G3M: Needs PSW.UM bit support for user/supervisor mode distinction
+| Register | ABI Name | Size | Usage | Special Constraints | Implicit Use |
+|----------|----------|------|-------|-------------------|--------------|
+| **r0** | zero | 32-bit | Zero register | Always holds 0, read-only | Operations using 0, offset 0 addressing |
+| **r1** | - | 32-bit | Assembler-reserved | Save before use, restore after | Address generation by assembler |
+| **r2** | - | 32-bit | Variable / RTOS | May be used by RTOS, check before use | Potentially used by real-time OS |
+| **r3** | SP | 32-bit | Stack pointer | Save before use, restore after | PREPARE, DISPOSE (V850E1+); PUSHSP, POPSP (RH850G3M+) |
+| **r4** | GP | 32-bit | Global pointer | Save before use, restore after | Global variable access in data area |
+| **r5** | TP | 32-bit | Text pointer | Save before use, restore after | Points to start of text area (code) |
+| **r6-r29** | - | 32-bit | General purpose | None | No implicit use |
+| **r30** | EP | 32-bit | Element pointer | None | Base pointer for SLD/SST instructions |
+| **r31** | LP | 32-bit | Link pointer | Save before use, restore after | Function calls by compiler |
+
+**Reset Values:**
+- **r0:** Always 0 (not affected by reset)
+- **r1-r31:** Undefined after reset
+- Registers must be initialized by software before use
+
+**Calling Convention Notes:**
+- Caller-saved: r6-r19 (volatile, not preserved across function calls)
+- Callee-saved: r20-r29 (must be preserved by called function)
+- Special registers (r1, r3-r5, r30-r31) used by compiler/assembler
+- See compiler documentation for ABI details
+
+**CPU Variant Differences:**
+- **V850/V850ES/V850E1/V850E2/V850E2M:** r3 used by PREPARE/DISPOSE instructions
+- **RH850G3M/RH850G3MH:** r3 also used by PUSHSP/POPSP instructions (multi-register push/pop)
+
+#### 3.1.2 Program Counter (PC)
+
+**Size and Layout:**
+
+| CPU Variant | PC Width | Valid Bits | Bit 0 | Bits [31:29] | Notes |
+|-------------|----------|------------|-------|--------------|-------|
+| **V850** | 24-bit | [23:1] | Always 0 | Reserved (0) | 16 MB address space |
+| **V850ES/E1/E2** | 24-bit | [23:1] | Always 0 | Reserved (0) | 16 MB address space |
+| **V850E2M** | 29-bit | [28:1] | Always 0 | Sign extension of bit 28 | 512 MB address space (product-dependent) |
+| **RH850G3M** | 32-bit | [31:1] | Always 0 | Valid | 4 GB address space |
+| **RH850G3MH** | 32-bit | [31:1] | Always 0 | Valid | 4 GB address space |
+
+**Reset Value:**
+- V850E2M: 00000000H
+- RH850G3M: Product-dependent (see hardware manual)
+
+**Key Constraints:**
+- **Bit 0 always 0:** Cannot branch to odd addresses (instructions are 16-bit or 32-bit aligned)
+- **Alignment:** All instructions must be 2-byte aligned (halfword boundary)
+- **RETI behavior:** When RETI restores PC from EIPC/FEPC/CTPC, bit 0 is ignored (forced to 0)
+- **Carry from bit 23:** On V850 (24-bit PC), carry from bit 23 to 24 is ignored
+
+**Implementation Status:** ✅ Complete (all registers + PC implemented)
+
+**Implementation Quality by Variant:**
+- **V850/V850ES/V850E1/V850E2/V850E2M:** ✅ 100% implemented
+- **RH850G3M/RH850G3MH:** ⚠️ Needs PSW.UM bit support for user/supervisor mode distinction
 
 ---
 
-### 3.2 FPU Registers (V850E2M+)
+### 3.2 FPU Registers (V850E2M, V850E3, RH850G3M, RH850G3MH)
 
 **File:** `llvm/lib/Target/V850/V850RegisterInfo.td` (Lines 83-115)
 
-The FPU **does not have dedicated register files**. It reuses CPU general-purpose registers (r0-r31):
+**Variants:** V850E2M, V850E2V3, V850E3, V850E3V5, RH850G3M, RH850G3MH
 
-| Precision | Register Count | Register Pairs | Notes |
-|-----------|----------------|----------------|-------|
-| **Single (32-bit)** | 32 registers | r0-r31 | Each register used independently |
-| **Double (64-bit)** | 16 register pairs | {r1,r0}, {r3,r2}, {r5,r4}, ... {r31,r30} | Specified by even-numbered register |
+**Important:** The FPU **does not have dedicated register files**. It reuses CPU general-purpose registers (r0-r31).
 
-**Important Constraints:**
-- **r0 zero register**: {r1, r0} cannot be used for double-precision operations (r0 always holds 0)
-- **Even register specification**: Double-precision instructions specify only the even-numbered register of the pair
-- **Register pair alignment**: Odd registers cannot be specified independently for double-precision operations
+#### 3.2.1 Floating-Point Register Organization
 
-**Examples:**
-```assembly
-addf.s r5, r6, r7          # Single-precision: r7 = r5 + r6
-addf.d r4, r6, r8          # Double-precision: {r9,r8} = {r5,r4} + {r7,r6}
+| Precision | Register Count | Register Naming | Register Pairs | Access Permission |
+|-----------|----------------|-----------------|----------------|-------------------|
+| **Single (32-bit)** | 32 registers | r0-r31 | Each register used independently | Requires PSW.CU0=1 (RH850G3M only) |
+| **Double (64-bit)** | 16 register pairs | Specified by even register | {r1,r0}, {r3,r2}, ... {r31,r30} | Requires PSW.CU0=1 (RH850G3M only) |
+
+**Register Pair Formation (Double-Precision):**
+```
+Specified Register → Actual Register Pair Used
+--------------------------------------------------
+r0  → {r1, r0}   (INVALID - r0 is zero register)
+r2  → {r3, r2}
+r4  → {r5, r4}
+r6  → {r7, r6}
+...
+r30 → {r31, r30}
 ```
 
-**Status:** ✅ Complete (FPU register aliasing fully implemented)
+**Bit Layout:**
+- **Single-precision:** 32 bits per register
+- **Double-precision:** 64 bits per register pair (high 32 bits in odd register, low 32 bits in even register)
+
+#### 3.2.2 Important Constraints
+
+| Constraint | Description | Rationale |
+|------------|-------------|-----------|
+| **r0 zero register** | {r1, r0} cannot be used for double-precision | r0 always holds 0, so low 32 bits would always be 0 |
+| **Even register specification** | Double-precision instructions specify only the even-numbered register | Even register implies the pair {even+1, even} |
+| **No odd register specification** | Odd registers cannot be specified for double-precision | Would be ambiguous - which pair? |
+| **Register pair alignment** | Pairs are fixed: {r1,r0}, {r3,r2}, {r5,r4}, etc. | Hardware limitation |
+| **CU0 permission (RH850G3M)** | PSW.CU0 must be 1 to access FPU | Coprocessor 0 enable bit controls FPU access |
+
+#### 3.2.3 Assembly Examples
+
+```assembly
+# Single-Precision Operations
+addf.s r5, r6, r7          # r7 = r5 + r6 (all 32-bit)
+mulf.s r10, r11, r12       # r12 = r10 * r11
+cmpf.s sf, r8, r9, cc0     # Compare r8 and r9, set condition code cc0
+
+# Double-Precision Operations
+addf.d r4, r6, r8          # {r9,r8} = {r5,r4} + {r7,r6} (all 64-bit pairs)
+mulf.d r10, r12, r14       # {r15,r14} = {r11,r10} * {r13,r12}
+divf.d r2, r4, r6          # {r7,r6} = {r3,r2} / {r5,r4}
+
+# INVALID Examples
+addf.d r0, r2, r4          # ERROR: {r1,r0} not usable (r0 is zero)
+addf.d r5, r6, r8          # ERROR: r5 is odd (must be even)
+```
+
+#### 3.2.4 FPU System Registers
+
+FPU operation is controlled by 6 system registers (see Section 3.6 and 3.8 for details):
+
+| RegID | selID | Symbol | Full Name | V850E2M | RH850G3M | Access |
+|-------|-------|--------|-----------|---------|----------|--------|
+| 6 | 0 | FPSR | FP Configuration/Status | ✅ | ✅ | R/W (CU0+SV on RH850G3M) |
+| 7 | 0 | FPEPC | FP Exception PC | ✅ | ✅ | R/W (CU0+SV on RH850G3M) |
+| 8 | 0 | FPST | FP Status (alias) | ✅ | ✅ | R/W (CU0 on RH850G3M) |
+| 9 | 0 | FPCC | FP Condition Code (alias) | ✅ | ✅ | R/W (CU0 on RH850G3M) |
+| 10 | 0 | FPCFG | FP Configuration (alias) | ✅ | ✅ | R/W (CU0 on RH850G3M) |
+| 11 | 0 | FPEC | FP Exception Control | ✅ | ✅ | R/W (CU0+SV on RH850G3M) |
+
+**Note:** FPST, FPCC, FPCFG are aliases/mirrors of specific FPSR bits for easier access.
+
+#### 3.2.5 FPSR Register Differences by Variant
+
+**V850E2M FPSR (RegID=6):**
+```
+31     30-24   23 22  21  20   19-18  17  16    15-10        9-5         4-0
+┌──┬─────────┬──┬──┬───┬───┬──────┬──┬──┬────────────┬───────────┬──────────┐
+│  │ CC(7:0) │  │0 │DEM│SEM│  RM  │FS│PR│  XC (6)    │  XE (5)   │ XP (5)   │
+└──┴─────────┴──┴──┴───┴───┴──────┴──┴──┴────────────┴───────────┴──────────┘
+31-24: CC(7:0) = Condition code bits (comparison results)
+21: DEM = Double-precision Exception Mode (0=imprecise, 1=precise)
+20: SEM = Single-precision Exception Mode (0=imprecise, 1=precise)
+19-18: RM = Rounding Mode (00=RN only, others prohibited)
+17: FS = Flush Subnormals (1=flush denormals to 0)
+16: PR = Precision mode of last exception
+15-10: XC = Exception Cause bits (E, V, Z, O, U, I)
+9-5: XE = Exception Enable bits (V, Z, O, U, I - no E)
+4-0: XP = Exception Preservation bits (V, Z, O, U, I - no E)
+```
+
+**RH850G3M FPSR (SR6, selID=0):**
+```
+31     30-24   23 22  21  20   19-18  17  16    15-10        9-5         4-0
+┌──┬─────────┬──┬──┬───┬──┬──────┬──┬──┬────────────┬───────────┬──────────┐
+│  │ CC(7:0) │FN│IF│PEM│0 │  RM  │FS│0 │  XC (6)    │  XE (5)   │ XP (5)   │
+└──┴─────────┴──┴──┴───┴──┴──────┴──┴──┴────────────┴───────────┴──────────┘
+31-24: CC(7:0) = Condition code bits (comparison results)
+23: FN = Flush to Nearest (enhanced flush mode)
+22: IF = Input Flush flag (accumulates flush information)
+21: PEM = Precise Exception Mode (0=imprecise, 1=precise for all operations)
+19-18: RM = Rounding Mode (00=RN, 01=RZ, 10=RP, 11=RM - all 4 modes supported!)
+17: FS = Flush Subnormals (1=flush denormals)
+15-10: XC = Exception Cause bits (E, V, Z, O, U, I)
+9-5: XE = Exception Enable bits (V, Z, O, U, I)
+4-0: XP = Exception Preservation bits (V, Z, O, U, I)
+```
+
+**Key FPSR Differences:**
+- **V850E2M:** Separate DEM/SEM bits (per-precision exception mode), only RN rounding mode
+- **RH850G3M:** Unified PEM bit (single exception mode for all), all 4 rounding modes (RN/RZ/RP/RM), FN/IF bits for enhanced flush handling
+
+**Rounding Modes:**
+- **RN (00):** Round to Nearest (ties to even) - supported by both
+- **RZ (01):** Round toward Zero - **RH850G3M only**
+- **RP (10):** Round toward +∞ - **RH850G3M only**
+- **RM (11):** Round toward −∞ - **RH850G3M only**
+
+#### 3.2.6 Exception Bit Definitions (XC, XE, XP)
+
+| Bit Position | Symbol | Exception Type | Description |
+|--------------|--------|----------------|-------------|
+| 15/10/5 | E | Unimplemented | Software emulation required (no enable/preservation bit) |
+| 14/9/4 | V | Invalid Operation | Invalid operand (NaN arithmetic, √negative, etc.) |
+| 13/8/3 | Z | Divide by Zero | Division by zero |
+| 12/7/2 | O | Overflow | Result too large for format |
+| 11/6/1 | U | Underflow | Result too small for format |
+| 10/5/0 | I | Inexact | Result not exactly representable |
+
+**Implementation Status:**
+- **FPU Register Model:** ✅ Complete (single/double precision aliasing fully implemented)
+- **V850E2M FPSR:** ✅ Complete (all bits implemented)
+- **RH850G3M FPSR:** ⚠️ Partial (missing FN, IF, PEM bits, only RN rounding mode implemented)
+- **RH850G3M Access Control:** ❌ PSW.CU0 checking not implemented
+
+**Priority:** Medium (RH850G3M FPSR enhancements needed for full IEEE754 compliance)
 
 ---
 
