@@ -21,15 +21,20 @@ The V850 backend has comprehensive support for V850, V850ES, V850E1, V850E2, and
 - **V850E2/V850E2M:** 100% complete ✅ (all instructions and 32 system registers implemented)
 - **RH850G3M:** 0% implemented ❌ (16 critical instructions missing)
 - **RH850G3MH:** 0% implemented ❌ (design variant of G3M)
-- **Scheduling Models:** 85% complete ✅ (V850/V850E1/V850E2/V850E2M models complete, missing RH850G3M)
+- **RH850G4MH:** 0% implemented ⚠️ (documented only, requires G3MH + 2 MPU instructions + 59 FXU SIMD instructions + FXSR register)
+- **RH850G4MH2:** 0% implemented ⚠️ (documented only, requires G4MH + 3 virtualization instructions)
+- **Scheduling Models:** 85% complete ✅ (V850/V850E1/V850E2/V850E2M models complete, missing RH850 variants)
 
 **Critical Issues:**
-1. ❌ **RH850G3M/G3MH variants completely missing** (affects automotive/industrial)
+1. ❌ **RH850G3M/G3MH/G4MH variants completely missing** (affects automotive/industrial)
 2. ❌ **Atomic operations incomplete** (LDL.W/STC.W missing, only CAXI available)
 3. ❌ **Cache control missing** (CACHE/PREF not implemented)
-4. ✅ **Scheduling models complete for V850-V850E2M** (dual-issue pipeline now modeled)
-5. ⚠️ **Register banking not utilized** (FPU system registers inaccessible via bank selection)
-6. ⚠️ **Variable-cycle instructions simplified** (DIVQ/PREPARE/DISPOSE use fixed latencies)
+4. ❌ **MPU and virtualization instructions missing** (LDM.MP/STM.MP, HVTRAP, LDM.GSR/STM.GSR)
+5. ❌ **FXU (Extended FPU) completely missing** (59 SIMD instructions, 32 vector registers, FXSR register for RH850G4MH)
+6. ✅ **Scheduling models complete for V850-V850E2M** (dual-issue pipeline now modeled)
+7. ✅ **Documentation complete for all variants** (RH850G4MH/G4MH2 FXU added 2026-01-11)
+8. ✅ **BSEL register banking implemented** (FPU system registers accessible via intrinsics)
+9. ⚠️ **Variable-cycle instructions simplified** (DIVQ/PREPARE/DISPOSE use fixed latencies)
 
 ---
 
@@ -72,7 +77,7 @@ The LLVM compiler uses `FeatureV850E1` for both variants because they share the 
 |---------|--------|-------------------|----------|
 | rh850g3m | ❌ Not Implemented | User/supervisor modes (PSW.UM), LDL.W/STC.W atomics, CLL, BINS, ROTL, LD.DW/ST.DW, LOOP, PUSHSP/POPSP, Bcond disp17, JARL [reg1] reg3, CACHE, PREF, SNOOZE, SYNCI, selID-based system registers, branch prediction | **High** |
 | rh850g3mh | ❌ Not Implemented | RH850G3M + performance enhancements, simplified FPU exceptions (FPINT replaces FPP/FPI), advanced out-of-order execution | **High** |
-| rh850g4mh | ⚠️ Documented | RH850G3MH + LDM.MP/STM.MP for MPU entry load/store, PID[31:24]=06H | Medium |
+| rh850g4mh | ⚠️ Documented | RH850G3MH + LDM.MP/STM.MP for MPU, FXU (59 SIMD instructions, 32 wreg registers, FXSR), PID[31:24]=06H | **High** |
 | rh850g4mh2 | ⚠️ Documented | RH850G4MH + virtualization support (Guest/Host modes, HVTRAP, LDM.GSR/STM.GSR, EIRET/FERET enhancements), PID[31:24]=07H | Medium |
 
 **Impact:** Automotive and industrial applications using RH850 MCUs cannot use LLVM.
@@ -98,8 +103,10 @@ The LLVM compiler uses `FeatureV850E1` for both variants because they share the 
 | Multiply | 8 | 8 | 100% ✅ | MULH, MUL, MULU variants |
 | MAC | 2 | 2 | 100% ✅ | MAC, MACU |
 | **FPU (All)** | **71** | **71** | **100% ✅** | All arithmetic, conversion, rounding, comparison |
+| **FXU (G4MH)** | **59** | **0** | **0% ❌** | SIMD vector operations (RH850G4MH only) |
 
 **Total Implemented (V850-V850E2M):** 192 instructions
+**Total Missing (RH850G4MH):** 59 FXU instructions
 
 ### 2.2 Missing RH850G3M Instructions ❌
 
@@ -127,6 +134,101 @@ The LLVM compiler uses `FeatureV850E1` for both variants because they share the 
 **Total Missing RH850G3M:** 16 instructions (0% implemented)
 
 **Critical Impact:** RH850G3M cannot be supported without these instructions. LDL.W/STC.W are essential for implementing C11/C++11 atomics.
+
+### 2.2.1 Missing RH850G4MH Instructions ❌
+
+**File:** `llvm/lib/Target/V850/V850InstrInfo.td` - **NO RH850G4MH INSTRUCTIONS**
+
+RH850G4MH requires all RH850G3M instructions plus the following additional instructions:
+
+| Instruction | Format | Category | Doc Reference | Priority | Impact |
+|-------------|--------|----------|---------------|----------|--------|
+| **LDM.MP** [reg1], eh-et | IX | MPU | V850CycleTimings.md line 336-341 | **High** | Load multiple MPU entry registers (MPLA, MPUA, MPAT) |
+| **STM.MP** eh-et, [reg1] | IX | MPU | V850CycleTimings.md line 336-341 | **High** | Store multiple MPU entry registers (MPLA, MPUA, MPAT) |
+
+**Total Missing RH850G4MH-specific:** 2 instructions (0% implemented)
+
+**Impact:** Efficient MPU context switching impossible without these instructions. Operating systems and RTOS on RH850G4MH require these for task switching.
+
+### 2.2.2 Missing RH850G4MH2 Virtualization Instructions ❌
+
+**File:** `llvm/lib/Target/V850/V850InstrInfo.td` - **NO RH850G4MH2 INSTRUCTIONS**
+
+RH850G4MH2 requires all RH850G4MH instructions plus the following virtualization instructions:
+
+| Instruction | Format | Category | Doc Reference | Priority | Impact |
+|-------------|--------|----------|---------------|----------|--------|
+| **HVTRAP** vector5 | X | Virtualization | V850CycleTimings.md line 347-353 | **Medium** | Hypervisor trap, forces Guest → Host mode transition |
+| **LDM.GSR** [reg1] | IX | Virtualization | V850CycleTimings.md line 347-353 | **Medium** | Load guest system registers (context switch) |
+| **STM.GSR** [reg1] | IX | Virtualization | V850CycleTimings.md line 347-353 | **Medium** | Store guest system registers (context save) |
+
+**Total Missing RH850G4MH2-specific:** 3 instructions (0% implemented)
+
+**Impact:** Hardware virtualization support impossible. Hypervisors and virtual machine monitors cannot be implemented on RH850G4MH2 without these instructions.
+
+**Note:** RH850G4MH2 also requires Host/Guest mode system register support (HMEIPC, HMEIPSW, HMFEPC, HMFEPSW, HMPSW, HVCFG, PSWH for host; GMEIPC, GMEIPSW, GMFEPC, GMFEPSW, GMPSW for guest via selID=13).
+
+### 2.2.3 Missing RH850G4MH FXU (Extended Floating-Point) Instructions ❌
+
+**File:** `llvm/lib/Target/V850/V850InstrInfo.td` - **NO FXU INSTRUCTIONS**
+
+RH850G4MH includes an Extended Floating-Point Unit (FXU) coprocessor that provides SIMD operations on 128-bit vector registers. The FXU enables 4 parallel single-precision floating-point operations.
+
+**FXU Features:**
+- 32 dedicated 128-bit vector registers (wreg0-wreg31)
+- 4× parallel single-precision operations per instruction
+- Independent FXSR status register (separate from FPU's FPSR)
+- Requires PSW.CU1=1 for access (Coprocessor 1 permission)
+
+**Missing FXU Instruction Categories:**
+
+| Category | Count | Example Instructions | Priority | Description |
+|----------|-------|---------------------|----------|-------------|
+| Vector Manipulation | 3 | MOVV.W4, FLPV.S4, SHFLV.W4 | **High** | Move, flip, shuffle vectors |
+| Load/Store | 8 | LDV.W, LDV.DW, LDV.QW, LDVZ.H4, STV.W, STV.DW, STV.QW, STVZ.H4 | **High** | Vector memory operations |
+| Basic Arithmetic | 11 | ABSF.S4, NEGF.S4, ADDF.S4, SUBF.S4, MULF.S4, DIVF.S4, etc. | **High** | SIMD arithmetic |
+| Fused Multiply-Add | 4 | FMAF.S4, FMSF.S4, FNMAF.S4, FNMSF.S4 | **High** | FMA operations |
+| Compound | 4 | ADDSUBF.S4, ADDSUBNF.S4, SUBADDF.S4, SUBADDNF.S4 | Medium | Add/sub combinations |
+| Exchange | 7 | ADDXF.S4, SUBXF.S4, MULXF.S4, ADDSUBXF.S4, etc. | Medium | Exchange variants |
+| Reduction | 5 | ADDRF.S4, SUBRF.S4, MULRF.S4, MAXRF.S4, MINRF.S4 | Medium | Pairwise reduction |
+| Conversion | 14 | CVTF.WS4, CVTF.SW4, CVTF.HS4, CVTF.SH4, TRNCF.SW4, etc. | Medium | Type conversions |
+| Comparison | 3 | CMPF.S4, CMOVF.W4, TRFSRV.W4 | Medium | Vector comparisons |
+
+**Total Missing FXU Instructions:** 59 instructions (0% implemented)
+
+**FXU System Register Required:**
+
+| Register | regID | selID | Description |
+|----------|-------|-------|-------------|
+| **FXSR** | 12 | 0 | Extended floating-point status register |
+
+**FXSR Register Layout (32-bit):**
+- Bits 26-21: FN, IF, PEM, RM[1:0], FS (control bits, same as FPSR)
+- Bits 20-16: XC (cause bits: E, V, Z, O, U)
+- Bits 9-5: XE (enable bits: V, Z, O, U, I)
+- Bits 4-0: XP (preservation bits: V, Z, O, U, I)
+
+**Impact:** SIMD floating-point operations impossible. Motor control, audio processing, and DSP algorithms on RH850G4MH cannot leverage vectorization. Significant performance penalty for floating-point intensive workloads.
+
+**FXU Opcode Encoding Summary:**
+
+All FXU instructions use `bits[10:5] = 111111` (opcode 0x3F) as the primary opcode.
+
+| Category Code | Binary | Hex | Instruction Types |
+|---------------|--------|-----|-------------------|
+| 0xB | 1011 | 0xB | Vector arithmetic, manipulation, conversion |
+| 0x9 | 1001 | 0x9 | Fused multiply-accumulate (FMAF, FMSF, etc.) |
+| 0xC | 1100 | 0xC | Conditional operations (CMOVF.W4) |
+| 0x6 | 0110 | 0x6 | Load/Store (LDV, STV instructions) |
+
+**FXU Instruction Formats:**
+- **M: 2OP** (32-bit): Two-operand vector ops (ABSF.S4, NEGF.S4, CVT*, etc.)
+- **M: 3OP** (32-bit): Three-operand vector ops (ADDF.S4, MULF.S4, CMPF.S4, etc.)
+- **M: 4OP** (48-bit): Four-operand vector ops (CMOVF.W4)
+- **M: D** (48-bit): Memory access with 16-bit displacement (LDV.*, STV.*)
+- **M: imm12** (48-bit): 12-bit immediate (SHFLV.W4)
+
+**Documentation Reference:** V850InstructionReference.md - FXU Opcode Encoding section
 
 ### 2.3 Partial/Incomplete Instructions ⚠️
 
@@ -486,7 +588,7 @@ System registers are accessed via `LDSR reg2, regID[, selID]` and `STSR regID, r
 
 ### 3.7 V850E2M Register Banking (BSEL-based)
 
-**Status:** ❌ Not Implemented (registers defined, but banking not used by LDSR/STSR)
+**Status:** ✅ Implemented via intrinsics (FPU bank access via llvm.v850.read/write.fpsr/fpepc/fpst/fpcc/fpcfg/fpec)
 
 **Documentation:** V850InstructionReference.md lines 726-1151
 
@@ -501,9 +603,13 @@ V850E2M uses BSEL register to select register banks:
 | **0x2000** | 32 | FPU Status | FPSR, FPEPC, FPST, FPCC, FPCFG, FPEC |
 | **0xFF00-0xFFFF** | 255 | User Banks | User-defined register banks |
 
-**Issue:** BSEL register exists (RegID 31) but LDSR/STSR don't validate or use bank selection. FPU system registers and protection registers cannot be accessed via banking.
+**Implementation:** FPU system registers (BSEL=0x2000) are accessible via intrinsics that automatically handle BSEL switching:
+- `@llvm.v850.read.fpsr/fpepc/fpst/fpcc/fpcfg/fpec()` - Read FPU registers
+- `@llvm.v850.write.fpsr/fpepc/fpst/fpcc/fpcfg/fpec(i32)` - Write FPU registers
 
-**Priority:** Low (primarily for OS/RTOS support)
+Each intrinsic expands to: `movhi 0x20,r0,tmp` → `ldsr tmp,bsel` → `stsr/ldsr fpu_reg` → `mov r0,tmp` → `ldsr tmp,bsel`
+
+**Remaining:** Protection registers (BSEL=0x1000-0x1010) not yet implemented (primarily for OS/RTOS support)
 
 ---
 
@@ -647,8 +753,9 @@ RH850G3M uses **(regID, selID)** register numbering:
 
 **Key Findings:**
 - V850/V850ES/V850E1/V850E2/V850E2M: ✅ Complete (all system registers implemented)
-- V850E2M: ⚠️ Register banking not used (BSEL-based access not implemented)
+- V850E2M: ✅ BSEL-based FPU register access implemented via intrinsics (llvm.v850.read/write.fpsr/fpepc/fpst/fpcc/fpcfg/fpec)
 - RH850G3M/G3MH: ❌ Completely missing
+- RH850G4MH/G4MH2: ❌ Completely missing
 ### 4.1 Current Scheduling Models
 
 **Files:**
@@ -776,14 +883,34 @@ def V850E2MUnitFPDiv    : ProcResource<1>;  // FP divide/sqrt (not pipelined)
 
 ### 4.5 Missing Scheduling Models
 
-| CPU Variant | Required | Status | Priority |
-|-------------|----------|--------|----------|
-| RH850G3M | Yes | ❌ Not Implemented | **Critical** |
-| RH850G3MH | Yes | ❌ Not Implemented | **Critical** |
+| CPU Variant | Required | Status | Priority | Key Features |
+|-------------|----------|--------|----------|--------------|
+| RH850G3M | Yes | ❌ Not Implemented | **Critical** | Branch prediction (1-4 cycles), blocking divide |
+| RH850G3MH | Yes | ❌ Not Implemented | **Critical** | Non-blocking divide issue, advanced OoO |
+| RH850G4MH | Yes | ❌ Not Implemented | **High** | FXU vector unit (59 instructions), MPU instructions |
+| RH850G4MH2 | Yes | ❌ Not Implemented | Medium | Virtualization (HVTRAP, LDM.GSR, STM.GSR) |
 
 **Files Needed:**
-- `llvm/lib/Target/V850/V850SchedRH850G3M.td` (new)
-- `llvm/lib/Target/V850/V850SchedRH850G3MH.td` (new)
+- `llvm/lib/Target/V850/V850SchedRH850G3M.td` (new) - Branch prediction model
+- `llvm/lib/Target/V850/V850SchedRH850G3MH.td` (new) - Non-blocking divide
+- `llvm/lib/Target/V850/V850SchedRH850G4MH.td` (new) - FXU vector unit
+
+**RH850G3M Scheduling Differences from V850E2M:**
+- Branch prediction: 1 cycle (hit) vs 4-6 cycles (miss) instead of fixed 4 cycles
+- DIVH/DIV latency: 19 cycles instead of 36 cycles
+- STSR latency: 1-1-3 instead of 1-1-1
+
+**RH850G3MH Scheduling Differences from RH850G3M:**
+- Non-blocking divide issue: issue=1, latency=19 (pipeline not blocked)
+- MAC/MACU: 2-2-4 instead of 1-1-3
+
+**RH850G4MH Scheduling Requirements:**
+- FXU unit resources: `RH850G4MHUnitFXU` for vector operations
+- FXU latencies: 4 cycles for most ops, 11 for DIVF.S4, 17 for SQRTF.S4
+- FXU loads/stores: 3/1 cycles respectively
+- MPU instructions: LDM.MP (N+8), STM.MP (N+2) where N = entries × 1.5
+
+**Documentation Reference:** V850InstructionReference.md - Pipeline Architecture and Scheduling section
 
 ---
 

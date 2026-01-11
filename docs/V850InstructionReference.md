@@ -629,6 +629,331 @@ single-precision (32-bit) and double-precision (64-bit) operations.
 
 ---
 
+## FXU (Extended Floating-Point) Instructions (RH850G4MH+)
+
+The RH850G4MH and later CPUs include an extended floating-point unit (FXU) that provides
+SIMD (Single Instruction Multiple Data) operations on 128-bit vector registers. The FXU
+can perform 4 parallel single-precision floating-point operations.
+
+**Note:** The FXU is a separate coprocessor from the FPU. Both can be present in the same CPU.
+
+### FXU Overview
+
+| Feature | Description |
+|---------|-------------|
+| Vector width | 128 bits (4 × 32-bit single-precision) |
+| Vector registers | wreg0-wreg31 (32 vector registers) |
+| Operations | 4 parallel single-precision float operations |
+| IEEE 754 | Compliant data types and exceptions |
+| Rounding modes | Nearest, Zero, +∞, −∞ |
+| Subnormals | Flush to zero or exception |
+| Status register | FXSR (independent from FPU's FPSR) |
+
+### FXU Vector Registers (wreg0-wreg31)
+
+The FXU has 32 dedicated 128-bit vector registers (wreg0-wreg31), each holding 4 single-precision values.
+
+```
+128-bit Vector Register Layout:
+┌───────────────┬───────────────┬───────────────┬───────────────┐
+│     w3        │     w2        │     w1        │     w0        │
+│  bits 127:96  │  bits 95:64   │  bits 63:32   │  bits 31:0    │
+│  (element 3)  │  (element 2)  │  (element 1)  │  (element 0)  │
+└───────────────┴───────────────┴───────────────┴───────────────┘
+```
+
+Each element (w0, w1, w2, w3) holds a 32-bit IEEE 754 single-precision float.
+
+### FXU Coprocessor Enable
+
+FXU access requires PSW.CU1=1 (Coprocessor 1 Use Permission). Executing FXU instructions
+with CU1=0 causes a Coprocessor Unusable Exception (cause code 0x81).
+
+### FXU Instruction Formats
+
+| Format | Size | Description |
+|--------|------|-------------|
+| M: 2OP | 32-bit | 2-operand vector: `opcode wreg2, wreg3` |
+| M: 3OP | 32-bit | 3-operand vector: `opcode wreg1, wreg2, wreg3` |
+| M: 4OP | 48-bit | 4-operand vector: `opcode wreg1, wreg2, wreg3, wreg4` |
+| M: I12 | 48-bit | Immediate with 12-bit constant |
+| M: MEM | 48-bit | Memory operations with reg1, reg2, wreg3 |
+
+### FXU Vector Manipulation Instructions
+
+| Mnemonic | Operands | Arch | Description |
+|----------|----------|------|-------------|
+| MOVV.W4 | wreg2, wreg3 | RH850G4MH | Move vector register to vector register |
+| FLPV.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Flip (exchange) vector elements |
+| SHFLV.W4 | imm12, wreg1, wreg2, wreg3 | RH850G4MH | Vector element shuffle |
+
+### FXU Vector Load/Store Instructions
+
+| Mnemonic | Operands | Arch | Description |
+|----------|----------|------|-------------|
+| LDV.W | disp16[reg1], wreg3 | RH850G4MH | Load single word to vector element |
+| LDV.DW | disp16[reg1], wreg3 | RH850G4MH | Load double-word to vector elements |
+| LDV.QW | disp16[reg1], wreg3 | RH850G4MH | Load quad-word (full 128-bit vector) |
+| LDVZ.H4 | disp16[reg1], wreg3 | RH850G4MH | Load 4 halfwords, zero-extend to words |
+| STV.W | wreg3, disp16[reg1] | RH850G4MH | Store single word from vector element |
+| STV.DW | wreg3, disp16[reg1] | RH850G4MH | Store double-word from vector elements |
+| STV.QW | wreg3, disp16[reg1] | RH850G4MH | Store quad-word (full 128-bit vector) |
+| STVZ.H4 | wreg3, disp16[reg1] | RH850G4MH | Store 4 words truncated to halfwords |
+
+### FXU Vector Arithmetic Instructions
+
+| Mnemonic | Operands | Arch | Description |
+|----------|----------|------|-------------|
+| ABSF.S4 | wreg2, wreg3 | RH850G4MH | Vector absolute value (4× single) |
+| NEGF.S4 | wreg2, wreg3 | RH850G4MH | Vector negate (4× single) |
+| ADDF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Vector add (4× single) |
+| SUBF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Vector subtract (4× single) |
+| MULF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Vector multiply (4× single) |
+| DIVF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Vector divide (4× single) |
+| MAXF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Vector maximum (4× single) |
+| MINF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Vector minimum (4× single) |
+| SQRTF.S4 | wreg2, wreg3 | RH850G4MH | Vector square root (4× single) |
+| RECIPF.S4 | wreg2, wreg3 | RH850G4MH | Vector reciprocal (4× single) |
+| RSQRTF.S4 | wreg2, wreg3 | RH850G4MH | Vector reciprocal sqrt (4× single) |
+
+### FXU Vector Fused Multiply-Add Instructions
+
+| Mnemonic | Operands | Arch | Description |
+|----------|----------|------|-------------|
+| FMAF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Vector fused multiply-add: w3 = w2*w1 + w3 |
+| FMSF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Vector fused multiply-sub: w3 = w2*w1 - w3 |
+| FNMAF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Vector neg fused multiply-add: w3 = -(w2*w1) + w3 |
+| FNMSF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Vector neg fused multiply-sub: w3 = -(w2*w1) - w3 |
+
+### FXU Compound Arithmetic Instructions
+
+| Mnemonic | Operands | Arch | Description |
+|----------|----------|------|-------------|
+| ADDSUBF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Add odd elements, subtract even elements |
+| ADDSUBNF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Add/sub with negation |
+| SUBADDF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Subtract odd elements, add even elements |
+| SUBADDNF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Sub/add with negation |
+
+### FXU Exchange Arithmetic Instructions
+
+| Mnemonic | Operands | Arch | Description |
+|----------|----------|------|-------------|
+| ADDXF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Add with element exchange |
+| SUBXF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Subtract with element exchange |
+| MULXF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Multiply with element exchange |
+| ADDSUBXF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Add/sub with element exchange |
+| ADDSUBNXF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Add/sub neg with element exchange |
+| SUBADDXF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Sub/add with element exchange |
+| SUBADDNXF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Sub/add neg with element exchange |
+
+### FXU Reduction Arithmetic Instructions
+
+| Mnemonic | Operands | Arch | Description |
+|----------|----------|------|-------------|
+| ADDRF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Add reduction: pairwise add and combine |
+| SUBRF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Subtract reduction |
+| MULRF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Multiply reduction |
+| MAXRF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Maximum reduction |
+| MINRF.S4 | wreg1, wreg2, wreg3 | RH850G4MH | Minimum reduction |
+
+### FXU Conversion Instructions
+
+| Mnemonic | Operands | Arch | Description |
+|----------|----------|------|-------------|
+| CVTF.WS4 | wreg2, wreg3 | RH850G4MH | Convert 4× word to 4× single |
+| CVTF.SW4 | wreg2, wreg3 | RH850G4MH | Convert 4× single to 4× word |
+| CVTF.UWS4 | wreg2, wreg3 | RH850G4MH | Convert 4× unsigned word to 4× single |
+| CVTF.SUW4 | wreg2, wreg3 | RH850G4MH | Convert 4× single to 4× unsigned word |
+| CVTF.HS4 | wreg2, wreg3 | RH850G4MH | Convert 4× half to 4× single (zero-extend) |
+| CVTF.SH4 | wreg2, wreg3 | RH850G4MH | Convert 4× single to 4× half (truncate) |
+| TRNCF.SW4 | wreg2, wreg3 | RH850G4MH | Truncate 4× single to 4× word |
+| TRNCF.SUW4 | wreg2, wreg3 | RH850G4MH | Truncate 4× single to 4× unsigned word |
+| CEILF.SW4 | wreg2, wreg3 | RH850G4MH | Ceiling 4× single to 4× word |
+| CEILF.SUW4 | wreg2, wreg3 | RH850G4MH | Ceiling 4× single to 4× unsigned word |
+| FLOORF.SW4 | wreg2, wreg3 | RH850G4MH | Floor 4× single to 4× word |
+| FLOORF.SUW4 | wreg2, wreg3 | RH850G4MH | Floor 4× single to 4× unsigned word |
+| ROUNDF.SW4 | wreg2, wreg3 | RH850G4MH | Round 4× single to 4× word |
+| ROUNDF.SUW4 | wreg2, wreg3 | RH850G4MH | Round 4× single to 4× unsigned word |
+
+### FXU Comparison Instructions
+
+| Mnemonic | Operands | Arch | Description |
+|----------|----------|------|-------------|
+| CMPF.S4 | fcond, wreg1, wreg2, wreg3 | RH850G4MH | Compare 4× single, result in wreg3 |
+| CMOVF.W4 | wreg1, wreg2, wreg3, wreg4 | RH850G4MH | Conditional move based on wreg3 mask |
+| TRFSRV.W4 | imm3, wreg3 | RH850G4MH | Transfer vector compare result to PSW.Z |
+
+### FXU Instruction Summary
+
+| Category | Count | Description |
+|----------|-------|-------------|
+| Vector Manipulation | 3 | MOVV, FLPV, SHFLV |
+| Load/Store | 8 | LDV, STV variants |
+| Basic Arithmetic | 11 | ABSF, NEGF, ADDF, SUBF, MULF, DIVF, MAXF, MINF, SQRTF, RECIPF, RSQRTF |
+| Fused Multiply-Add | 4 | FMAF, FMSF, FNMAF, FNMSF |
+| Compound | 4 | ADDSUBF, ADDSUBNF, SUBADDF, SUBADDNF |
+| Exchange | 7 | ADDXF, SUBXF, MULXF, and exchange variants |
+| Reduction | 5 | ADDRF, SUBRF, MULRF, MAXRF, MINRF |
+| Conversion | 14 | CVTF, TRNCF, CEILF, FLOORF, ROUNDF variants |
+| Comparison | 3 | CMPF, CMOVF, TRFSRV |
+| **Total** | **59** | All FXU instructions |
+
+### FXU Opcode Encoding (RH850G4MH+)
+
+All FXU instructions use `bits[10:5] = 111111` (opcode 0x3F) as the primary opcode.
+The instruction format is determined by `bits[26:23]` (category) and `bits[22:17]` (sub-opcode).
+
+**FXU Format Encoding (bits[10:5] = 111111):**
+
+```
+Format M: 2OP (32-bit)
+  15           11 10      5 4              0 31          27 26  23 22      17 16
+  ┌─────────────┬─────────┬────────────────┬─────────────┬──────┬───────────┬──┐
+  │    wreg2    │ 111111  │   sub-opcode   │    wreg3    │ cat  │  sub-op   │  │
+  └─────────────┴─────────┴────────────────┴─────────────┴──────┴───────────┴──┘
+
+Format M: 3OP (32-bit)
+  15           11 10      5 4              0 31          27 26  23 22      17 16
+  ┌─────────────┬─────────┬────────────────┬─────────────┬──────┬───────────┬──┐
+  │    wreg2    │ 111111  │     wreg1      │    wreg3    │ cat  │  sub-op   │  │
+  └─────────────┴─────────┴────────────────┴─────────────┴──────┴───────────┴──┘
+
+Format M: 4OP (48-bit)
+  15           11 10      5 4              0 31          27 26             16
+  ┌─────────────┬─────────┬────────────────┬─────────────┬─────────────────┐
+  │  sub-opcode │ 111111  │     wreg1      │    wreg3    │    sub-opcode   │
+  └─────────────┴─────────┴────────────────┴─────────────┴─────────────────┘
+  47           43 42      37 36           32
+  ┌─────────────┬─────────┬────────────────┐
+  │    wreg2    │ sub-op  │     wreg4      │
+  └─────────────┴─────────┴────────────────┘
+
+Format M: D (48-bit, memory access)
+  15           11 10      5 4              0 31          27 26             16
+  ┌─────────────┬─────────┬────────────────┬─────────────┬─────────────────┐
+  │   sub-op    │ 11110 1 │      reg1      │    wreg3    │    sub-opcode   │
+  └─────────────┴─────────┴────────────────┴─────────────┴─────────────────┘
+  47                                       32
+  ┌─────────────────────────────────────────┐
+  │               disp16                    │
+  └─────────────────────────────────────────┘
+```
+
+**Category Codes (bits[26:23]):**
+
+| Category | Binary | Hex | Description |
+|----------|--------|-----|-------------|
+| 0xB | 1011 | 0xB | FXU Vector Arithmetic/Manipulation |
+| 0x9 | 1001 | 0x9 | FXU Fused Multiply-Accumulate |
+| 0xC | 1100 | 0xC | FXU Conditional Operations |
+| 0x6 | 0110 | 0x6 | FXU Load/Store (Format M:D) |
+
+#### FXU Vector Manipulation Opcodes
+
+| Instruction | Format | bits[26:23] | bits[22:17] | bits[4:0] | Full Opcode (hex) |
+|-------------|--------|-------------|-------------|-----------|-------------------|
+| MOVV.W4 wreg2, wreg3 | M: 2OP | 1011 | 010000 | 11110 | 0x07E0_B400 |
+| FLPV.S4 wreg1, wreg2, wreg3 | M: 3OP | 1011 | 010000 | wreg1 | varies |
+| SHFLV.W4 imm12, wreg1, wreg2, wreg3 | M: imm12 | 1011 | - | - | 48-bit format |
+
+#### FXU Load/Store Opcodes
+
+| Instruction | Format | bits[15:11] | bits[26:17] | Notes |
+|-------------|--------|-------------|-------------|-------|
+| LDV.W imm4, disp16[reg1], wreg3 | M: D | 00000 | 0110_ii_1110_1 | ii = element select |
+| LDV.DW imm2, disp16[reg1], wreg3 | M: D | 00000 | 0110_ii_1110_1 | ii = dword select |
+| LDV.QW disp16[reg1], wreg3 | M: D | 00000 | 0110_00_1110_1 | Full 128-bit load |
+| LDVZ.H4 disp16[reg1], wreg3 | M: D | 00000 | 0110_ii_1110_1 | Halfword zero-extend |
+| STV.W imm4, wreg3, disp16[reg1] | M: D | 00000 | 0111_ii_1110_1 | ii = element select |
+| STV.DW imm1, wreg3, disp16[reg1] | M: D | 00000 | 0111_ii_1110_1 | ii = dword select |
+| STV.QW wreg3, disp16[reg1] | M: D | 00000 | 0111_00_1110_1 | Full 128-bit store |
+| STVZ.H4 wreg3, disp16[reg1] | M: D | 00000 | 0111_ii_1110_1 | Halfword truncate |
+
+#### FXU Basic Arithmetic Opcodes
+
+| Instruction | Format | bits[26:23] | bits[22:17] | Category | Sub-op (hex) |
+|-------------|--------|-------------|-------------|----------|--------------|
+| ABSF.S4 wreg2, wreg3 | M: 2OP | 1011 | 010000 | 0xB | 0x10 |
+| NEGF.S4 wreg2, wreg3 | M: 2OP | 1011 | 010001 | 0xB | 0x11 |
+| ADDF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1011 | 010010 | 0xB | 0x12 |
+| SUBF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1011 | 010011 | 0xB | 0x13 |
+| MULF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1011 | 010100 | 0xB | 0x14 |
+| DIVF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1011 | 011110 | 0xB | 0x1E |
+| MAXF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1011 | 011100 | 0xB | 0x1C |
+| MINF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1011 | 011101 | 0xB | 0x1D |
+| SQRTF.S4 wreg2, wreg3 | M: 2OP | 1011 | 011000 | 0xB | 0x18 |
+| RECIPF.S4 wreg2, wreg3 | M: 2OP | 1011 | 011001 | 0xB | 0x19 |
+| RSQRTF.S4 wreg2, wreg3 | M: 2OP | 1011 | 011010 | 0xB | 0x1A |
+
+#### FXU Fused Multiply-Add Opcodes
+
+| Instruction | Format | bits[26:23] | bits[22:17] | Category | Sub-op (hex) |
+|-------------|--------|-------------|-------------|----------|--------------|
+| FMAF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1001 | 100000 | 0x9 | 0x20 |
+| FMSF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1001 | 100001 | 0x9 | 0x21 |
+| FNMAF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1001 | 100010 | 0x9 | 0x22 |
+| FNMSF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1001 | 100011 | 0x9 | 0x23 |
+
+#### FXU Compound Arithmetic Opcodes
+
+| Instruction | Format | bits[26:23] | bits[22:17] | Category | Sub-op (hex) |
+|-------------|--------|-------------|-------------|----------|--------------|
+| ADDSUBF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1011 | 101000 | 0xB | 0x28 |
+| ADDSUBNF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1011 | 101100 | 0xB | 0x2C |
+| SUBADDF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1011 | 101001 | 0xB | 0x29 |
+| SUBADDNF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1011 | 101101 | 0xB | 0x2D |
+
+#### FXU Exchange Arithmetic Opcodes
+
+| Instruction | Format | bits[26:23] | bits[22:17] | Category | Sub-op (hex) |
+|-------------|--------|-------------|-------------|----------|--------------|
+| ADDXF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1011 | 100010 | 0xB | 0x22 |
+| SUBXF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1011 | 100011 | 0xB | 0x23 |
+| MULXF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1011 | 100100 | 0xB | 0x24 |
+| ADDSUBXF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1011 | 101010 | 0xB | 0x2A |
+| ADDSUBNXF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1011 | 101110 | 0xB | 0x2E |
+| SUBADDXF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1011 | 101011 | 0xB | 0x2B |
+| SUBADDNXF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1011 | 101111 | 0xB | 0x2F |
+
+#### FXU Reduction Arithmetic Opcodes
+
+| Instruction | Format | bits[26:23] | bits[22:17] | Category | Sub-op (hex) |
+|-------------|--------|-------------|-------------|----------|--------------|
+| ADDRF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1011 | 110100 | 0xB | 0x34 |
+| SUBRF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1011 | 110101 | 0xB | 0x35 |
+| MULRF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1011 | 110110 | 0xB | 0x36 |
+| MAXRF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1011 | 110111 | 0xB | 0x37 |
+| MINRF.S4 wreg1, wreg2, wreg3 | M: 3OP | 1011 | 111000 | 0xB | 0x38 |
+
+#### FXU Conversion Opcodes
+
+| Instruction | Format | bits[26:23] | bits[22:17] | Category | Sub-op (hex) |
+|-------------|--------|-------------|-------------|----------|--------------|
+| CVTF.WS4 wreg2, wreg3 | M: 2OP | 1011 | 000000 | 0xB | 0x00 |
+| CVTF.SW4 wreg2, wreg3 | M: 2OP | 1011 | 000001 | 0xB | 0x01 |
+| CVTF.UWS4 wreg2, wreg3 | M: 2OP | 1011 | 010000 | 0xB | 0x10 |
+| CVTF.SUW4 wreg2, wreg3 | M: 2OP | 1011 | 010001 | 0xB | 0x11 |
+| CVTF.HS4 wreg2, wreg3 | M: 2OP | 1011 | 000010 | 0xB | 0x02 |
+| CVTF.SH4 wreg2, wreg3 | M: 2OP | 1011 | 000011 | 0xB | 0x03 |
+| TRNCF.SW4 wreg2, wreg3 | M: 2OP | 1011 | 000100 | 0xB | 0x04 |
+| TRNCF.SUW4 wreg2, wreg3 | M: 2OP | 1011 | 010100 | 0xB | 0x14 |
+| CEILF.SW4 wreg2, wreg3 | M: 2OP | 1011 | 000101 | 0xB | 0x05 |
+| CEILF.SUW4 wreg2, wreg3 | M: 2OP | 1011 | 010101 | 0xB | 0x15 |
+| FLOORF.SW4 wreg2, wreg3 | M: 2OP | 1011 | 000110 | 0xB | 0x06 |
+| FLOORF.SUW4 wreg2, wreg3 | M: 2OP | 1011 | 010110 | 0xB | 0x16 |
+| ROUNDF.SW4 wreg2, wreg3 | M: 2OP | 1011 | 000111 | 0xB | 0x07 |
+| ROUNDF.SUW4 wreg2, wreg3 | M: 2OP | 1011 | 010111 | 0xB | 0x17 |
+
+#### FXU Comparison Opcodes
+
+| Instruction | Format | bits[26:23] | bits[22:17] | Category | Sub-op (hex) |
+|-------------|--------|-------------|-------------|----------|--------------|
+| CMPF.S4 fcond, wreg1, wreg2, wreg3 | M: 3OP | 1011 | 001100 | 0xB | 0x0C |
+| CMOVF.W4 wreg1, wreg2, wreg3, wreg4 | M: 4OP | 1100 | 001110 | 0xC | 0x0E |
+| TRFSRV.W4 imm3, wreg3 | M: 2OP | 1011 | 001111 | 0xB | 0x0F |
+
+---
+
 ## Registers
 
 ### General Purpose Registers (r0-r31)
@@ -1201,6 +1526,79 @@ FPU registers can be accessed via:
 | O | Overflow | Result overflow |
 | U | Underflow | Result underflow |
 | I | Inexact | Inexact result |
+
+---
+
+### FXU Registers (RH850G4MH+)
+
+The FXU (Extended Floating-Point Unit) has its own status and control register separate from the FPU.
+
+#### FXSR — FXU Status Register
+
+| CPU | regID | selID | Name | Reset | R/W | Privilege | Description |
+|-----|-------|-------|------|-------|-----|-----------|-------------|
+| RH850G4MH+ | 12 | 0 | FXSR | 0x00220000 | R/W | UM | Extended floating-point status register |
+
+**FXSR Register Layout:**
+
+```
+31   27 26 25 24 23:22 21 20:16 15:10 9:5  4:0
+┌────┬──┬──┬───┬─────┬──┬─────┬─────┬────┬────┐
+│ 0  │FN│IF│PEM│ RM  │FS│ XC  │  0  │ XE │ XP │
+└────┴──┴──┴───┴─────┴──┴─────┴─────┴────┴────┘
+```
+
+| Bits | Field | R/W | Description |
+|------|-------|-----|-------------|
+| 31:27 | - | R | Reserved (0) |
+| 26 | FN | R/W | Flush to nearest (subnormal handling) |
+| 25 | IF | R/W | Input flush enable |
+| 24 | PEM | R/W | Precise exception mode |
+| 23:22 | RM | R/W | Rounding mode: 00=nearest, 01=zero, 10=+∞, 11=-∞ |
+| 21 | FS | R/W | Flush subnormal enable |
+| 20:16 | XC | R/W | Cause bits (E, V, Z, O, U from MSB to LSB) |
+| 15:10 | - | R | Reserved (0) |
+| 9:5 | XE | R/W | Enable bits (V, Z, O, U, I from MSB to LSB) |
+| 4:0 | XP | R/W | Preservation (pending) bits (V, Z, O, U, I) |
+
+**Cause Bits (XC):**
+- Bit 20: E - Unimplemented operation exception
+- Bit 19: V - Invalid operation exception
+- Bit 18: Z - Division by zero exception
+- Bit 17: O - Overflow exception
+- Bit 16: U - Underflow exception
+
+**Enable Bits (XE):**
+- Bit 9: V - Invalid operation enable
+- Bit 8: Z - Division by zero enable
+- Bit 7: O - Overflow enable
+- Bit 6: U - Underflow enable
+- Bit 5: I - Inexact enable
+
+**Preservation Bits (XP):**
+- Bit 4: V - Invalid operation pending
+- Bit 3: Z - Division by zero pending
+- Bit 2: O - Overflow pending
+- Bit 1: U - Underflow pending
+- Bit 0: I - Inexact pending
+
+**Notes:**
+- FXSR is independent from FPSR; each unit maintains its own status
+- Exception cause bits are OR-ed across all 4 SIMD elements
+- The FXU uses the same rounding mode encoding as the FPU
+- Subnormal flush behavior is controlled per-unit
+
+#### FXU Vector Register File
+
+The FXU has 32 dedicated 128-bit vector registers (wreg0-wreg31).
+
+| Register | Width | Access | Description |
+|----------|-------|--------|-------------|
+| wreg0-wreg31 | 128-bit | PSW.CU1=1 | Vector registers for SIMD operations |
+
+**Access Requirements:**
+- PSW.CU1 must be 1 to access FXU registers
+- Attempting to access with CU1=0 causes Coprocessor Unusable Exception (code 0x81)
 
 ---
 
@@ -1867,6 +2265,344 @@ All FPU instructions use the extended opcode 111111 (bits 10:5). Format FI encod
 | NMSUBF.S | reg1, reg2, reg3, reg4 | Single | 101W11 | reg1[4:0] | reg4 = -(reg1*reg2 - reg3) |
 
 Note: In fused multiply-add instructions, 'W' bits encode reg4 register field.
+
+---
+
+## Pipeline Architecture and Scheduling
+
+### Pipeline Characteristics by CPU Variant
+
+| CPU Variant | Pipeline Stages | Issue Width | Branch Prediction | FPU |
+|-------------|-----------------|-------------|-------------------|-----|
+| V850 | 5 (IF-ID-EX-MEM-WB) | 1 (single) | No | No |
+| V850ES | 5 (IF-ID-EX-DF-WB) | 1 (single) | No | No |
+| V850E1 | 5 (IF-ID-EX-DF-WB) | 1 (single) | No | No |
+| V850E2 | 7 (IF-DP-ID-EX-AT-DF-WB) | 2 (dual) | No | Optional |
+| V850E2M | 7 (IF-DP-ID-EX-AT-DF-WB) | 2 (dual) | No | Yes |
+| RH850G3M | 7 | 2 (dual) | Yes | Yes |
+| RH850G3MH | 7+ (OoO features) | 2 (dual) | Yes | Yes |
+| RH850G4MH | 7+ (OoO features) | 2 (dual) | Yes | Yes + FXU |
+| RH850G4MH2 | 7+ (OoO features) | 2 (dual) | Yes | Yes + FXU |
+
+### Pipeline Stage Descriptions
+
+**V850/V850ES/V850E1 (5-stage):**
+```
+IF → ID → EX → MEM → WB
+│     │     │      │     └─ Write-Back: Register file update
+│     │     │      └────── Memory: Data memory access
+│     │     └───────────── Execute: ALU/Branch/Multiply
+│     └─────────────────── Decode: Instruction decode, register read
+└───────────────────────── Fetch: Instruction fetch from memory
+```
+
+**V850E2/V850E2M (7-stage dual-issue):**
+```
+IF → DP → ID → EX → AT → DF → WB
+│     │     │     │     │     │     └─ Write-Back
+│     │     │     │     │     └────── Data Fetch (memory read)
+│     │     │     │     └──────────── Address Translation
+│     │     │     └────────────────── Execute (ALU/MUL)
+│     │     └──────────────────────── Decode (dual-issue decision)
+│     └────────────────────────────── Pre-Decode (instruction alignment)
+└──────────────────────────────────── Fetch
+```
+
+### Dual-Issue Pipeline Resources (V850E2+)
+
+| Resource | Pipeline | Instructions |
+|----------|----------|--------------|
+| MEM | Lpipe | LD.*, ST.*, SLD.*, SST.*, Bit manipulation |
+| MUL | Lpipe | MUL, MULU, MULH, MULHI, MAC, MACU |
+| ALU | Lpipe or Rpipe | ADD, SUB, CMP, MOV, AND, OR, XOR, etc. |
+| BSFT | Rpipe | SAR, SHL, SHR, BSH, BSW, HSW, CMOV, SETF, SCH* |
+| DIV | Rpipe | DIV, DIVU, DIVH, DIVHU, DIVQ, DIVQU |
+| FPU | FPU pipe | All floating-point operations |
+| FXU | FXU pipe | All extended FP vector operations (G4MH) |
+
+### Timing Notation
+
+| Symbol | Meaning | Example |
+|--------|---------|---------|
+| issue (i) | Cycles before next instruction can start | `1-1-2` → issue=1 |
+| repeat (r) | Cycles when same instruction executes consecutively | `1-1-2` → repeat=1 |
+| latency (l) | Cycles before result available to dependent instruction | `1-1-2` → latency=2 |
+
+Format: `issue-repeat-latency` (e.g., `1-1-2` means issue=1, repeat=1, latency=2)
+
+### Key Instruction Latencies by Category
+
+#### Integer ALU (1-1-1 on all variants)
+- ADD, SUB, CMP, MOV, AND, OR, XOR, NOT, TST
+- SATADD, SATSUB, SASF, SETF
+- Shift: SHR, SAR, SHL, ROTL
+- Data manipulation: BSH, BSW, HSH, HSW, SXB, SXH, ZXB, ZXH
+
+#### Load Instructions
+
+| Instruction | V850/ES/E1 | V850E2/E2M | RH850G3M+ |
+|-------------|------------|------------|-----------|
+| LD.B/H/W | 1-1-2 | 1-1-3 | 1-1-3 |
+| SLD.B/H/W | 1-1-2 | 1-1-3 | 1-1-3 |
+| LD.DW | N/A | N/A | 1-1-3 |
+
+#### Store Instructions (1-1-1 on all variants)
+- ST.B, ST.H, ST.W, ST.DW
+- SST.B, SST.H, SST.W
+
+#### Multiply Instructions
+
+| Instruction | V850 | V850ES/E1 | V850E2+ |
+|-------------|------|-----------|---------|
+| MULH/MULHI | 1-1-2 | 1-1-2 | 1-1-3 |
+| MUL/MULU | N/A | 1-4-5 | 1-1-3 |
+| MAC/MACU | N/A | N/A | 1-1-3 (E2), 2-2-4 (G3MH+) |
+
+#### Divide Instructions
+
+| Instruction | V850 | V850ES/E1 | V850E2M | RH850G3M | RH850G3MH+ |
+|-------------|------|-----------|---------|----------|------------|
+| DIVH | 36-36-36 | 35-35-35 | 36-36-36 | 19-19-19 | 1-19-19 |
+| DIV/DIVU | N/A | 35-35-35 | 36-36-36 | 19-19-19 | 1-19-19 |
+| DIVQ/DIVQU | N/A | N/A | N+5/N+4 | N+3 | N+3 |
+
+Note: N = (dividend bits) - (divisor bits), range 0-16.
+
+#### Branch Instructions
+
+| Instruction | V850 | V850ES/E1 | V850E2M | RH850 (pred hit) | RH850 (miss) |
+|-------------|------|-----------|---------|------------------|--------------|
+| Bcond (taken) | 3-3-3 | 2-2-2 | 4-4-4 | 1-1-1 | 4-6 |
+| Bcond (not taken) | 1-1-1 | 1-1-1 | 1-1-1 | 1-1-1 | 4-6 |
+| JMP [reg1] | 3-3-3 | 3-3-3 | 4-4-4 | 2-6 | 2-6 |
+| JR/JARL | 3-3-3 | 2-2-2 | 4-4-4 | 2-3 | 2-3 |
+
+#### FPU Instructions (V850E2M+)
+
+| Instruction | V850E2M | RH850G3MH/G4MH | Notes |
+|-------------|---------|----------------|-------|
+| ADDF.S/SUBF.S | 4 | 4 | Single precision add/sub |
+| ADDF.D/SUBF.D | 4 | 4 | Double precision add/sub |
+| MULF.S | 4 | 4 | Single precision multiply |
+| MULF.D | 5 | 7 | Double precision multiply |
+| DIVF.S | ~35 | 11 | Single precision divide |
+| DIVF.D | ~64 | 19 | Double precision divide |
+| SQRTF.S | ~30 | 17 | Single precision sqrt |
+| SQRTF.D | ~60 | 33 | Double precision sqrt |
+| FMAF.S | 4 | 4 | Single precision FMA |
+| CMPF.S/D | 1 | 1 | Compare |
+
+#### FXU Instructions (RH850G4MH+)
+
+| Instruction | Latency | Notes |
+|-------------|---------|-------|
+| ABSF.S4/NEGF.S4 | 4 | Unary vector ops |
+| ADDF.S4/SUBF.S4/MULF.S4 | 4 | Binary vector ops |
+| DIVF.S4 | ~11 | Vector divide |
+| SQRTF.S4 | ~17 | Vector sqrt |
+| FMAF.S4 | 4 | Vector FMA |
+| LDV.W/DW/QW | 3 | Vector load |
+| STV.W/DW/QW | 1 | Vector store |
+
+### Special Instruction Timings
+
+| Instruction | V850 | V850ES/E1 | V850E2M | RH850G3M+ |
+|-------------|------|-----------|---------|-----------|
+| TRAP | 4-4-4 | 3-3-3 | 7-7-7 | 8-8-8 |
+| RETI | 4-4-4 | 3-3-3 | 7-7-7 | 8-8-8 |
+| CALLT | N/A | 4-4-4 | 10-10-10 | 17-17-17 |
+| SYSCALL | N/A | N/A | 10-10-10 | 17-17-17 |
+| PREPARE | N/A | n+1 | n+2 | N+1 to N+3 |
+| DISPOSE | N/A | n+1 | n+2 | N+1 to N+8 |
+
+Note: n/N = number of registers in list.
+
+---
+
+## Hazard Management
+
+### Data Hazards
+
+#### Load-Use Hazard
+
+When a load instruction result is used by the immediately following instruction:
+
+| CPU Variant | Load Latency | Required Gap | Hardware Behavior |
+|-------------|--------------|--------------|-------------------|
+| V850/ES/E1 | 2 cycles | 1 instruction | Hardware interlock stall |
+| V850E2+ | 3 cycles | 2 instructions | Hardware interlock stall |
+
+**Example (V850):**
+```assembly
+LD.W [r4], r6       ; Cycle 1-2
+ADD  r6, r7         ; Stalls 1 cycle if immediate
+```
+
+**Optimization:** Place independent instructions between load and use.
+
+#### Multiply-Use Hazard
+
+| CPU Variant | Multiply Latency | Required Gap |
+|-------------|------------------|--------------|
+| V850/ES/E1 | 2 cycles | 1 instruction |
+| V850E2+ | 3 cycles | 2 instructions |
+
+#### Divide Hazard
+
+Division is a long-latency blocking operation:
+
+| CPU Variant | Latency | Blocking Behavior |
+|-------------|---------|-------------------|
+| V850 | 36 cycles | Blocks pipeline entirely |
+| V850ES/E1 | 34-35 cycles | Interruptible, restarts if interrupted |
+| V850E2M | 35-36 cycles | Interruptible |
+| RH850G3M | 19 cycles | Blocking |
+| RH850G3MH+ | 19 cycles | Non-blocking issue (result still 19 cycles) |
+
+### Control Hazards
+
+#### Branch Prediction (RH850G3M+)
+
+| Prediction | Penalty |
+|------------|---------|
+| Correct | 1 cycle |
+| Mispredicted | 4-6 cycles |
+
+#### Branch Target Alignment
+
+If a 4-byte instruction is at a non-word-aligned address, an extra fetch cycle is required:
+- **Penalty:** 1 cycle for misaligned branch target
+- **Avoidance:** Align 4-byte instructions to word boundaries
+
+### System Register Hazards
+
+#### LDSR/STSR Hazards
+
+| Register | Read-after-Write Latency | Required Synchronization |
+|----------|-------------------------|--------------------------|
+| EIPC/FEPC | 3 cycles | 2 instruction gap |
+| PSW.UM | Variable | SYNCI before instruction fetch |
+| FPSR/FPU regs | Variable | SYNCP before FPU operation |
+| MPU registers | Variable | SYNCP before Load/Store |
+
+### Synchronization Instructions (V850E2M+)
+
+| Instruction | Purpose | When Required |
+|-------------|---------|---------------|
+| SYNCP | Pipeline synchronization | Before using updated system register values |
+| SYNCE | Exception synchronization | Before changing FPSR.PEM |
+| SYNCI | Instruction synchronization | After PSW.UM change, self-modifying code |
+| SYNCM | Memory synchronization | Memory ordering across CPUs |
+
+### Dual-Issue Restrictions (V850E2+)
+
+These instructions are **single-issue only**:
+
+| Instruction | Reason |
+|-------------|--------|
+| MOV imm32, reg1 | 6-byte instruction |
+| MAC/MACU | Uses MUL and extra register ports |
+| ADF/SBF | Conditional arithmetic |
+| SATADD/SATSUB (3-op) | Extended saturation |
+| PREPARE/DISPOSE | Multi-cycle memory access |
+| CAXI | Atomic operation |
+| LDL.W/STC.W | Atomic operation |
+| TRAP/SYSCALL | Exception |
+| EIRET/FERET/RETI | Return from exception |
+
+**Dual-issue constraints:**
+1. Same-pipe instructions cannot dual-issue
+2. 6-byte instructions cannot dual-issue
+3. Register dependency prevents dual-issue
+4. Memory ordering must be preserved
+
+### RH850G4MH-Specific Hazards
+
+#### MPU Entry Instructions
+
+| Instruction | Latency | Notes |
+|-------------|---------|-------|
+| LDM.MP | N+8 | N = entries × 1.5 (rounded). Interruptible. |
+| STM.MP | N+2 | N = entries × 1.5 (rounded). Interruptible. |
+
+**Required:** Execute SYNCP after MPU register updates before Load/Store.
+
+#### Virtualization Instructions (RH850G4MH2)
+
+| Instruction | Latency | Notes |
+|-------------|---------|-------|
+| HVTRAP | 8-8-8 | Guest→Host transition |
+| LDM.GSR | 26-26-26 | Load guest system registers |
+| STM.GSR | 19-19-19 | Store guest system registers |
+
+### Hazard Summary Table
+
+| Hazard Type | Penalty | Resolution |
+|-------------|---------|------------|
+| Load-use (V850) | 1 stall | 1 instruction gap |
+| Load-use (V850E2+) | 2 stalls | 2 instruction gap |
+| Multiply-use (V850) | 1 stall | 1 instruction gap |
+| Multiply-use (V850E2+) | 2 stalls | 2 instruction gap |
+| LDSR EIPC/FEPC | 2 stalls | 2 instruction gap |
+| Divide (V850) | 36 cycles | Blocking |
+| Divide (RH850G3MH+) | Issue=1, Latency=19 | Non-blocking issue |
+| Branch taken (V850) | 3 cycles | - |
+| Branch predicted hit (RH850) | 1 cycle | - |
+| Branch mispredicted (RH850) | 4-6 cycles | - |
+| Alignment | 1 cycle | Align branch targets |
+| System register update | Variable | SYNCP/SYNCE/SYNCI |
+
+---
+
+## LLVM Scheduling Model
+
+### Implemented Models
+
+| Model | Target CPUs | Issue Width | Key Features |
+|-------|-------------|-------------|--------------|
+| V850Model | V850, V850ES, V850E1 | 1 | 5-stage pipeline, single-issue |
+| V850E2MModel | V850E2, V850E2M | 2 | 7-stage dual-issue, FPU support |
+
+### Resource Classes
+
+**V850Model Resources:**
+- `V850UnitALU` - Integer ALU
+- `V850UnitMem` - Load/Store unit
+- `V850UnitBranch` - Branch unit
+- `V850UnitMul` - Integer multiply
+- `V850UnitDiv` - Integer divide (blocking)
+
+**V850E2MModel Resources:**
+- `V850E2MLpipe` - L-pipe (load/store, multiply, MAC)
+- `V850E2MRpipe` - R-pipe (ALU, shift, bit search)
+- `V850E2MAnyPipe` - Either pipe (most ALU ops)
+- `V850E2MUnitBranch` - Branch unit
+- `V850E2MUnitDiv` - Integer divide (blocking)
+- `V850E2MUnitFPALU` - FP ALU (add, sub, mul, cmp, cvt)
+- `V850E2MUnitFPDiv` - FP divide/sqrt (not pipelined)
+
+### Write Resources
+
+| Write Type | V850 Latency | V850E2M Latency | Notes |
+|------------|--------------|-----------------|-------|
+| WriteIALU | 1 | 1 | Integer ALU |
+| WriteIMul | 2 | 3 | Integer multiply |
+| WriteIDiv | 36 | 36 | Integer divide |
+| WriteLDB/H/W | 2 | 3 | Load operations |
+| WriteSTB/H/W | 1 | 1 | Store operations |
+| WriteBranch | 3 | 4 | Branch taken |
+| WriteFAdd32 | N/A | 4 | FP single add/sub |
+| WriteFMul32 | N/A | 4 | FP single multiply |
+| WriteFDiv32 | N/A | 35 | FP single divide |
+
+### Missing Scheduling Models
+
+| Target | Status | Required |
+|--------|--------|----------|
+| RH850G3M | Not implemented | Branch prediction, non-blocking divide issue |
+| RH850G3MH | Not implemented | Advanced OoO features |
+| RH850G4MH | Not implemented | FXU vector unit, MPU instructions |
+| RH850G4MH2 | Not implemented | Virtualization instructions |
 
 ---
 
