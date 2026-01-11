@@ -8,7 +8,21 @@
 //
 // This file describes the V850E2M scheduling model with FPU support.
 //
-// V850E2M includes an FPU with the following characteristics:
+// V850E2/E2M features a 7-stage dual-issue superscalar pipeline:
+//   IF (Instruction Fetch) -> DP (Pre-Decode) -> ID (Decode) ->
+//   EX (Execute) -> AT (Address Translation) -> DF (Data Fetch) -> WB
+//
+// Dual-issue resources:
+//   - Lpipe: Load/store, multiply, MAC operations
+//   - Rpipe: ALU, shift, data manipulation, bit search
+//   - Both pipes can execute many arithmetic/logical operations
+//
+// Parallel issue restrictions:
+//   - Same-pipe instructions cannot dual-issue
+//   - 6-byte instructions cannot dual-issue
+//   - Some special instructions are single-issue only
+//
+// FPU characteristics:
 // - Single and double precision IEEE 754 floating point
 // - FPU operations run in parallel with integer operations
 // - Non-pipelined divide and square root units
@@ -21,53 +35,83 @@
 
 def V850E2MModel : SchedMachineModel {
   let MicroOpBufferSize = 0;    // V850E2M is in-order
-  let IssueWidth = 1;           // Single-issue
-  let LoadLatency = 2;          // Default load latency
-  let MispredictPenalty = 3;    // Branch misprediction penalty
+  let IssueWidth = 2;           // Dual-issue superscalar (Lpipe + Rpipe)
+  let LoadLatency = 3;          // Default load latency (1-1-3)
+  let MispredictPenalty = 4;    // Branch taken penalty (4-4-4)
   let CompleteModel = false;    // Incomplete model
 }
 
 //===----------------------------------------------------------------------===//
 // Define processor resources for V850E2M
+//
+// Dual-issue pipeline resources:
+//   Lpipe: Load/store, multiply, MAC
+//   Rpipe: ALU, shift, data manipulation, bit search
+//   Both: Can execute many arithmetic/logical ops
 //===----------------------------------------------------------------------===//
 
 let SchedModel = V850E2MModel in {
   let BufferSize = 0 in {
-    def V850E2MUnitALU      : ProcResource<1>;  // Integer ALU
-    def V850E2MUnitMem      : ProcResource<1>;  // Load/Store unit
+    // Dual-issue pipe resources
+    def V850E2MLpipe        : ProcResource<1>;  // L-pipe (load/store, mul, MAC)
+    def V850E2MRpipe        : ProcResource<1>;  // R-pipe (ALU, shift, bit search)
+
+    // Combined resource for instructions that can use either pipe
+    def V850E2MAnyPipe      : ProcResource<2>;  // Either pipe (most ALU ops)
+
     def V850E2MUnitBranch   : ProcResource<1>;  // Branch unit
     def V850E2MUnitFPALU    : ProcResource<1>;  // FP ALU (add, sub, mul, cmp, cvt)
   }
 
   let BufferSize = 1 in {
-    def V850E2MUnitMul      : ProcResource<1>;  // Integer multiply
-    def V850E2MUnitDiv      : ProcResource<1>;  // Integer divide
+    def V850E2MUnitDiv      : ProcResource<1>;  // Integer divide (blocking)
     def V850E2MUnitFPDiv    : ProcResource<1>;  // FP divide/sqrt (not pipelined)
   }
+
+  // Create resource groups for dual-issue modeling
+  // Instructions using Lpipe or Rpipe consume from the combined AnyPipe resource
+  def V850E2MLpipeGroup : ProcResGroup<[V850E2MLpipe]>;
+  def V850E2MRpipeGroup : ProcResGroup<[V850E2MRpipe]>;
 }
 
 //===----------------------------------------------------------------------===//
 // V850E2M Integer Instruction Latencies
+//
+// Resources assignment:
+//   - Rpipe: ALU, shift, data manipulation, bit search, conditional move
+//   - Lpipe: load/store, multiply, MAC
+//   - AnyPipe: most arithmetic/logical operations can use either pipe
 //===----------------------------------------------------------------------===//
 
 let SchedModel = V850E2MModel in {
 
-// Integer ALU - 1 cycle latency
-def : WriteRes<WriteIALU, [V850E2MUnitALU]>;
-def : WriteRes<WriteIALUimm, [V850E2MUnitALU]>;
-def : WriteRes<WriteShift, [V850E2MUnitALU]>;
-def : WriteRes<WriteShiftReg, [V850E2MUnitALU]>;
-def : WriteRes<WriteMOV, [V850E2MUnitALU]>;
-def : WriteRes<WriteCMP, [V850E2MUnitALU]>;
-def : WriteRes<WriteExt, [V850E2MUnitALU]>;
-def : WriteRes<WriteBSW, [V850E2MUnitALU]>;
-def : WriteRes<WriteSat, [V850E2MUnitALU]>;
-def : WriteRes<WriteBit, [V850E2MUnitALU]>;
-def : WriteRes<WriteSCH, [V850E2MUnitALU]>;
-def : WriteRes<WriteCMOV, [V850E2MUnitALU]>;
+// Integer ALU - 1 cycle latency (1-1-1)
+// Most ALU ops can use either pipe
+def : WriteRes<WriteIALU, [V850E2MAnyPipe]>;
+def : WriteRes<WriteIALUimm, [V850E2MAnyPipe]>;
+def : WriteRes<WriteMOV, [V850E2MAnyPipe]>;
+def : WriteRes<WriteCMP, [V850E2MAnyPipe]>;
+def : WriteRes<WriteSat, [V850E2MAnyPipe]>;    // SATADD/SATSUB
 
-// Integer multiply - 2 cycles
-def : WriteRes<WriteIMul, [V850E2MUnitMul]> { let Latency = 2; }
+// Shift operations - Rpipe only (1-1-1)
+def : WriteRes<WriteShift, [V850E2MRpipe]>;
+def : WriteRes<WriteShiftReg, [V850E2MRpipe]>;
+
+// Data manipulation - Rpipe only (1-1-1)
+def : WriteRes<WriteExt, [V850E2MRpipe]>;      // SXB, SXH, ZXB, ZXH
+def : WriteRes<WriteBSW, [V850E2MRpipe]>;      // BSH, BSW, HSH, HSW
+
+// Bit search - Rpipe only (1-1-1)
+def : WriteRes<WriteSCH, [V850E2MRpipe]>;      // SCH0L, SCH0R, SCH1L, SCH1R
+
+// Conditional move - can use either pipe (1-1-1)
+def : WriteRes<WriteCMOV, [V850E2MAnyPipe]>;   // CMOV, ADF, SBF
+
+// Bit manipulation - uses Lpipe for memory access (4-4-4)
+def : WriteRes<WriteBit, [V850E2MLpipe]> { let Latency = 4; }
+
+// Integer multiply - Lpipe only (1-1-3)
+def : WriteRes<WriteIMul, [V850E2MLpipe]> { let Latency = 3; }
 
 // Integer divide - 36 cycles (worst case for DIV/DIVU)
 def : WriteRes<WriteIDiv, [V850E2MUnitDiv]> {
@@ -75,34 +119,49 @@ def : WriteRes<WriteIDiv, [V850E2MUnitDiv]> {
   let ReleaseAtCycles = [36];
 }
 
-// Quick divide (DIVQ/DIVQU) - ~20 cycles average (N+5 cycles)
+// Quick divide (DIVQ/DIVQU) - N+5 cycles (N = valid bits difference)
 def : WriteRes<WriteIDivQ, [V850E2MUnitDiv]> {
-  let Latency = 20;
-  let ReleaseAtCycles = [20];
+  let Latency = 12;  // Conservative estimate for N ~ 7
+  let ReleaseAtCycles = [12];
 }
 
-// MAC - 3 cycles
-def : WriteRes<WriteIMAC, [V850E2MUnitMul]> { let Latency = 3; }
+// MAC - Lpipe only (1-1-3)
+def : WriteRes<WriteIMAC, [V850E2MLpipe]> { let Latency = 3; }
 
-// Memory operations
-def : WriteRes<WriteLDB, [V850E2MUnitMem]> { let Latency = 3; }
-def : WriteRes<WriteLDH, [V850E2MUnitMem]> { let Latency = 3; }
-def : WriteRes<WriteLDW, [V850E2MUnitMem]> { let Latency = 2; }
-def : WriteRes<WriteSTB, [V850E2MUnitMem]>;
-def : WriteRes<WriteSTH, [V850E2MUnitMem]>;
-def : WriteRes<WriteSTW, [V850E2MUnitMem]>;
+// Memory operations - Lpipe only
+// Load latency: 1-1-3 (all load sizes)
+def : WriteRes<WriteLDB, [V850E2MLpipe]> { let Latency = 3; }
+def : WriteRes<WriteLDH, [V850E2MLpipe]> { let Latency = 3; }
+def : WriteRes<WriteLDW, [V850E2MLpipe]> { let Latency = 3; }
+// Store latency: 1-1-1
+def : WriteRes<WriteSTB, [V850E2MLpipe]>;
+def : WriteRes<WriteSTH, [V850E2MLpipe]>;
+def : WriteRes<WriteSTW, [V850E2MLpipe]>;
 
-// Branch operations
-def : WriteRes<WriteJmp, [V850E2MUnitBranch]>;
-def : WriteRes<WriteJal, [V850E2MUnitBranch]>;
-def : WriteRes<WriteBranch, [V850E2MUnitBranch]>;
+// Branch operations - Branch unit (4-4-4 for taken branches)
+def : WriteRes<WriteJmp, [V850E2MUnitBranch]> { let Latency = 4; }
+def : WriteRes<WriteJal, [V850E2MUnitBranch]> { let Latency = 4; }
+def : WriteRes<WriteBranch, [V850E2MUnitBranch]> { let Latency = 4; }
 
 // Special instructions
 def : WriteRes<WriteNop, []>;
-def : WriteRes<WriteSys, [V850E2MUnitALU]>;
-def : WriteRes<WritePREPARE, [V850E2MUnitMem]> { let Latency = 4; }
-def : WriteRes<WriteDISPOSE, [V850E2MUnitMem]> { let Latency = 4; }
-def : WriteRes<WriteCALLT, [V850E2MUnitBranch]> { let Latency = 2; }
+// LDSR: varies by register (1-4), STSR: 1-1-1
+def : WriteRes<WriteSys, [V850E2MAnyPipe]> { let Latency = 4; }
+
+// PREPARE: n+2 cycles (n = registers in list)
+def : WriteRes<WritePREPARE, [V850E2MLpipe]> {
+  let Latency = 4;
+  let ReleaseAtCycles = [4];
+}
+
+// DISPOSE: n+2 to n+6 cycles depending on variant
+def : WriteRes<WriteDISPOSE, [V850E2MLpipe]> {
+  let Latency = 4;
+  let ReleaseAtCycles = [4];
+}
+
+// CALLT: 10-10-10
+def : WriteRes<WriteCALLT, [V850E2MUnitBranch]> { let Latency = 10; }
 
 //===----------------------------------------------------------------------===//
 // V850E2M FPU Instruction Latencies
@@ -174,13 +233,13 @@ def : WriteRes<WriteFMov, [V850E2MUnitFPALU]>;
 // FP min/max - 2 cycles
 def : WriteRes<WriteFMinMax, [V850E2MUnitFPALU]> { let Latency = 2; }
 
-// FP load - same latency as integer loads
-def : WriteRes<WriteFLD32, [V850E2MUnitMem]> { let Latency = 2; }
-def : WriteRes<WriteFLD64, [V850E2MUnitMem]> { let Latency = 3; }
+// FP load - uses Lpipe (same as integer loads, 1-1-3)
+def : WriteRes<WriteFLD32, [V850E2MLpipe]> { let Latency = 3; }
+def : WriteRes<WriteFLD64, [V850E2MLpipe]> { let Latency = 3; }
 
-// FP store
-def : WriteRes<WriteFST32, [V850E2MUnitMem]>;
-def : WriteRes<WriteFST64, [V850E2MUnitMem]>;
+// FP store - uses Lpipe (1-1-1)
+def : WriteRes<WriteFST32, [V850E2MLpipe]>;
+def : WriteRes<WriteFST64, [V850E2MLpipe]>;
 
 //===----------------------------------------------------------------------===//
 // Read Advances

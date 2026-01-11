@@ -115,15 +115,21 @@ def ReadFStoreData  : SchedRead;     // FP store data operand
 //===----------------------------------------------------------------------===//
 // V850 Generic Scheduling Model
 //
-// This is a simple model for the base V850 processor.
-// V850 is an in-order, single-issue processor.
+// This is a model for the base V850 processor.
+// V850 is an in-order, single-issue processor with 5-stage pipeline:
+//   IF (Instruction Fetch) -> ID (Decode) -> EX (Execute) -> MEM -> WB
+//
+// Timing notation: issue-repeat-latency
+//   - issue: cycles before next instruction can start
+//   - repeat: cycles when same instruction executes consecutively
+//   - latency: cycles before result is available to dependent instruction
 //===----------------------------------------------------------------------===//
 
 def V850Model : SchedMachineModel {
   let MicroOpBufferSize = 0;    // V850 is in-order
   let IssueWidth = 1;           // Single-issue
-  let LoadLatency = 2;          // Default load latency
-  let MispredictPenalty = 3;    // Branch misprediction penalty
+  let LoadLatency = 2;          // Default load latency (1-1-2)
+  let MispredictPenalty = 3;    // Branch taken penalty (3 cycles)
   let CompleteModel = false;    // Incomplete model - use defaults for unmodeled instrs
 }
 
@@ -164,43 +170,51 @@ def : WriteRes<WriteBit, [V850UnitALU]>;
 def : WriteRes<WriteSCH, [V850UnitALU]>;
 def : WriteRes<WriteCMOV, [V850UnitALU]>;
 
-// Integer multiply - 2 cycles
+// Integer multiply - MULH is 1-1-2 on base V850
 def : WriteRes<WriteIMul, [V850UnitMul]> { let Latency = 2; }
 
-// Integer divide - 36 cycles (worst case)
+// Integer divide - DIVH is 36-36-36 on base V850
 def : WriteRes<WriteIDiv, [V850UnitDiv]> {
   let Latency = 36;
   let ReleaseAtCycles = [36];
 }
 
-// Quick divide (DIVQ/DIVQU) - ~20 cycles average
+// Quick divide (DIVQ/DIVQU) - not available on base V850
+// Marked as unsupported - will use default scheduling
+let Unsupported = true in
 def : WriteRes<WriteIDivQ, [V850UnitDiv]> {
   let Latency = 20;
   let ReleaseAtCycles = [20];
 }
 
-// MAC - 3 cycles
+// MAC - not available on base V850
+let Unsupported = true in
 def : WriteRes<WriteIMAC, [V850UnitMul]> { let Latency = 3; }
 
-// Memory operations
-def : WriteRes<WriteLDB, [V850UnitMem]> { let Latency = 3; }
-def : WriteRes<WriteLDH, [V850UnitMem]> { let Latency = 3; }
+// Memory operations - V850 base: LD.* is 1-1-2, ST.* is 1-1-1
+def : WriteRes<WriteLDB, [V850UnitMem]> { let Latency = 2; }
+def : WriteRes<WriteLDH, [V850UnitMem]> { let Latency = 2; }
 def : WriteRes<WriteLDW, [V850UnitMem]> { let Latency = 2; }
 def : WriteRes<WriteSTB, [V850UnitMem]>;
 def : WriteRes<WriteSTH, [V850UnitMem]>;
 def : WriteRes<WriteSTW, [V850UnitMem]>;
 
-// Branch operations
-def : WriteRes<WriteJmp, [V850UnitBranch]>;
-def : WriteRes<WriteJal, [V850UnitBranch]>;
-def : WriteRes<WriteBranch, [V850UnitBranch]>;
+// Branch operations - V850 base: JMP/JR/JARL are 3-3-3, Bcond taken is 3-3-3
+def : WriteRes<WriteJmp, [V850UnitBranch]> { let Latency = 3; }
+def : WriteRes<WriteJal, [V850UnitBranch]> { let Latency = 3; }
+def : WriteRes<WriteBranch, [V850UnitBranch]> { let Latency = 3; }
 
 // Special instructions
 def : WriteRes<WriteNop, []>;
-def : WriteRes<WriteSys, [V850UnitALU]>;
-def : WriteRes<WritePREPARE, [V850UnitMem]> { let Latency = 4; }
-def : WriteRes<WriteDISPOSE, [V850UnitMem]> { let Latency = 4; }
-def : WriteRes<WriteCALLT, [V850UnitBranch]> { let Latency = 2; }
+def : WriteRes<WriteSys, [V850UnitALU]>;  // LDSR/STSR: 1-1-1 (3 for EIPC/FEPC)
+
+// PREPARE/DISPOSE/CALLT - not available on base V850
+// Marked as unsupported - will use default scheduling
+let Unsupported = true in {
+  def : WriteRes<WritePREPARE, [V850UnitMem]> { let Latency = 4; }
+  def : WriteRes<WriteDISPOSE, [V850UnitMem]> { let Latency = 4; }
+  def : WriteRes<WriteCALLT, [V850UnitBranch]> { let Latency = 4; }
+}
 
 // Read advances (no forwarding penalty)
 def : ReadAdvance<ReadIALU, 0>;

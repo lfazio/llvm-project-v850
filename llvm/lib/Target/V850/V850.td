@@ -64,6 +64,7 @@ include "V850RegisterInfo.td"
 include "V850CallingConv.td"
 include "V850InstrInfo.td"
 include "V850Schedule.td"
+include "V850SchedV850E1.td"
 include "V850SchedV850E2M.td"
 
 def V850InstrInfo : InstrInfo;
@@ -80,9 +81,12 @@ def : ProcessorModel<"v850", V850Model, []>;
 // V850ES: Base 6 system registers only
 // V850E1: Base 6 + 12 additional debug/CALLT system registers
 // Both use FeatureV850E1 for instruction set (compiler doesn't enforce register restrictions)
-def : ProcessorModel<"v850es", V850Model, [FeatureV850E1]>;
-def : ProcessorModel<"v850e1", V850Model, [FeatureV850E1]>;
-def : ProcessorModel<"v850e2", V850Model, [FeatureV850E2]>;
+// Both use V850E1Model for scheduling (different MUL/branch timings from base V850)
+def : ProcessorModel<"v850es", V850E1Model, [FeatureV850E1]>;
+def : ProcessorModel<"v850e1", V850E1Model, [FeatureV850E1]>;
+
+// V850E2 uses same pipeline as V850E2M (7-stage dual-issue) but without FPU
+def : ProcessorModel<"v850e2", V850E2MModel, [FeatureV850E2]>;
 
 // V850E2M+ processors use V850E2MModel (includes FPU)
 def : ProcessorModel<"v850e2m", V850E2MModel, [FeatureV850E2M]>;
