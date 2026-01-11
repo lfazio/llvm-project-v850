@@ -156,4 +156,48 @@ let TargetPrefix = "v850" in { // All intrinsics start with "llvm.v850.".
   // void @llvm.v850.ei()
   def int_v850_ei : Intrinsic<[], [], [IntrNoMem, IntrHasSideEffects]>;
 
+  //===----------------------------------------------------------------------===//
+  // System Register Access
+  //
+  // Generic intrinsics for accessing system registers via LDSR/STSR.
+  // The regID parameter specifies which system register to access (0-31).
+  //
+  // Note: For FPU registers (regID 6-11), use the BSEL-based intrinsics
+  // (llvm.v850.read/write.fpsr, etc.) which handle bank switching.
+  //===----------------------------------------------------------------------===//
+
+  // LDSR - Load to system register
+  // void @llvm.v850.ldsr(i32 %value, i32 %regID)
+  // Writes %value to system register specified by %regID
+  def int_v850_ldsr : Intrinsic<[], [llvm_i32_ty, llvm_i32_ty],
+                                [IntrNoMem, IntrHasSideEffects, ImmArg<ArgIndex<1>>]>;
+
+  // STSR - Store from system register
+  // i32 @llvm.v850.stsr(i32 %regID)
+  // Reads the system register specified by %regID
+  def int_v850_stsr : Intrinsic<[llvm_i32_ty], [llvm_i32_ty],
+                                [IntrNoMem, IntrHasSideEffects, ImmArg<ArgIndex<0>>]>;
+
+  //===----------------------------------------------------------------------===//
+  // Multiply-Accumulate Operations (V850E2M+)
+  //
+  // MAC/MACU perform 32x32 multiply with 64-bit accumulate.
+  // The 64-bit accumulator is represented as a register pair (hi:lo).
+  // The instruction computes: (acc_hi:acc_lo) + (a * b)
+  //===----------------------------------------------------------------------===//
+
+  // MAC - Signed multiply-accumulate
+  // (i32, i32) @llvm.v850.mac(i32 %a, i32 %b, i32 %acc_hi, i32 %acc_lo)
+  // Returns: (result_hi, result_lo) = (acc_hi:acc_lo) + sext(a) * sext(b)
+  def int_v850_mac : Intrinsic<[llvm_i32_ty, llvm_i32_ty],
+                               [llvm_i32_ty, llvm_i32_ty, llvm_i32_ty, llvm_i32_ty],
+                               [IntrNoMem]>;
+
+  // MACU - Unsigned multiply-accumulate
+  // (i32, i32) @llvm.v850.macu(i32 %a, i32 %b, i32 %acc_hi, i32 %acc_lo)
+  // Returns: (result_hi, result_lo) = (acc_hi:acc_lo) + zext(a) * zext(b)
+  def int_v850_macu : Intrinsic<[llvm_i32_ty, llvm_i32_ty],
+                                [llvm_i32_ty, llvm_i32_ty, llvm_i32_ty, llvm_i32_ty],
+                                [IntrNoMem]>;
+
 } // TargetPrefix = "v850"

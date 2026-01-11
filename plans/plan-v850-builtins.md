@@ -18,11 +18,11 @@ This document tracks the implementation of V850-specific compiler builtins and i
 
 | Category | Instructions | Missing | Status |
 |----------|-------------|---------|--------|
-| **Saturating Arith** | SATADD, SATSUB, SATSUBR, SATADD_3, SATSUB_3 | `saddsat`/`ssubsat` patterns | ⚠️ Pending |
-| **Memory Barriers** | SYNCP, SYNCM, SYNCE | Intrinsics, `fence` patterns | ⚠️ Pending |
-| **Interrupt Control** | DI, EI | Intrinsics | ⚠️ Pending |
-| **System Registers** | LDSR, STSR | Generic intrinsics | ⚠️ Pending |
-| **MAC Operations** | MAC, MACU | Intrinsics | ⚠️ Pending |
+| **Saturating Arith** | SATADD, SATSUB, SATSUBR, SATADD_3, SATSUB_3 | `saddsat`/`ssubsat` patterns | ✅ Complete |
+| **Memory Barriers** | SYNCP, SYNCM, SYNCE | Intrinsics, `fence` patterns | ✅ Complete |
+| **Interrupt Control** | DI, EI | Intrinsics | ✅ Complete |
+| **System Registers** | LDSR, STSR | Generic intrinsics | ✅ Complete |
+| **MAC Operations** | MAC, MACU | Intrinsics | ✅ Complete |
 
 ### Clang Frontend - Not Implemented
 
@@ -108,7 +108,7 @@ def int_v850_ei : Intrinsic<[], [], [IntrNoMem, IntrHasSideEffects]>;
 
 ### A.4 Generic LDSR/STSR Intrinsics
 
-**Status:** ⚠️ Pending
+**Status:** ✅ Complete
 
 **Goal:** Add generic intrinsics for system register access.
 
@@ -131,7 +131,7 @@ def int_v850_stsr : Intrinsic<[llvm_i32_ty], [llvm_i32_ty],
 
 ### A.5 MAC/MACU Intrinsics
 
-**Status:** ⚠️ Pending
+**Status:** ✅ Complete
 
 **Goal:** Add intrinsics for multiply-accumulate operations.
 
@@ -139,18 +139,28 @@ def int_v850_stsr : Intrinsic<[llvm_i32_ty], [llvm_i32_ty],
 - `llvm/include/llvm/IR/IntrinsicsV850.td`
 - `llvm/lib/Target/V850/V850InstrInfo.td`
 
-**Intrinsics:**
+**Intrinsics (implemented):**
 ```tablegen
-def int_v850_mac : Intrinsic<[llvm_i64_ty],
-                             [llvm_i32_ty, llvm_i32_ty, llvm_i64_ty],
+// MAC - Signed multiply-accumulate
+// (i32, i32) @llvm.v850.mac(i32 %a, i32 %b, i32 %acc_hi, i32 %acc_lo)
+// Returns: (result_hi, result_lo) = (acc_hi:acc_lo) + sext(a) * sext(b)
+def int_v850_mac : Intrinsic<[llvm_i32_ty, llvm_i32_ty],
+                             [llvm_i32_ty, llvm_i32_ty, llvm_i32_ty, llvm_i32_ty],
                              [IntrNoMem]>;
-def int_v850_macu : Intrinsic<[llvm_i64_ty],
-                              [llvm_i32_ty, llvm_i32_ty, llvm_i64_ty],
+
+// MACU - Unsigned multiply-accumulate
+// (i32, i32) @llvm.v850.macu(i32 %a, i32 %b, i32 %acc_hi, i32 %acc_lo)
+// Returns: (result_hi, result_lo) = (acc_hi:acc_lo) + zext(a) * zext(b)
+def int_v850_macu : Intrinsic<[llvm_i32_ty, llvm_i32_ty],
+                              [llvm_i32_ty, llvm_i32_ty, llvm_i32_ty, llvm_i32_ty],
                               [IntrNoMem]>;
 ```
 
 **Tests:**
-- `llvm/test/CodeGen/V850/mac-intrinsics.ll`
+- `llvm/test/CodeGen/V850/mac-intrinsics.ll` - Direct intrinsic tests
+- `llvm/test/CodeGen/V850/mac.ll` - Pattern matching tests (sext/zext + mul + add)
+- `llvm/test/MC/V850/insn/mac.s` - MC encoding test
+- `llvm/test/MC/V850/insn/macu.s` - MC encoding test
 
 ---
 
@@ -237,9 +247,12 @@ Add `getTargetBuiltins()` implementation.
 
 ### C.3 MAC Instruction Selection
 
-**Status:** ❌ Not started
+**Status:** ✅ Complete
 
 - Pattern for `(a * b) + c` in 64-bit accumulator context → MAC/MACU
+- Implemented in `V850ISelLowering.cpp` via DAG combining
+- Pattern: `(sext(a) * sext(b)) + acc` → MAC
+- Pattern: `(zext(a) * zext(b)) + acc` → MACU
 
 ---
 
@@ -266,6 +279,9 @@ Add `getTargetBuiltins()` implementation.
 | 2026-01-11 | A.1 Saturating arithmetic (already implemented) | ✅ Complete |
 | 2026-01-11 | A.2 Memory barrier intrinsics (syncp/syncm/synce) | ✅ Complete |
 | 2026-01-11 | A.3 Interrupt control intrinsics (di/ei) | ✅ Complete |
+| 2026-01-11 | A.4 Generic LDSR/STSR intrinsics | ✅ Complete |
+| 2026-01-11 | A.5 MAC/MACU intrinsics with pattern matching | ✅ Complete |
+| 2026-01-11 | C.3 MAC instruction selection (DAG combine) | ✅ Complete |
 
 ---
 
