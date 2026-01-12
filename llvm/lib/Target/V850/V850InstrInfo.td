@@ -266,6 +266,12 @@ def SDT_V850TstMem : SDTypeProfile<1, 2, [SDTCisVT<0, i32>,
 def V850tst1mem : SDNode<"V850ISD::TST1_MEM", SDT_V850TstMem,
                          [SDNPHasChain, SDNPMayLoad, SDNPMemOperand]>;
 
+// Jump table branch - (chain, index, jumptable) -> chain
+// Uses SWITCH instruction for table-driven branching (V850E1+)
+def SDT_V850BrJT : SDTypeProfile<0, 2, [SDTCisVT<0, i32>, SDTCisVT<1, i32>]>;
+def V850brjt : SDNode<"V850ISD::BR_JT", SDT_V850BrJT,
+                      [SDNPHasChain]>;
+
 //===----------------------------------------------------------------------===//
 // Pattern fragments for instruction selection
 //===----------------------------------------------------------------------===//
@@ -1108,6 +1114,16 @@ def SWITCH : FormatI<0b000010, (outs), (ins GPR:$reg1),
                      []> {
   let reg2 = 0;
 }
+
+// SWITCH_JT - Pseudo instruction for jump table branch
+// Expands to SWITCH + inline jump table data
+// The jump table contains signed 16-bit offsets from the table base
+let isBranch = 1, isTerminator = 1, isBarrier = 1, isIndirectBranch = 1,
+    isCodeGenOnly = 1 in
+def SWITCH_JT : V850Pseudo<(outs), (ins GPR:$index, i32imm:$jti),
+                           "switch_jt\t$index, $jti",
+                           [(V850brjt GPR:$index, tjumptable:$jti)]>,
+                Requires<[HasV850E1]>;
 
 //===----------------------------------------------------------------------===//
 // Short Load/Store Instructions - Format IV (16-bit)

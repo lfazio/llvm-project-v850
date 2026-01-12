@@ -18,6 +18,7 @@
 #include "llvm/CodeGen/CallingConvLower.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
+#include "llvm/CodeGen/MachineJumpTableInfo.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/TargetLoweringObjectFileImpl.h"
@@ -149,8 +150,12 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
   setOperationAction(ISD::ExternalSymbol, MVT::i32, Custom);
   setOperationAction(ISD::BlockAddress, MVT::i32, Custom);
 
-  // Jump table
-  setOperationAction(ISD::BR_JT, MVT::Other, Expand);
+  // Jump table - V850E1+ has SWITCH instruction for table-driven branching
+  if (STI.hasV850E1()) {
+    setOperationAction(ISD::BR_JT, MVT::Other, Custom);
+  } else {
+    setOperationAction(ISD::BR_JT, MVT::Other, Expand);
+  }
 
   // VAARG support - expand
   setOperationAction(ISD::VASTART, MVT::Other, Expand);
@@ -279,6 +284,8 @@ SDValue V850TargetLowering::LowerOperation(SDValue Op,
     return LowerDivRem(Op, DAG);
   case ISD::INTRINSIC_W_CHAIN:
     return LowerINTRINSIC_W_CHAIN(Op, DAG);
+  case ISD::BR_JT:
+    return LowerBR_JT(Op, DAG);
   }
 }
 
@@ -320,6 +327,8 @@ const char *V850TargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "V850ISD::NOT1_MEM";
   case V850ISD::TST1_MEM:
     return "V850ISD::TST1_MEM";
+  case V850ISD::BR_JT:
+    return "V850ISD::BR_JT";
   }
   return nullptr;
 }
@@ -521,6 +530,35 @@ SDValue V850TargetLowering::LowerINTRINSIC_W_CHAIN(SDValue Op,
     return DAG.getNode(V850ISD::TST1_MEM, DL, VTs, Ops);
   }
   }
+}
+
+//===----------------------------------------------------------------------===//
+//                      Jump Table Lowering (V850E1+)
+//===----------------------------------------------------------------------===//
+
+SDValue V850TargetLowering::LowerBR_JT(SDValue Op, SelectionDAG &DAG) const {
+  SDValue Chain = Op.getOperand(0);
+  SDValue Table = Op.getOperand(1);
+  SDValue Index = Op.getOperand(2);
+  SDLoc DL(Op);
+
+  // Get the jump table index
+  JumpTableSDNode *JT = cast<JumpTableSDNode>(Table);
+  SDValue JTI = DAG.getTargetJumpTable(JT->getIndex(), MVT::i32);
+
+  // Create V850ISD::BR_JT node: chain = BR_JT chain, index, jumptable
+  // The SWITCH instruction will be generated from this node
+  return DAG.getNode(V850ISD::BR_JT, DL, MVT::Other, Chain, Index, JTI);
+}
+
+unsigned V850TargetLowering::getJumpTableEncoding() const {
+  // V850E1+ uses inline jump tables with SWITCH instruction
+  // Each entry is a signed 16-bit offset (halfword) from the table base
+  if (Subtarget.hasV850E1())
+    return MachineJumpTableInfo::EK_Inline;
+
+  // Base V850 uses standard block addresses
+  return MachineJumpTableInfo::EK_BlockAddress;
 }
 
 //===----------------------------------------------------------------------===//

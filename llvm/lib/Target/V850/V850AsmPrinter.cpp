@@ -20,6 +20,7 @@
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/MachineConstantPool.h"
 #include "llvm/CodeGen/MachineInstr.h"
+#include "llvm/CodeGen/MachineJumpTableInfo.h"
 #include "llvm/CodeGen/MachineModuleInfo.h"
 #include "llvm/IR/Mangler.h"
 #include "llvm/MC/MCAsmInfo.h"
@@ -126,6 +127,40 @@ void V850AsmPrinter::emitInstruction(const MachineInstr *MI) {
     JmpInst.setOpcode(V850::JMP);
     JmpInst.addOperand(MCOperand::createReg(V850::LP));
     EmitToStreamer(*OutStreamer, JmpInst);
+    return;
+  }
+  case V850::SWITCH_JT: {
+    // SWITCH_JT pseudo expands to: switch reg + inline jump table
+    // Emit the SWITCH instruction
+    MCInst SwitchInst;
+    SwitchInst.setOpcode(V850::SWITCH);
+    SwitchInst.addOperand(MCOperand::createReg(MI->getOperand(0).getReg()));
+    EmitToStreamer(*OutStreamer, SwitchInst);
+
+    // Emit the inline jump table
+    // Each entry is a signed 16-bit offset from the table base
+    unsigned JTI = MI->getOperand(1).getIndex();
+    const MachineJumpTableInfo *MJTI = MF->getJumpTableInfo();
+    const std::vector<MachineJumpTableEntry> &JT = MJTI->getJumpTables();
+    const std::vector<MachineBasicBlock *> &JTBBs = JT[JTI].MBBs;
+
+    // Create a symbol for the jump table base (immediately after SWITCH)
+    MCSymbol *JTISymbol = GetJTISymbol(JTI);
+    OutStreamer->emitLabel(JTISymbol);
+
+    // Emit each jump table entry as a .hword offset
+    for (MachineBasicBlock *MBB : JTBBs) {
+      // Entry = (target - table_base) >> 1
+      // But since we're emitting .hword with a subtraction expression,
+      // the assembler will compute the difference
+      const MCExpr *Value = MCSymbolRefExpr::create(MBB->getSymbol(), OutContext);
+      const MCExpr *Base = MCSymbolRefExpr::create(JTISymbol, OutContext);
+      const MCExpr *Diff = MCBinaryExpr::createSub(Value, Base, OutContext);
+      // Shift right by 1 (divide by 2) since SWITCH multiplies by 2
+      const MCExpr *ShiftedDiff = MCBinaryExpr::createAShr(
+          Diff, MCConstantExpr::create(1, OutContext), OutContext);
+      OutStreamer->emitValue(ShiftedDiff, 2); // 2 bytes = halfword
+    }
     return;
   }
   default:

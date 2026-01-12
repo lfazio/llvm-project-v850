@@ -268,7 +268,7 @@ Add `getTargetBuiltins()` implementation.
 
 ### C.4 SWITCH Instruction Support
 
-**Status:** ✅ Intrinsic Complete (Jump table lowering pending)
+**Status:** ✅ Complete (Intrinsic + Jump table lowering)
 
 **Description:**
 The V850E1+ SWITCH instruction provides efficient table-driven branching for switch/case statements.
@@ -284,44 +284,46 @@ adr = (PC + 2) + (GR[reg1] << 1)           ; Table entry address
 PC = (PC + 2) + sign_extend(mem[adr]) << 1  ; Target = table_base + offset
 ```
 
-**Usage Pattern:**
+**Generated Assembly Example:**
 ```asm
-    ; switch(index) with table at .Ltable
-    mov     index, r10
-    switch  r10
-.Ltable:
-    .hword  (.Lcase0 - .Ltable) >> 1    ; Entry 0: offset to case 0
-    .hword  (.Lcase1 - .Ltable) >> 1    ; Entry 1: offset to case 1
-    .hword  (.Lcase2 - .Ltable) >> 1    ; Entry 2: offset to case 2
+    ; switch(index) with inline jump table
+    switch  r6
+.LJTI0_0:
+    .hword  (.LBB0_2 - .LJTI0_0) >> 1    ; Entry 0: offset to case 0
+    .hword  (.LBB0_3 - .LJTI0_0) >> 1    ; Entry 1: offset to case 1
+    .hword  (.LBB0_4 - .LJTI0_0) >> 1    ; Entry 2: offset to case 2
     ...
-.Lcase0:
+.LBB0_2:
     ; case 0 code
-.Lcase1:
+.LBB0_3:
     ; case 1 code
 ```
 
-**Current State:**
-- `BR_JT` is set to `Expand` (jump tables not using SWITCH)
-- SWITCH instruction defined in `V850InstrInfo.td:1106` but not pattern-matched
+**Implementation Details:**
 
-**Implementation Tasks:**
+1. **A.6 SWITCH Intrinsic** ✅
+   - `llvm.v850.switch` intrinsic for direct access
+   - Pattern: `(int_v850_switch GPR:$index)` → `(SWITCH GPR:$index)`
 
-1. **A.6 SWITCH Intrinsic** (Low priority)
-   - Add `llvm.v850.switch` intrinsic for direct access
-   - Useful for hand-optimized code and compiler exploration
+2. **C.5 Jump Table Lowering** ✅
+   - `BR_JT` set to `Custom` for V850E1+
+   - `LowerBR_JT` creates `V850ISD::BR_JT` node
+   - `SWITCH_JT` pseudo instruction matches `V850brjt` SDNode
+   - `V850AsmPrinter` expands `SWITCH_JT` to `SWITCH` + inline jump table
+   - `getJumpTableEncoding()` returns `EK_Inline` for V850E1+
 
-2. **C.5 Jump Table Lowering** (Medium priority, higher complexity)
-   - Change `BR_JT` from `Expand` to `Custom`
-   - Implement `LowerBR_JT` to generate SWITCH + table
-   - Requires emitting jump table data in code section
+**Files Modified:**
+- `V850InstrInfo.td`: SWITCH_JT pseudo, V850brjt SDNode
+- `V850ISelLowering.cpp`: LowerBR_JT, getJumpTableEncoding
+- `V850AsmPrinter.cpp`: SWITCH_JT expansion with inline table emission
 
 **Intrinsic Definition:**
 ```tablegen
 // SWITCH - Jump with table look up
-// void @llvm.v850.switch(i32 %index, ptr %table)
-// Branches to table[index], where table contains signed halfword offsets
+// void @llvm.v850.switch(i32 %index)
+// Branches to table[index], where table immediately follows the instruction
 def int_v850_switch : Intrinsic<[], [llvm_i32_ty],
-                                [IntrNoMem, IntrHasSideEffects, IntrNoReturn]>;
+                                [IntrHasSideEffects]>;
 ```
 
 **Benefits:**
@@ -331,13 +333,14 @@ def int_v850_switch : Intrinsic<[], [llvm_i32_ty],
 
 **Tests:**
 - `llvm/test/CodeGen/V850/switch-intrinsic.ll` - Direct intrinsic usage
+- `llvm/test/CodeGen/V850/jump-table.ll` - Automatic switch lowering
 
 ---
 
 ## Implementation Priority
 
-| Priority | Task | Effort | Impact |
-|----------|------|--------|--------|
+| Priority | Task | Effort | Impact | Status |
+|----------|------|--------|--------|--------|
 | 1 | A.1 Saturating arithmetic patterns | Low | Medium | ✅ |
 | 2 | A.2 Memory barrier intrinsics | Low | High (correctness) | ✅ |
 | 3 | A.3 DI/EI intrinsics | Low | Medium | ✅ |
@@ -346,7 +349,7 @@ def int_v850_switch : Intrinsic<[], [llvm_i32_ty],
 | 6 | A.5 MAC intrinsics | Medium | Low | ✅ |
 | 7 | C.1-C.3 Optimizations | Medium | Medium | ✅ |
 | 8 | A.6 SWITCH intrinsic | Low | Low | ✅ |
-| 9 | C.5 Jump table lowering (BR_JT) | High | Medium | ❌ |
+| 9 | C.5 Jump table lowering (BR_JT) | Medium | Medium | ✅ |
 
 ---
 
@@ -365,6 +368,7 @@ def int_v850_switch : Intrinsic<[], [llvm_i32_ty],
 | 2026-01-11 | C.1 Combine patterns (HSW, BSW, SATADD/SATSUB) | ✅ Complete |
 | 2026-01-11 | C.2 Atomic operations (CAXI, atomic RMW) | ✅ Complete |
 | 2026-01-11 | A.6 SWITCH intrinsic (llvm.v850.switch) | ✅ Complete |
+| 2026-01-12 | C.5 Jump table lowering (BR_JT → SWITCH_JT) | ✅ Complete |
 
 ---
 

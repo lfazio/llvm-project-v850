@@ -64,6 +64,11 @@ enum NodeType : unsigned {
   // TST1_MEM: Test bit in memory - (result, chain) = TST1_MEM chain, addr, bitnum
   // Returns 1 if bit was 0 (Z flag set), 0 otherwise
   TST1_MEM,
+
+  // BR_JT: Jump table branch using SWITCH instruction (V850E1+)
+  // chain = BR_JT chain, index, jumptable
+  // The SWITCH instruction reads a halfword offset from a table and branches.
+  BR_JT,
 };
 } // namespace V850ISD
 
@@ -94,6 +99,11 @@ public:
   SDValue LowerMULHU(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerDivRem(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerINTRINSIC_W_CHAIN(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerBR_JT(SDValue Op, SelectionDAG &DAG) const;
+
+  /// getJumpTableEncoding - Return the entry encoding for jump tables.
+  /// V850E1+ uses inline jump tables with SWITCH instruction.
+  unsigned getJumpTableEncoding() const override;
 
   /// PerformDAGCombine - Perform target-specific DAG combining.
   SDValue PerformDAGCombine(SDNode *N, DAGCombinerInfo &DCI) const override;
