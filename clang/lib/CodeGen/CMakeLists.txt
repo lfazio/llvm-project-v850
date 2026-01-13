@@ -126,6 +126,7 @@ add_clang_library(clangCodeGen
   TargetBuiltins/RISCV.cpp
   TargetBuiltins/SPIR.cpp
   TargetBuiltins/SystemZ.cpp
+  TargetBuiltins/V850.cpp
   TargetBuiltins/WebAssembly.cpp
   TargetBuiltins/X86.cpp
   TargetInfo.cpp

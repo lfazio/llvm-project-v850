@@ -87,17 +87,24 @@ public:
 
   bool isValidFeatureName(StringRef Feature) const override {
     return llvm::StringSwitch<bool>(Feature)
-        .Case("fpu", true)
+        .Case("v850e1", true)
+        .Case("v850e2", true)
+        .Case("v850e2m", true)
+        .Case("v850e3", true)
+        .Case("v850fpu", true)
         .Case("soft-float", true)
         .Default(false);
   }
 
+  bool
+  initFeatureMap(llvm::StringMap<bool> &Features, DiagnosticsEngine &Diags,
+                 StringRef CPU,
+                 const std::vector<std::string> &FeaturesVec) const override;
+
   bool handleTargetFeatures(std::vector<std::string> &Features,
                             DiagnosticsEngine &Diags) override;
 
-  llvm::SmallVector<Builtin::InfosShard> getTargetBuiltins() const override {
-    return {};
-  }
+  llvm::SmallVector<Builtin::InfosShard> getTargetBuiltins() const override;
 
   bool allowsLargerPreferedTypeAlignment() const override { return false; }
 
@@ -111,7 +118,7 @@ public:
         .Case("v850e2m", CPU >= CK_V850E2M)
         .Case("v850e2v3", CPU >= CK_V850E2V3)
         .Case("v850e3", CPU >= CK_V850E3)
-        .Case("fpu", HasFPU && !SoftFloat)
+        .Case("v850fpu", HasFPU && !SoftFloat)
         .Case("soft-float", SoftFloat)
         .Default(false);
   }

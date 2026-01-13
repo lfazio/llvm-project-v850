@@ -24,13 +24,14 @@ This document tracks the implementation of V850-specific compiler builtins and i
 | **System Registers** | LDSR, STSR | Generic intrinsics | ✅ Complete |
 | **MAC Operations** | MAC, MACU | Intrinsics | ✅ Complete |
 
-### Clang Frontend - Not Implemented
+### Clang Frontend - Implemented
 
 | Component | Status |
 |-----------|--------|
-| `BuiltinsV850.def` | ❌ Missing |
-| `CGBuiltin` V850 | ❌ Missing |
-| User-facing builtins | ❌ Missing |
+| `BuiltinsV850.def` | ✅ Complete |
+| `CGBuiltin` V850 | ✅ Complete |
+| User-facing builtins | ✅ Complete |
+| Sema feature checking | ✅ Complete |
 
 ---
 
@@ -168,64 +169,52 @@ def int_v850_macu : Intrinsic<[llvm_i32_ty, llvm_i32_ty],
 
 ### B.1 Create BuiltinsV850.def
 
-**Status:** ❌ Not started
+**Status:** ✅ Complete
 
 **File:** `clang/include/clang/Basic/BuiltinsV850.def`
 
-**Builtins:**
-```c
-// Atomic bit operations
-BUILTIN(__builtin_v850_set1, "vv*Ui", "n")
-BUILTIN(__builtin_v850_clr1, "vv*Ui", "n")
-BUILTIN(__builtin_v850_not1, "vv*Ui", "n")
-BUILTIN(__builtin_v850_tst1, "iv*Ui", "n")
+**Implemented Builtins:**
 
-// Byte/word swap
-BUILTIN(__builtin_v850_hsw, "UiUi", "nc")
-BUILTIN(__builtin_v850_bsh, "UiUi", "nc")
-
-// Memory barriers
-BUILTIN(__builtin_v850_syncp, "v", "n")
-BUILTIN(__builtin_v850_syncm, "v", "n")
-BUILTIN(__builtin_v850_synce, "v", "n")
-
-// Interrupt control
-BUILTIN(__builtin_v850_di, "v", "n")
-BUILTIN(__builtin_v850_ei, "v", "n")
-
-// System registers
-BUILTIN(__builtin_v850_ldsr, "vUiUi", "n")
-BUILTIN(__builtin_v850_stsr, "UiUi", "n")
-
-// Saturating arithmetic
-BUILTIN(__builtin_v850_satadd, "iii", "nc")
-BUILTIN(__builtin_v850_satsub, "iii", "nc")
-
-// FPU register access (via BSEL banking)
-BUILTIN(__builtin_v850_read_fpsr, "Ui", "n")
-BUILTIN(__builtin_v850_write_fpsr, "vUi", "n")
-// ... other FPU registers
-```
+| Category | Builtins | Feature |
+|----------|----------|---------|
+| **Base V850** | `di`, `ei`, `ldsr`, `stsr`, `satadd`, `satsub` | (none) |
+| **V850E1+** | `set1`, `clr1`, `not1`, `tst1`, `hsw`, `bsh`, `mac`, `macu` | `v850e1` |
+| **V850E2M+** | `syncp`, `syncm`, `synce` | `v850e2m` |
+| **FPU** | `read/write_fpsr`, `read/write_fpepc`, `read/write_fpst`, `read/write_fpcc`, `read/write_fpcfg`, `read/write_fpec` | `v850fpu` |
 
 ---
 
 ### B.2 Implement CGBuiltin for V850
 
-**Status:** ❌ Not started
+**Status:** ✅ Complete
 
 **File:** `clang/lib/CodeGen/TargetBuiltins/V850.cpp`
 
-Map Clang builtins to LLVM intrinsics.
+Maps Clang builtins to LLVM intrinsics:
+- Bit operations → `llvm.v850.set1/clr1/not1/tst1`
+- Byte swap → `llvm.v850.hsw/bsh`
+- Barriers → `llvm.v850.syncp/syncm/synce`
+- Interrupts → `llvm.v850.di/ei`
+- System registers → `llvm.v850.ldsr/stsr`
+- Saturating arithmetic → `llvm.sadd.sat.i32/llvm.ssub.sat.i32`
+- FPU registers → `llvm.v850.read/write.*`
 
 ---
 
 ### B.3 Register builtins in V850TargetInfo
 
-**Status:** ❌ Not started
+**Status:** ✅ Complete
 
-**File:** `clang/lib/Basic/Targets/V850.cpp`
+**Files:**
+- `clang/lib/Basic/Targets/V850.cpp` - `getTargetBuiltins()` implementation
+- `clang/lib/Basic/Targets/V850.h` - `hasFeature()` for feature checking
+- `clang/include/clang/Basic/TargetBuiltins.h` - V850 namespace
 
-Add `getTargetBuiltins()` implementation.
+**Tests:**
+- `clang/test/CodeGen/V850/builtins.c` - CodeGen verification
+- `clang/test/Sema/v850-builtins-v850e1.c` - V850E1 positive test
+- `clang/test/Sema/v850-builtins-v850e2m.c` - V850E2M positive test
+- `clang/test/Sema/v850-builtins-error.c` - Feature error tests
 
 ---
 
@@ -344,7 +333,7 @@ def int_v850_switch : Intrinsic<[], [llvm_i32_ty],
 | 1 | A.1 Saturating arithmetic patterns | Low | Medium | ✅ |
 | 2 | A.2 Memory barrier intrinsics | Low | High (correctness) | ✅ |
 | 3 | A.3 DI/EI intrinsics | Low | Medium | ✅ |
-| 4 | B.1-B.3 Clang builtins | Medium | High (usability) | ❌ |
+| 4 | B.1-B.3 Clang builtins | Medium | High (usability) | ✅ |
 | 5 | A.4 Generic LDSR/STSR | Medium | Medium | ✅ |
 | 6 | A.5 MAC intrinsics | Medium | Low | ✅ |
 | 7 | C.1-C.3 Optimizations | Medium | Medium | ✅ |
@@ -369,6 +358,12 @@ def int_v850_switch : Intrinsic<[], [llvm_i32_ty],
 | 2026-01-11 | C.2 Atomic operations (CAXI, atomic RMW) | ✅ Complete |
 | 2026-01-11 | A.6 SWITCH intrinsic (llvm.v850.switch) | ✅ Complete |
 | 2026-01-12 | C.5 Jump table lowering (BR_JT → SWITCH_JT) | ✅ Complete |
+| 2026-01-13 | B.1 BuiltinsV850.def with TARGET_BUILTIN feature checks | ✅ Complete |
+| 2026-01-13 | B.2 CGBuiltin V850 implementation | ✅ Complete |
+| 2026-01-13 | B.3 V850TargetInfo getTargetBuiltins() | ✅ Complete |
+| 2026-01-13 | Clang Sema tests for feature checking | ✅ Complete |
+| 2026-01-13 | Fix feature name mismatch (fpu → v850fpu) | ✅ Complete |
+| 2026-01-13 | Add MAC/MACU builtins to Clang | ✅ Complete |
 
 ---
 

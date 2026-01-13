@@ -1,0 +1,158 @@
+//===--- BuiltinsV850.def - V850 Builtin function database ------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines the V850-specific builtin function database. Users of
+// this file must define the BUILTIN macro to make use of this information.
+//
+//===----------------------------------------------------------------------===//
+
+// The format of this database matches clang/Basic/Builtins.def.
+
+#if defined(BUILTIN) && !defined(TARGET_BUILTIN)
+#define TARGET_BUILTIN(ID, TYPE, ATTRS, FEATURE) BUILTIN(ID, TYPE, ATTRS)
+#endif
+
+//===----------------------------------------------------------------------===//
+// Base V850 Instructions (available on all variants)
+//===----------------------------------------------------------------------===//
+
+// DI - Disable interrupts (PSW.ID = 1)
+// void __builtin_v850_di(void)
+BUILTIN(__builtin_v850_di, "v", "n")
+
+// EI - Enable interrupts (PSW.ID = 0)
+// void __builtin_v850_ei(void)
+BUILTIN(__builtin_v850_ei, "v", "n")
+
+// LDSR - Load to system register
+// void __builtin_v850_ldsr(unsigned int value, unsigned int regID)
+BUILTIN(__builtin_v850_ldsr, "vUiIUi", "n")
+
+// STSR - Store from system register
+// unsigned int __builtin_v850_stsr(unsigned int regID)
+BUILTIN(__builtin_v850_stsr, "UiIUi", "n")
+
+// SATADD - Saturating add (2-operand form, base V850)
+// int __builtin_v850_satadd(int a, int b)
+BUILTIN(__builtin_v850_satadd, "iii", "nc")
+
+// SATSUB - Saturating subtract (2-operand form, base V850)
+// int __builtin_v850_satsub(int a, int b)
+BUILTIN(__builtin_v850_satsub, "iii", "nc")
+
+//===----------------------------------------------------------------------===//
+// V850E1/ES Instructions
+//
+// These instructions require V850E1 or later architecture.
+// The register-operand forms of bit manipulation and byte swap are V850E1+.
+//===----------------------------------------------------------------------===//
+
+// SET1 - Atomically set a bit in memory (register form)
+// void __builtin_v850_set1(void *addr, unsigned int bit)
+TARGET_BUILTIN(__builtin_v850_set1, "vv*Ui", "n", "v850e1")
+
+// CLR1 - Atomically clear a bit in memory (register form)
+// void __builtin_v850_clr1(void *addr, unsigned int bit)
+TARGET_BUILTIN(__builtin_v850_clr1, "vv*Ui", "n", "v850e1")
+
+// NOT1 - Atomically toggle a bit in memory (register form)
+// void __builtin_v850_not1(void *addr, unsigned int bit)
+TARGET_BUILTIN(__builtin_v850_not1, "vv*Ui", "n", "v850e1")
+
+// TST1 - Test a bit in memory (register form)
+// Returns Z flag value (1 if bit was 0, 0 otherwise)
+// int __builtin_v850_tst1(void *addr, unsigned int bit)
+TARGET_BUILTIN(__builtin_v850_tst1, "iv*Ui", "n", "v850e1")
+
+// HSW - Halfword swap (swap upper and lower 16-bit halfwords)
+// unsigned int __builtin_v850_hsw(unsigned int x)
+// Result: (x >> 16) | (x << 16), i.e., 0xAABBCCDD -> 0xCCDDAABB
+TARGET_BUILTIN(__builtin_v850_hsw, "UiUi", "nc", "v850e1")
+
+// BSH - Byte swap halfword (swap bytes in each 16-bit halfword)
+// unsigned int __builtin_v850_bsh(unsigned int x)
+// Result: 0xAABBCCDD -> 0xBBAADDCC
+TARGET_BUILTIN(__builtin_v850_bsh, "UiUi", "nc", "v850e1")
+
+// MAC - Signed multiply-accumulate
+// long long __builtin_v850_mac(int a, int b, long long acc)
+// Returns: acc + (a * b) as 64-bit signed result
+TARGET_BUILTIN(__builtin_v850_mac, "LLiiiLLi", "nc", "v850e1")
+
+// MACU - Unsigned multiply-accumulate
+// unsigned long long __builtin_v850_macu(unsigned int a, unsigned int b,
+//                                        unsigned long long acc)
+// Returns: acc + (a * b) as 64-bit unsigned result
+TARGET_BUILTIN(__builtin_v850_macu, "ULLiUiUiULLi", "nc", "v850e1")
+
+//===----------------------------------------------------------------------===//
+// V850E2M Instructions
+//
+// These instructions require V850E2M or later architecture.
+// Memory barriers and FPU register access are V850E2M+.
+//===----------------------------------------------------------------------===//
+
+// SYNCP - Synchronize pipeline (full memory barrier)
+// void __builtin_v850_syncp(void)
+TARGET_BUILTIN(__builtin_v850_syncp, "v", "n", "v850e2m")
+
+// SYNCM - Synchronize memory
+// void __builtin_v850_syncm(void)
+TARGET_BUILTIN(__builtin_v850_syncm, "v", "n", "v850e2m")
+
+// SYNCE - Synchronize exceptions
+// void __builtin_v850_synce(void)
+TARGET_BUILTIN(__builtin_v850_synce, "v", "n", "v850e2m")
+
+//===----------------------------------------------------------------------===//
+// FPU System Register Access (V850E2M+)
+//
+// These intrinsics provide access to FPU system registers.
+// On V850E2M, FPU registers are accessed via BSEL banking (regID 6-11).
+//===----------------------------------------------------------------------===//
+
+// Read FPU status registers
+// unsigned int __builtin_v850_read_fpsr(void)
+TARGET_BUILTIN(__builtin_v850_read_fpsr, "Ui", "n", "v850fpu")
+
+// unsigned int __builtin_v850_read_fpepc(void)
+TARGET_BUILTIN(__builtin_v850_read_fpepc, "Ui", "n", "v850fpu")
+
+// unsigned int __builtin_v850_read_fpst(void)
+TARGET_BUILTIN(__builtin_v850_read_fpst, "Ui", "n", "v850fpu")
+
+// unsigned int __builtin_v850_read_fpcc(void)
+TARGET_BUILTIN(__builtin_v850_read_fpcc, "Ui", "n", "v850fpu")
+
+// unsigned int __builtin_v850_read_fpcfg(void)
+TARGET_BUILTIN(__builtin_v850_read_fpcfg, "Ui", "n", "v850fpu")
+
+// unsigned int __builtin_v850_read_fpec(void)
+TARGET_BUILTIN(__builtin_v850_read_fpec, "Ui", "n", "v850fpu")
+
+// Write FPU status registers
+// void __builtin_v850_write_fpsr(unsigned int value)
+TARGET_BUILTIN(__builtin_v850_write_fpsr, "vUi", "n", "v850fpu")
+
+// void __builtin_v850_write_fpepc(unsigned int value)
+TARGET_BUILTIN(__builtin_v850_write_fpepc, "vUi", "n", "v850fpu")
+
+// void __builtin_v850_write_fpst(unsigned int value)
+TARGET_BUILTIN(__builtin_v850_write_fpst, "vUi", "n", "v850fpu")
+
+// void __builtin_v850_write_fpcc(unsigned int value)
+TARGET_BUILTIN(__builtin_v850_write_fpcc, "vUi", "n", "v850fpu")
+
+// void __builtin_v850_write_fpcfg(unsigned int value)
+TARGET_BUILTIN(__builtin_v850_write_fpcfg, "vUi", "n", "v850fpu")
+
+// void __builtin_v850_write_fpec(unsigned int value)
+TARGET_BUILTIN(__builtin_v850_write_fpec, "vUi", "n", "v850fpu")
+
+#undef BUILTIN
+#undef TARGET_BUILTIN

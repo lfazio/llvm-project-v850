@@ -1,0 +1,237 @@
+//===------ V850.cpp - Emit LLVM Code for V850 builtins -------------------===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// This contains code to emit V850 Builtin calls as LLVM code.
+//
+//===----------------------------------------------------------------------===//
+
+#include "CodeGenFunction.h"
+#include "clang/Basic/TargetBuiltins.h"
+#include "llvm/IR/IntrinsicsV850.h"
+
+using namespace clang;
+using namespace CodeGen;
+using namespace llvm;
+
+Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
+                                            const CallExpr *E) {
+  switch (BuiltinID) {
+  default:
+    return nullptr;
+
+  //===--------------------------------------------------------------------===//
+  // Atomic Bit Operations
+  //===--------------------------------------------------------------------===//
+
+  case V850::BI__builtin_v850_set1: {
+    Value *Addr = EmitScalarExpr(E->getArg(0));
+    Value *Bit = EmitScalarExpr(E->getArg(1));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_set1);
+    return Builder.CreateCall(F, {Addr, Bit});
+  }
+  case V850::BI__builtin_v850_clr1: {
+    Value *Addr = EmitScalarExpr(E->getArg(0));
+    Value *Bit = EmitScalarExpr(E->getArg(1));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_clr1);
+    return Builder.CreateCall(F, {Addr, Bit});
+  }
+  case V850::BI__builtin_v850_not1: {
+    Value *Addr = EmitScalarExpr(E->getArg(0));
+    Value *Bit = EmitScalarExpr(E->getArg(1));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_not1);
+    return Builder.CreateCall(F, {Addr, Bit});
+  }
+  case V850::BI__builtin_v850_tst1: {
+    Value *Addr = EmitScalarExpr(E->getArg(0));
+    Value *Bit = EmitScalarExpr(E->getArg(1));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_tst1);
+    return Builder.CreateCall(F, {Addr, Bit});
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Byte/Halfword Swap Operations
+  //===--------------------------------------------------------------------===//
+
+  case V850::BI__builtin_v850_hsw: {
+    Value *X = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_hsw);
+    return Builder.CreateCall(F, X);
+  }
+  case V850::BI__builtin_v850_bsh: {
+    Value *X = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_bsh);
+    return Builder.CreateCall(F, X);
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Memory Barrier Operations
+  //===--------------------------------------------------------------------===//
+
+  case V850::BI__builtin_v850_syncp: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_syncp);
+    return Builder.CreateCall(F);
+  }
+  case V850::BI__builtin_v850_syncm: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_syncm);
+    return Builder.CreateCall(F);
+  }
+  case V850::BI__builtin_v850_synce: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_synce);
+    return Builder.CreateCall(F);
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Interrupt Control Operations
+  //===--------------------------------------------------------------------===//
+
+  case V850::BI__builtin_v850_di: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_di);
+    return Builder.CreateCall(F);
+  }
+  case V850::BI__builtin_v850_ei: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ei);
+    return Builder.CreateCall(F);
+  }
+
+  //===--------------------------------------------------------------------===//
+  // System Register Access
+  //===--------------------------------------------------------------------===//
+
+  case V850::BI__builtin_v850_ldsr: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Value *RegID = EmitScalarExpr(E->getArg(1));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, RegID});
+  }
+  case V850::BI__builtin_v850_stsr: {
+    Value *RegID = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, RegID);
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Saturating Arithmetic Operations
+  //===--------------------------------------------------------------------===//
+
+  case V850::BI__builtin_v850_satadd: {
+    Value *A = EmitScalarExpr(E->getArg(0));
+    Value *B = EmitScalarExpr(E->getArg(1));
+    // Use LLVM's saturating add intrinsic
+    Function *F = CGM.getIntrinsic(Intrinsic::sadd_sat, {Int32Ty});
+    return Builder.CreateCall(F, {A, B});
+  }
+  case V850::BI__builtin_v850_satsub: {
+    Value *A = EmitScalarExpr(E->getArg(0));
+    Value *B = EmitScalarExpr(E->getArg(1));
+    // Use LLVM's saturating sub intrinsic
+    Function *F = CGM.getIntrinsic(Intrinsic::ssub_sat, {Int32Ty});
+    return Builder.CreateCall(F, {A, B});
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Multiply-Accumulate Operations (V850E1+)
+  //===--------------------------------------------------------------------===//
+
+  case V850::BI__builtin_v850_mac: {
+    // long long __builtin_v850_mac(int a, int b, long long acc)
+    Value *A = EmitScalarExpr(E->getArg(0));
+    Value *B = EmitScalarExpr(E->getArg(1));
+    Value *Acc = EmitScalarExpr(E->getArg(2));
+    // Split 64-bit acc into hi and lo parts
+    Value *AccLo = Builder.CreateTrunc(Acc, Int32Ty);
+    Value *AccHi = Builder.CreateTrunc(Builder.CreateLShr(Acc, 32), Int32Ty);
+    // Call the intrinsic
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_mac);
+    Value *Result = Builder.CreateCall(F, {A, B, AccHi, AccLo});
+    // Extract hi and lo results and combine into 64-bit value
+    Value *ResHi = Builder.CreateExtractValue(Result, 0);
+    Value *ResLo = Builder.CreateExtractValue(Result, 1);
+    Value *ResHi64 = Builder.CreateZExt(ResHi, Int64Ty);
+    Value *ResLo64 = Builder.CreateZExt(ResLo, Int64Ty);
+    return Builder.CreateOr(Builder.CreateShl(ResHi64, 32), ResLo64);
+  }
+  case V850::BI__builtin_v850_macu: {
+    // unsigned long long __builtin_v850_macu(unsigned int a, unsigned int b,
+    //                                        unsigned long long acc)
+    Value *A = EmitScalarExpr(E->getArg(0));
+    Value *B = EmitScalarExpr(E->getArg(1));
+    Value *Acc = EmitScalarExpr(E->getArg(2));
+    // Split 64-bit acc into hi and lo parts
+    Value *AccLo = Builder.CreateTrunc(Acc, Int32Ty);
+    Value *AccHi = Builder.CreateTrunc(Builder.CreateLShr(Acc, 32), Int32Ty);
+    // Call the intrinsic
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_macu);
+    Value *Result = Builder.CreateCall(F, {A, B, AccHi, AccLo});
+    // Extract hi and lo results and combine into 64-bit value
+    Value *ResHi = Builder.CreateExtractValue(Result, 0);
+    Value *ResLo = Builder.CreateExtractValue(Result, 1);
+    Value *ResHi64 = Builder.CreateZExt(ResHi, Int64Ty);
+    Value *ResLo64 = Builder.CreateZExt(ResLo, Int64Ty);
+    return Builder.CreateOr(Builder.CreateShl(ResHi64, 32), ResLo64);
+  }
+
+  //===--------------------------------------------------------------------===//
+  // FPU System Register Access (V850E2M+)
+  //===--------------------------------------------------------------------===//
+
+  case V850::BI__builtin_v850_read_fpsr: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_read_fpsr);
+    return Builder.CreateCall(F);
+  }
+  case V850::BI__builtin_v850_read_fpepc: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_read_fpepc);
+    return Builder.CreateCall(F);
+  }
+  case V850::BI__builtin_v850_read_fpst: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_read_fpst);
+    return Builder.CreateCall(F);
+  }
+  case V850::BI__builtin_v850_read_fpcc: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_read_fpcc);
+    return Builder.CreateCall(F);
+  }
+  case V850::BI__builtin_v850_read_fpcfg: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_read_fpcfg);
+    return Builder.CreateCall(F);
+  }
+  case V850::BI__builtin_v850_read_fpec: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_read_fpec);
+    return Builder.CreateCall(F);
+  }
+  case V850::BI__builtin_v850_write_fpsr: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_write_fpsr);
+    return Builder.CreateCall(F, Val);
+  }
+  case V850::BI__builtin_v850_write_fpepc: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_write_fpepc);
+    return Builder.CreateCall(F, Val);
+  }
+  case V850::BI__builtin_v850_write_fpst: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_write_fpst);
+    return Builder.CreateCall(F, Val);
+  }
+  case V850::BI__builtin_v850_write_fpcc: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_write_fpcc);
+    return Builder.CreateCall(F, Val);
+  }
+  case V850::BI__builtin_v850_write_fpcfg: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_write_fpcfg);
+    return Builder.CreateCall(F, Val);
+  }
+  case V850::BI__builtin_v850_write_fpec: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_write_fpec);
+    return Builder.CreateCall(F, Val);
+  }
+  }
+}

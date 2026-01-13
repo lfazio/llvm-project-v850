@@ -11,11 +11,29 @@
 //===----------------------------------------------------------------------===//
 
 #include "V850.h"
+#include "clang/Basic/Builtins.h"
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/MacroBuilder.h"
+#include "clang/Basic/TargetBuiltins.h"
 
 using namespace clang;
 using namespace clang::targets;
+
+static constexpr int NumBuiltins =
+    V850::LastTSBuiltin - Builtin::FirstTSBuiltin;
+
+static constexpr llvm::StringTable BuiltinStrings =
+    CLANG_BUILTIN_STR_TABLE_START
+#define BUILTIN CLANG_BUILTIN_STR_TABLE
+#define TARGET_BUILTIN CLANG_TARGET_BUILTIN_STR_TABLE
+#include "clang/Basic/BuiltinsV850.def"
+    ;
+
+static constexpr auto BuiltinInfos = Builtin::MakeInfos<NumBuiltins>({
+#define BUILTIN CLANG_BUILTIN_ENTRY
+#define TARGET_BUILTIN CLANG_TARGET_BUILTIN_ENTRY
+#include "clang/Basic/BuiltinsV850.def"
+});
 
 const char *const V850TargetInfo::GCCRegNames[] = {
     "r0",  "r1",  "r2",  "r3",  "r4",  "r5",  "r6",  "r7",
@@ -133,12 +151,48 @@ bool V850TargetInfo::setCPU(const std::string &Name) {
   return CPU != CK_NONE;
 }
 
+bool V850TargetInfo::initFeatureMap(
+    llvm::StringMap<bool> &Features, DiagnosticsEngine &Diags, StringRef CPU,
+    const std::vector<std::string> &FeaturesVec) const {
+  // Enable features based on CPU variant
+  // Features are cumulative: v850e3 includes v850e2m includes v850e2 includes v850e1
+  CPUKind CpuKind = llvm::StringSwitch<CPUKind>(CPU)
+                        .Case("v850", CK_V850)
+                        .Case("v850e1", CK_V850E1)
+                        .Case("v850es", CK_V850ES)
+                        .Case("v850e2", CK_V850E2)
+                        .Case("v850e2m", CK_V850E2M)
+                        .Case("v850e2v3", CK_V850E2V3)
+                        .Case("v850e3", CK_V850E3)
+                        .Default(CK_V850);
+
+  // V850E1 and later (including V850ES)
+  if (CpuKind >= CK_V850E1)
+    Features["v850e1"] = true;
+
+  // V850E2 and later
+  if (CpuKind >= CK_V850E2)
+    Features["v850e2"] = true;
+
+  // V850E2M and later (includes FPU by default)
+  if (CpuKind >= CK_V850E2M) {
+    Features["v850e2m"] = true;
+    Features["v850fpu"] = true;
+  }
+
+  // V850E3 and later
+  if (CpuKind >= CK_V850E3)
+    Features["v850e3"] = true;
+
+  return TargetInfo::initFeatureMap(Features, Diags, CPU, FeaturesVec);
+}
+
 bool V850TargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
                                            DiagnosticsEngine &Diags) {
   for (const auto &Feature : Features) {
-    if (Feature == "+fpu")
+    if (Feature == "+v850fpu")
       HasFPU = true;
-    else if (Feature == "-fpu")
+    else if (Feature == "-v850fpu")
       HasFPU = false;
     else if (Feature == "+soft-float")
       SoftFloat = true;
@@ -146,4 +200,9 @@ bool V850TargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
       SoftFloat = false;
   }
   return true;
+}
+
+llvm::SmallVector<Builtin::InfosShard>
+V850TargetInfo::getTargetBuiltins() const {
+  return {{&BuiltinStrings, BuiltinInfos}};
 }
