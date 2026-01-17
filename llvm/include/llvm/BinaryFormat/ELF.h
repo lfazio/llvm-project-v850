@@ -1026,6 +1026,11 @@ enum {
 #include "ELFRelocs/MSP430.def"
 };
 
+// ELF Relocation types for V850
+enum {
+#include "ELFRelocs/V850.def"
+};
+
 // ELF Relocation type for VE.
 enum {
 #include "ELFRelocs/VE.def"
@@ -1061,14 +1066,14 @@ enum : unsigned {
   // (commit hash 296de4def055c871809068e0816325a4ac04eb12)
 
   // Base ABI Modifiers
-  EF_LOONGARCH_ABI_SOFT_FLOAT    = 0x1,
-  EF_LOONGARCH_ABI_SINGLE_FLOAT  = 0x2,
-  EF_LOONGARCH_ABI_DOUBLE_FLOAT  = 0x3,
+  EF_LOONGARCH_ABI_SOFT_FLOAT = 0x1,
+  EF_LOONGARCH_ABI_SINGLE_FLOAT = 0x2,
+  EF_LOONGARCH_ABI_DOUBLE_FLOAT = 0x3,
   EF_LOONGARCH_ABI_MODIFIER_MASK = 0x7,
 
   // Object file ABI versions
-  EF_LOONGARCH_OBJABI_V0   = 0x0,
-  EF_LOONGARCH_OBJABI_V1   = 0x40,
+  EF_LOONGARCH_OBJABI_V0 = 0x0,
+  EF_LOONGARCH_OBJABI_V1 = 0x40,
   EF_LOONGARCH_OBJABI_MASK = 0xC0,
 };
 
