@@ -178,8 +178,11 @@ def int_v850_macu : Intrinsic<[llvm_i32_ty, llvm_i32_ty],
 | Category | Builtins | Feature |
 |----------|----------|---------|
 | **Base V850** | `di`, `ei`, `ldsr`, `stsr`, `satadd`, `satsub` | (none) |
+| **Base V850 Named SysRegs** | `read/write_eipc`, `read/write_eipsw`, `read/write_fepc`, `read/write_fepsw`, `read_ecr`, `read/write_psw` | (none) |
 | **V850E1+** | `set1`, `clr1`, `not1`, `tst1`, `hsw`, `bsh`, `mac`, `macu` | `v850e1` |
+| **V850E1+ Named SysRegs** | `read/write_ctpc`, `read/write_ctpsw`, `read/write_ctbp` | `v850e1` |
 | **V850E2M+** | `syncp`, `syncm`, `synce` | `v850e2m` |
+| **V850E2M+ Named SysRegs** | `read/write_eiwr`, `read/write_fewr`, `read/write_bsel` | `v850e2m` |
 | **FPU** | `read/write_fpsr`, `read/write_fpepc`, `read/write_fpst`, `read/write_fpcc`, `read/write_fpcfg`, `read/write_fpec` | `v850fpu` |
 
 ---
@@ -364,6 +367,38 @@ def int_v850_switch : Intrinsic<[], [llvm_i32_ty],
 | 2026-01-13 | Clang Sema tests for feature checking | ✅ Complete |
 | 2026-01-13 | Fix feature name mismatch (fpu → v850fpu) | ✅ Complete |
 | 2026-01-13 | Add MAC/MACU builtins to Clang | ✅ Complete |
+| 2026-01-13 | Add named system register builtins (compile-time CPU variant enforcement) | ✅ Complete |
+| 2026-01-13 | Add system register enforcement in LLVM backend (ISel predicates) | ✅ Complete |
+| 2026-01-13 | Add system register validation in llvm-mc assembler | ✅ Complete |
+| 2026-01-13 | Fix CTPC/CTPSW/CTBP register ID mappings (16/17/20, not 20/21) | ✅ Complete |
+
+---
+
+## System Register CPU Variant Enforcement
+
+System register access is now enforced at multiple levels:
+
+### Clang (compile-time)
+- Named builtins (`__builtin_v850_read_ctpc`, etc.) use `TARGET_BUILTIN` with feature requirements
+- Errors at compile time if using V850E1+ registers on base V850, or V850E2M+ registers on V850E1
+
+### LLVM ISel (llc)
+- Patterns for system register intrinsics have `Predicates = [HasV850E1]` or `[HasV850E2M]`
+- Instruction selection fails if pattern requires unavailable feature
+
+### LLVM-MC (assembler)
+- `validateSystemRegister()` in AsmParser checks register access at assembly time
+- Errors: "system register requires V850E1 or later CPU" / "system register requires V850E2M or later CPU"
+
+### Register ID to CPU Variant Mapping
+
+| Register ID | Register Name | Required CPU |
+|-------------|---------------|--------------|
+| 0-5 | EIPC, EIPSW, FEPC, FEPSW, ECR, PSW | Base V850 |
+| 6-11 | FPSR, FPEPC, FPST, FPCC, FPCFG, FPEC | V850E2M+FPU (BSEL=0x2000) |
+| 11-15 | SCCFG, SCBP, EIIC, FEIC, DBIC | V850E2M+ (CPU bank) |
+| 16-27 | CTPC, CTPSW, DBPC, DBPSW, CTBP, DIR, BPC, ASID, BPAV, BPAM, BPDV, BPDM | V850E1+ |
+| 28-31 | EIWR, FEWR, DBWR, BSEL | V850E2M+ |
 
 ---
 

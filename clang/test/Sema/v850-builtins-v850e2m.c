@@ -14,6 +14,19 @@ void test_all_builtins(void *addr, unsigned int bit) {
   (void)__builtin_v850_satadd(1, 2);
   (void)__builtin_v850_satsub(1, 2);
 
+  // Base V850 named system register builtins
+  (void)__builtin_v850_read_eipc();
+  __builtin_v850_write_eipc(0);
+  (void)__builtin_v850_read_eipsw();
+  __builtin_v850_write_eipsw(0);
+  (void)__builtin_v850_read_fepc();
+  __builtin_v850_write_fepc(0);
+  (void)__builtin_v850_read_fepsw();
+  __builtin_v850_write_fepsw(0);
+  (void)__builtin_v850_read_ecr();
+  (void)__builtin_v850_read_psw();
+  __builtin_v850_write_psw(0);
+
   // V850E1 builtins
   __builtin_v850_set1(addr, bit);
   __builtin_v850_clr1(addr, bit);
@@ -22,10 +35,26 @@ void test_all_builtins(void *addr, unsigned int bit) {
   (void)__builtin_v850_hsw(0);
   (void)__builtin_v850_bsh(0);
 
+  // V850E1+ system register builtins
+  (void)__builtin_v850_read_ctpc();
+  __builtin_v850_write_ctpc(0);
+  (void)__builtin_v850_read_ctpsw();
+  __builtin_v850_write_ctpsw(0);
+  (void)__builtin_v850_read_ctbp();
+  __builtin_v850_write_ctbp(0);
+
   // V850E2M builtins
   __builtin_v850_syncp();
   __builtin_v850_syncm();
   __builtin_v850_synce();
+
+  // V850E2M+ system register builtins
+  (void)__builtin_v850_read_eiwr();
+  __builtin_v850_write_eiwr(0);
+  (void)__builtin_v850_read_fewr();
+  __builtin_v850_write_fewr(0);
+  (void)__builtin_v850_read_bsel();
+  __builtin_v850_write_bsel(0);
 
   // FPU builtins (V850E2M includes FPU by default)
   (void)__builtin_v850_read_fpsr();

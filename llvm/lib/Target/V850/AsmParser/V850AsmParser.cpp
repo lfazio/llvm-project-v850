@@ -82,6 +82,11 @@ class V850AsmParser : public MCTargetAsmParser {
   bool validateFPURegisterPair(StringRef Mnemonic, const OperandVector &Operands,
                                SMLoc IDLoc);
 
+  /// Validate system register access based on CPU features.
+  /// Returns true if validation fails (system register not available for CPU).
+  bool validateSystemRegister(StringRef Mnemonic, const OperandVector &Operands,
+                              SMLoc IDLoc);
+
 public:
   V850AsmParser(const MCSubtargetInfo &STI, MCAsmParser &Parser,
                 const MCInstrInfo &MII, const MCTargetOptions &Options)
@@ -759,6 +764,85 @@ bool V850AsmParser::validateFPURegisterPair(StringRef Mnemonic,
   return false;
 }
 
+bool V850AsmParser::validateSystemRegister(StringRef Mnemonic,
+                                            const OperandVector &Operands,
+                                            SMLoc IDLoc) {
+  // Only validate LDSR and STSR instructions
+  if (!Mnemonic.equals_insensitive("ldsr") && !Mnemonic.equals_insensitive("stsr"))
+    return false;
+
+  // Get the system register operand
+  // LDSR: ldsr reg2, regID -> Operands[0]=mnemonic, [1]=reg2, [2]=regID
+  // STSR: stsr regID, reg2 -> Operands[0]=mnemonic, [1]=regID, [2]=reg2
+  unsigned SysRegOpIdx = Mnemonic.equals_insensitive("ldsr") ? 2 : 1;
+
+  if (SysRegOpIdx >= Operands.size())
+    return false;
+
+  const V850Operand &SysRegOp =
+      static_cast<const V850Operand &>(*Operands[SysRegOpIdx]);
+  if (!SysRegOp.isReg())
+    return false;
+
+  MCRegister Reg = SysRegOp.getReg();
+
+  // Check CPU feature requirements for system registers
+  // Use getFeatureBits() to check features
+  const FeatureBitset &Features = STI.getFeatureBits();
+  bool HasV850E1 = Features[V850::FeatureV850E1];
+  bool HasV850E2M = Features[V850::FeatureV850E2M];
+  bool HasV850FPU = Features[V850::FeatureV850FPU];
+
+  // V850E1+ registers (check by register enum, not encoding)
+  if (Reg == V850::CTPC || Reg == V850::CTPSW || Reg == V850::CTBP ||
+      Reg == V850::DBPC || Reg == V850::DBPSW || Reg == V850::DIR ||
+      Reg == V850::BPC || Reg == V850::ASID || Reg == V850::BPAV ||
+      Reg == V850::BPAM || Reg == V850::BPDV || Reg == V850::BPDM) {
+    if (!HasV850E1) {
+      Error(SysRegOp.getStartLoc(),
+            "system register requires V850E1 or later CPU");
+      return true;
+    }
+    return false;
+  }
+
+  // V850E2M+ registers
+  if (Reg == V850::EIWR || Reg == V850::FEWR || Reg == V850::DBWR ||
+      Reg == V850::BSEL) {
+    if (!HasV850E2M) {
+      Error(SysRegOp.getStartLoc(),
+            "system register requires V850E2M or later CPU");
+      return true;
+    }
+    return false;
+  }
+
+  // V850E2M+ CPU bank registers (SCCFG, SCBP, exception cause registers)
+  if (Reg == V850::SCCFG || Reg == V850::SCBP ||
+      Reg == V850::EIIC || Reg == V850::FEIC || Reg == V850::DBIC) {
+    if (!HasV850E2M) {
+      Error(SysRegOp.getStartLoc(),
+            "system register requires V850E2M or later CPU");
+      return true;
+    }
+    return false;
+  }
+
+  // FPU registers (when BSEL=0x2000)
+  if (Reg == V850::FPSR || Reg == V850::FPEPC || Reg == V850::FPST ||
+      Reg == V850::FPCC || Reg == V850::FPCFG || Reg == V850::FPEC) {
+    if (!HasV850FPU) {
+      Error(SysRegOp.getStartLoc(),
+            "FPU system register requires V850E2M with FPU");
+      return true;
+    }
+    return false;
+  }
+
+  // Base V850 registers (EIPC, EIPSW, FEPC, FEPSW, ECR, PSW): always available
+  return false;
+}
+
 bool V850AsmParser::matchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
                                              OperandVector &Operands,
                                              MCStreamer &Out,
@@ -785,6 +869,10 @@ bool V850AsmParser::matchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
 
     // Validate register pair constraints for double-precision FPU instructions
     if (validateFPURegisterPair(Mnemonic, Operands, IDLoc))
+      return true;
+
+    // Validate system register access based on CPU features
+    if (validateSystemRegister(Mnemonic, Operands, IDLoc))
       return true;
 
     Inst.setLoc(IDLoc);

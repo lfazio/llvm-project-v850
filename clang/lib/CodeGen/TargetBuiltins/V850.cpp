@@ -115,6 +115,145 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
   }
 
   //===--------------------------------------------------------------------===//
+  // Named System Register Access (Base V850)
+  //===--------------------------------------------------------------------===//
+
+  // EIPC - Exception/Interrupt saved PC (regID 0)
+  case V850::BI__builtin_v850_read_eipc: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32(0));
+  }
+  case V850::BI__builtin_v850_write_eipc: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32(0)});
+  }
+
+  // EIPSW - Exception/Interrupt saved PSW (regID 1)
+  case V850::BI__builtin_v850_read_eipsw: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32(1));
+  }
+  case V850::BI__builtin_v850_write_eipsw: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32(1)});
+  }
+
+  // FEPC - Fatal Error saved PC (regID 2)
+  case V850::BI__builtin_v850_read_fepc: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32(2));
+  }
+  case V850::BI__builtin_v850_write_fepc: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32(2)});
+  }
+
+  // FEPSW - Fatal Error saved PSW (regID 3)
+  case V850::BI__builtin_v850_read_fepsw: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32(3));
+  }
+  case V850::BI__builtin_v850_write_fepsw: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32(3)});
+  }
+
+  // ECR - Exception Cause Register (regID 4, read-only)
+  case V850::BI__builtin_v850_read_ecr: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32(4));
+  }
+
+  // PSW - Program Status Word (regID 5)
+  case V850::BI__builtin_v850_read_psw: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32(5));
+  }
+  case V850::BI__builtin_v850_write_psw: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32(5)});
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Named System Register Access (V850E1+)
+  //===--------------------------------------------------------------------===//
+
+  // CTPC - CALLT saved PC (regID 16)
+  case V850::BI__builtin_v850_read_ctpc: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32(16));
+  }
+  case V850::BI__builtin_v850_write_ctpc: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32(16)});
+  }
+
+  // CTPSW - CALLT saved PSW (regID 17)
+  case V850::BI__builtin_v850_read_ctpsw: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32(17));
+  }
+  case V850::BI__builtin_v850_write_ctpsw: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32(17)});
+  }
+
+  // CTBP - CALLT Base Pointer (regID 20)
+  case V850::BI__builtin_v850_read_ctbp: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32(20));
+  }
+  case V850::BI__builtin_v850_write_ctbp: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32(20)});
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Named System Register Access (V850E2M+)
+  //===--------------------------------------------------------------------===//
+
+  // EIWR - EI-level Working Register (regID 28)
+  case V850::BI__builtin_v850_read_eiwr: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32(28));
+  }
+  case V850::BI__builtin_v850_write_eiwr: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32(28)});
+  }
+
+  // FEWR - FE-level Working Register (regID 29)
+  case V850::BI__builtin_v850_read_fewr: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32(29));
+  }
+  case V850::BI__builtin_v850_write_fewr: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32(29)});
+  }
+
+  // BSEL - Bank Selection Register (regID 31)
+  case V850::BI__builtin_v850_read_bsel: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32(31));
+  }
+  case V850::BI__builtin_v850_write_bsel: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32(31)});
+  }
+
+  //===--------------------------------------------------------------------===//
   // Saturating Arithmetic Operations
   //===--------------------------------------------------------------------===//
 

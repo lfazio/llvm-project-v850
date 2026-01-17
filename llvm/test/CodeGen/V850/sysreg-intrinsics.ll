@@ -74,23 +74,33 @@ entry:
   ret i32 %val
 }
 
-; Test reading CTPC (regID 20)
+; Test reading CTPC (regID 16) - V850E1+
 ; CHECK-LABEL: test_stsr_ctpc:
 ; CHECK: stsr ctpc, r{{[0-9]+}}
 ; CHECK: jmp [r31]
 define i32 @test_stsr_ctpc() {
 entry:
-  %val = call i32 @llvm.v850.stsr(i32 20)
+  %val = call i32 @llvm.v850.stsr(i32 16)
   ret i32 %val
 }
 
-; Test reading CTPSW (regID 21)
+; Test reading CTPSW (regID 17) - V850E1+
 ; CHECK-LABEL: test_stsr_ctpsw:
 ; CHECK: stsr ctpsw, r{{[0-9]+}}
 ; CHECK: jmp [r31]
 define i32 @test_stsr_ctpsw() {
 entry:
-  %val = call i32 @llvm.v850.stsr(i32 21)
+  %val = call i32 @llvm.v850.stsr(i32 17)
+  ret i32 %val
+}
+
+; Test reading CTBP (regID 20) - V850E1+
+; CHECK-LABEL: test_stsr_ctbp:
+; CHECK: stsr ctbp, r{{[0-9]+}}
+; CHECK: jmp [r31]
+define i32 @test_stsr_ctbp() {
+entry:
+  %val = call i32 @llvm.v850.stsr(i32 20)
   ret i32 %val
 }
 

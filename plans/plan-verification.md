@@ -21,8 +21,8 @@ The V850 backend has comprehensive support for V850, V850ES, V850E1, V850E2, and
 - **V850E2/V850E2M:** 100% complete ✅ (all instructions and 32 system registers implemented)
 - **RH850G3M:** 0% implemented ❌ (16 critical instructions missing)
 - **RH850G3MH:** 0% implemented ❌ (design variant of G3M)
-- **RH850G4MH:** 0% implemented ⚠️ (documented only, requires G3MH + 2 MPU instructions + 59 FXU SIMD instructions + FXSR register)
-- **RH850G4MH2:** 0% implemented ⚠️ (documented only, requires G4MH + 3 virtualization instructions)
+- **RH850G4MH:** 0% implemented ❌ (requires G3MH + 2 MPU instructions + 59 FXU SIMD instructions + FXSR register)
+- **RH850G4MH2:** 0% implemented ❌ (requires G4MH + 3 virtualization instructions)
 - **Scheduling Models:** 85% complete ✅ (V850/V850E1/V850E2/V850E2M models complete, missing RH850 variants)
 
 **Critical Issues:**
@@ -77,8 +77,8 @@ The LLVM compiler uses `FeatureV850E1` for both variants because they share the 
 |---------|--------|-------------------|----------|
 | rh850g3m | ❌ Not Implemented | User/supervisor modes (PSW.UM), LDL.W/STC.W atomics, CLL, BINS, ROTL, LD.DW/ST.DW, LOOP, PUSHSP/POPSP, Bcond disp17, JARL [reg1] reg3, CACHE, PREF, SNOOZE, SYNCI, selID-based system registers, branch prediction | **High** |
 | rh850g3mh | ❌ Not Implemented | RH850G3M + performance enhancements, simplified FPU exceptions (FPINT replaces FPP/FPI), advanced out-of-order execution | **High** |
-| rh850g4mh | ⚠️ Documented | RH850G3MH + LDM.MP/STM.MP for MPU, FXU (59 SIMD instructions, 32 wreg registers, FXSR), PID[31:24]=06H | **High** |
-| rh850g4mh2 | ⚠️ Documented | RH850G4MH + virtualization support (Guest/Host modes, HVTRAP, LDM.GSR/STM.GSR, EIRET/FERET enhancements), PID[31:24]=07H | Medium |
+| rh850g4mh | ❌ Not Implemented | RH850G3MH + LDM.MP/STM.MP for MPU, FXU (59 SIMD instructions, 32 wreg registers, FXSR), PSW.CU1=1 for FXU access, PID[31:24]=06H | **High** |
+| rh850g4mh2 | ❌ Not Implemented | RH850G4MH + virtualization support (Guest/Host modes, HVTRAP, LDM.GSR/STM.GSR, EIRET/FERET enhancements), selID=13 for guest registers, PID[31:24]=07H | **High** |
 
 **Impact:** Automotive and industrial applications using RH850 MCUs cannot use LLVM.
 
@@ -739,7 +739,196 @@ RH850G3M uses **(regID, selID)** register numbering:
 
 ---
 
-## 3.9 System Register Summary by CPU Variant
+### 3.9 RH850G4MH System Registers (selID-based + FXU + MPU)
+
+**Variants:** RH850G4MH, RH850G4MH2
+
+**Status:** ❌ **NOT Implemented** (no RH850G4MH support in LLVM)
+
+**Documentation:** V850InstructionReference.md, RH850G4MH User's Manual
+
+RH850G4MH inherits all RH850G3MH system registers and adds:
+
+#### 3.9.1 FXU (Extended Floating-Point Unit) Registers
+
+**Access Control:** Requires PSW.CU1=1 (Coprocessor 1 enable)
+
+| RegID | selID | Symbol | Full Name | Access | Description |
+|-------|-------|--------|-----------|--------|-------------|
+| 12 | 0 | FXSR | FXU Status Register | CU1 | Extended FPU status (similar layout to FPSR) |
+
+**FXSR Register Layout (32-bit):**
+```
+31     30-24   23 22  21  20   19-18  17  16    15-10        9-5         4-0
+┌──┬─────────┬──┬──┬───┬──┬──────┬──┬──┬────────────┬───────────┬──────────┐
+│  │   (0)   │FN│IF│PEM│0 │  RM  │FS│0 │  XC (6)    │  XE (5)   │ XP (5)   │
+└──┴─────────┴──┴──┴───┴──┴──────┴──┴──┴────────────┴───────────┴──────────┘
+23: FN = Flush to Nearest
+22: IF = Input Flush flag
+21: PEM = Precise Exception Mode
+19-18: RM = Rounding Mode (00=RN, 01=RZ, 10=RP, 11=RM)
+17: FS = Flush Subnormals
+15-10: XC = Exception Cause bits (E, V, Z, O, U, I)
+9-5: XE = Exception Enable bits (V, Z, O, U, I)
+4-0: XP = Exception Preservation bits (V, Z, O, U, I)
+```
+
+**FXU Vector Registers:**
+
+| Register | Size | Description |
+|----------|------|-------------|
+| wreg0-wreg31 | 128-bit | 32 vector registers for SIMD operations |
+
+**Note:** wreg registers are NOT accessible via LDSR/STSR. They are accessed via FXU load/store instructions (LDV.W, LDV.DW, LDV.QW, STV.W, STV.DW, STV.QW).
+
+#### 3.9.2 MPU (Memory Protection Unit) System Registers (selID=5, 6)
+
+**Access:** Supervisor mode only
+
+| RegID | selID | Symbol | Full Name | Access | Description |
+|-------|-------|--------|-----------|--------|-------------|
+| 0 | 5 | MPM | Memory Protection Mode | SV | MPU enable and mode control |
+| 1 | 5 | MPRC | Memory Protection Region Count | SV | Number of protection regions |
+| 2 | 5 | MPBRGN | MPU Base Region Number | SV | Base region number |
+| 3 | 5 | MPTRGN | MPU Total Region Number | SV | Total region number |
+| 8 | 5 | MCA | Memory Check Address | SV | Address that caused protection violation |
+| 9 | 5 | MCS | Memory Check Status | SV | Protection violation status |
+| 10 | 5 | MCC | Memory Check Clear | SV | Clear protection violation |
+| 11 | 5 | MCR | Memory Check Region | SV | Region that caused violation |
+| 0-15 | 6 | MPLAn | Memory Protection Lower Address n | SV | Lower bound of protection region n |
+| 0-15 | 7 | MPUAn | Memory Protection Upper Address n | SV | Upper bound of protection region n |
+| 0-15 | 8 | MPATn | Memory Protection Attributes n | SV | Attributes for protection region n |
+
+**MPATn Attributes Layout:**
+```
+31-26  25   24   23   22   21   20   19-16  15-0
+┌────┬────┬────┬────┬────┬────┬────┬──────┬─────┐
+│ 0  │WMPID│WG │RMPID│RG │ E  │ SX │ ASID │ (0) │
+└────┴────┴────┴────┴────┴────┴────┴──────┴─────┘
+WMPID: Write MPID enable
+WG: Write global enable
+RMPID: Read MPID enable
+RG: Read global enable
+E: Region enable
+SX: Supervisor execute permission
+ASID: Address space ID
+```
+
+#### 3.9.3 PSW Extensions for RH850G4MH
+
+**Additional PSW Bits (beyond RH850G3MH):**
+```
+31 30 29 19 18 17 16 15 14 12 11 10 9 8 7  6  5  4  3  2  1  0
+┌──┬──┬────┬──┬──┬──┬──┬────┬─────────┬─┬──┬──┬──┬──┬──┬──┬──┬──┐
+│0 │UM│ 0  │C │C │C │EB│  0 │  Debug  │0│NP│EP│ID│SA│CY│OV│S │Z │
+│  │  │    │U2│U1│U0│V │    │         │ │  │  │  │T │  │  │  │  │
+└──┴──┴────┴──┴──┴──┴──┴────┴─────────┴─┴──┴──┴──┴──┴──┴──┴──┴──┘
+```
+
+**Coprocessor Enable Bits:**
+- **CU0 (bit 16):** Coprocessor 0 enable (FPU access)
+- **CU1 (bit 17):** Coprocessor 1 enable (**FXU access - NEW for G4MH**)
+- **CU2 (bit 18):** Coprocessor 2 enable (reserved)
+
+**Implementation Status:** ❌ **0% Implemented** - No RH850G4MH support
+
+**Critical Issues:**
+1. FXU unit not defined (wreg registers, FXSR)
+2. No PSW.CU1 support for FXU access control
+3. MPU system registers not defined
+4. LDM.MP/STM.MP instructions not implemented
+
+**Priority:** **High** for RH850G4MH support
+
+---
+
+### 3.10 RH850G4MH2 System Registers (Virtualization)
+
+**Variants:** RH850G4MH2
+
+**Status:** ❌ **NOT Implemented** (no RH850G4MH2 support in LLVM)
+
+**Documentation:** V850InstructionReference.md, RH850G4MH2 User's Manual
+
+RH850G4MH2 inherits all RH850G4MH system registers and adds virtualization support for Guest/Host modes.
+
+#### 3.10.1 Host Mode System Registers (selID=0)
+
+| RegID | selID | Symbol | Full Name | Access | Description |
+|-------|-------|--------|-----------|--------|-------------|
+| 16 | 0 | HVCFG | Hypervisor Configuration | HV | Virtualization configuration |
+| 17 | 0 | GMCFG | Guest Machine Configuration | HV | Guest configuration |
+| 18 | 0 | HVSB | Hypervisor Stack Base | HV | Host stack base address |
+| 19 | 0 | PSWH | PSW Host | HV | Extended PSW for host mode |
+
+**HVCFG Register Layout:**
+```
+31-2   1     0
+┌────┬────┬────┐
+│ 0  │HVP │HVE │
+└────┴────┴────┘
+HVE: Hypervisor Enable (1=virtualization enabled)
+HVP: Hypervisor Present (read-only, 1=G4MH2)
+```
+
+#### 3.10.2 Host Mode Exception Registers (selID=0)
+
+| RegID | selID | Symbol | Full Name | Access | Description |
+|-------|-------|--------|-----------|--------|-------------|
+| 8 | 0 | HMEIPC | Host Mode EI Exception PC | HV | PC when Host EI exception |
+| 9 | 0 | HMEIPSW | Host Mode EI Exception PSW | HV | PSW when Host EI exception |
+| 10 | 0 | HMFEPC | Host Mode FE Exception PC | HV | PC when Host FE exception |
+| 11 | 0 | HMFEPSW | Host Mode FE Exception PSW | HV | PSW when Host FE exception |
+| 12 | 0 | HMPSW | Host Mode PSW | HV | Host mode program status |
+
+#### 3.10.3 Guest Mode System Registers (selID=13)
+
+| RegID | selID | Symbol | Full Name | Access | Description |
+|-------|-------|--------|-----------|--------|-------------|
+| 0 | 13 | GMEIPC | Guest Mode EI Exception PC | HV | Guest EI exception PC |
+| 1 | 13 | GMEIPSW | Guest Mode EI Exception PSW | HV | Guest EI exception PSW |
+| 2 | 13 | GMFEPC | Guest Mode FE Exception PC | HV | Guest FE exception PC |
+| 3 | 13 | GMFEPSW | Guest Mode FE Exception PSW | HV | Guest FE exception PSW |
+| 4 | 13 | GMPSW | Guest Mode PSW | HV | Guest mode program status |
+| 5 | 13 | GMMEA | Guest Mode Memory Error Address | HV | Guest memory error address |
+| 6 | 13 | GMMEI | Guest Mode Memory Error Info | HV | Guest memory error info |
+| 8 | 13 | GMEIIC | Guest Mode EI Interrupt Cause | HV | Guest EI interrupt cause |
+| 9 | 13 | GMFEIC | Guest Mode FE Interrupt Cause | HV | Guest FE interrupt cause |
+| 12 | 13 | GMSPID | Guest Mode SPID | HV | Guest system protection ID |
+| 13 | 13 | GMSPIDLIST | Guest Mode SPID List | HV | Guest SPID permission list |
+| 16 | 13 | GMEBASE | Guest Mode Exception Base | HV | Guest exception base address |
+| 17 | 13 | GMINTBP | Guest Mode Interrupt Base | HV | Guest interrupt base pointer |
+| 24 | 13 | GMINTCFG | Guest Mode Interrupt Config | HV | Guest interrupt configuration |
+| 25 | 13 | GMPLMR | Guest Mode Priority Level Mask | HV | Guest priority level masking |
+
+**Access Permissions:**
+- **HV:** Hypervisor (Host) mode only (accessed via LDM.GSR/STM.GSR)
+
+#### 3.10.4 Mode Transitions
+
+**Guest → Host Transitions (causes HVTRAP):**
+- HVTRAP instruction executed in Guest mode
+- Unimplemented instruction in Guest mode
+- Memory protection violation in Guest mode
+- External interrupt directed to Host
+
+**Host → Guest Transitions:**
+- EIRET/FERET with PSWH.GM=1 (switch to Guest mode)
+
+**Implementation Status:** ❌ **0% Implemented** - No RH850G4MH2 support
+
+**Critical Issues:**
+1. Hypervisor configuration registers not defined
+2. Guest mode system registers (selID=13) not defined
+3. HVTRAP instruction not implemented
+4. LDM.GSR/STM.GSR instructions not implemented
+5. Guest/Host mode transition semantics not implemented
+
+**Priority:** **High** for RH850G4MH2 virtualization support
+
+---
+
+## 3.11 System Register Summary by CPU Variant
 
 | CPU Variant | RegID Range | selID Support | Banking | Total Registers | Impl Status |
 |-------------|-------------|---------------|---------|-----------------|-------------|
@@ -750,12 +939,15 @@ RH850G3M uses **(regID, selID)** register numbering:
 | **V850E2M** | 0-5, 6-15, 16-27, 28-31 | No | BSEL-based | 32 | ✅ 100% (32/32) |
 | **RH850G3M** | (regID, selID) pairs | Yes | selID groups | 50+ | ❌ 0% |
 | **RH850G3MH** | (regID, selID) pairs | Yes | selID groups | 50+ | ❌ 0% |
+| **RH850G4MH** | (regID, selID) pairs + FXU | Yes | selID groups + FXU | 80+ (50+ sys + FXSR + 32 wreg) | ❌ 0% |
+| **RH850G4MH2** | (regID, selID) pairs + FXU + Virt | Yes | selID groups + FXU + Guest/Host | 100+ (G4MH + 20+ virt) | ❌ 0% |
 
 **Key Findings:**
 - V850/V850ES/V850E1/V850E2/V850E2M: ✅ Complete (all system registers implemented)
 - V850E2M: ✅ BSEL-based FPU register access implemented via intrinsics (llvm.v850.read/write.fpsr/fpepc/fpst/fpcc/fpcfg/fpec)
-- RH850G3M/G3MH: ❌ Completely missing
-- RH850G4MH/G4MH2: ❌ Completely missing
+- RH850G3M/G3MH: ❌ Completely missing (16 instructions, selID-based registers)
+- RH850G4MH: ❌ Completely missing (G3MH + FXU 59 SIMD instructions + MPU)
+- RH850G4MH2: ❌ Completely missing (G4MH + virtualization support)
 ### 4.1 Current Scheduling Models
 
 **Files:**
@@ -906,6 +1098,14 @@ def V850E2MUnitFPDiv    : ProcResource<1>;  // FP divide/sqrt (not pipelined)
 
 **RH850G4MH Scheduling Requirements:**
 - FXU unit resources: `RH850G4MHUnitFXU` for vector operations
+- FXU pipeline: 4-way SIMD execution, 128-bit registers
+- FXU latencies per V850CycleTimings.md (vector arithmetic: 4-6 cycles, FMA: 4 cycles, DIVF.S4: 14-17 cycles)
+- MPU instruction timing (LDM.MP/STM.MP: variable based on entry count)
+
+**RH850G4MH2 Scheduling Requirements:**
+- Inherits all RH850G4MH scheduling characteristics
+- Virtualization instructions: HVTRAP (trap latency), LDM.GSR/STM.GSR (context switch timing)
+- Guest/Host mode transitions may affect pipeline state
 - FXU latencies: 4 cycles for most ops, 11 for DIVF.S4, 17 for SQRTF.S4
 - FXU loads/stores: 3/1 cycles respectively
 - MPU instructions: LDM.MP (N+8), STM.MP (N+2) where N = entries × 1.5
@@ -1077,9 +1277,9 @@ def HasV850E3  : Predicate<"Subtarget->hasV850E3()">;
 
 **Status:** ❌ Missing V850ES feature flag
 
-### 7.2 Missing Feature Flags for RH850G3M ❌
+### 7.2 Missing Feature Flags for RH850G3M/G4MH ❌
 
-**Required Additions:**
+**Required Additions for RH850G3M:**
 
 ```cpp
 // V850Subtarget.h additions needed:
@@ -1099,7 +1299,27 @@ def HasRH850Atomics : Predicate<"Subtarget->hasRH850Atomics()">;
 def HasRH850Cache : Predicate<"Subtarget->hasRH850Cache()">;
 ```
 
-**Priority:** **Critical** for RH850G3M implementation
+**Required Additions for RH850G4MH:**
+
+```cpp
+// V850Subtarget.h additions needed for G4MH:
+bool HasRH850G4MH = false;
+bool HasRH850G4MH2 = false;
+bool HasRH850FXU = false;         // FXU SIMD unit (59 instructions)
+bool HasRH850MPU = false;         // MPU support (LDM.MP/STM.MP)
+bool HasRH850Virtualization = false;  // Virtualization (G4MH2)
+```
+
+```tablegen
+// V850InstrInfo.td additions needed for G4MH:
+def HasRH850G4MH : Predicate<"Subtarget->hasRH850G4MH()">;
+def HasRH850G4MH2 : Predicate<"Subtarget->hasRH850G4MH2()">;
+def HasRH850FXU : Predicate<"Subtarget->hasRH850FXU()">;
+def HasRH850MPU : Predicate<"Subtarget->hasRH850MPU()">;
+def HasRH850Virtualization : Predicate<"Subtarget->hasRH850Virtualization()">;
+```
+
+**Priority:** **Critical** for RH850G3M, **High** for RH850G4MH implementation
 
 ### 7.3 Feature Implication Analysis
 
@@ -1114,14 +1334,22 @@ V850 (base - 74 instructions, 6 system registers)
                   ├── V850E3 (implies V850E2M + FPU)
                   └── RH850G3M (implies V850E2M + FPU + Atomics + Cache)
                       └── RH850G3MH (implies RH850G3M + Branch Prediction)
+                          └── RH850G4MH (implies RH850G3MH + FXU + MPU)
+                              └── RH850G4MH2 (implies RH850G4MH + Virtualization)
 ```
 
 **Key Distinction - V850ES vs V850E1:**
 - **V850ES:** Extended instruction set (same as V850E1) but limited to 6 base system registers
 - **V850E1:** Same instruction set as V850ES + full set of system registers (12 additional registers for debug/CALLT)
 
+**Key Distinction - RH850G3MH vs RH850G4MH:**
+- **RH850G3MH:** Full RH850 integer ISA, FPU, atomics, cache, branch prediction
+- **RH850G4MH:** Adds FXU (59 SIMD instructions, 32 wreg registers) and enhanced MPU (LDM.MP/STM.MP)
+- **RH850G4MH2:** Adds hardware virtualization (Host/Guest modes, HVTRAP, LDM.GSR/STM.GSR)
+
 **Status:** ❌ V850ES-V850E1 missing in implication chain
 **Status:** ❌ RH850G3M/G3MH not in chain
+**Status:** ❌ RH850G4MH/G4MH2 not in chain
 
 ---
 
@@ -1271,6 +1499,128 @@ V850 (base - 74 instructions, 6 system registers)
 **Acceptance Criteria:**
 - All instructions assemble correctly
 - CACHE/PREF can be used in inline assembly
+
+### Priority 2.5 (High) - RH850G4MH Foundation
+
+**Estimated Effort:** 3-4 weeks (after RH850G3M complete)
+
+#### 2.5.1 Add RH850G4MH CPU Variants and Features
+
+**Files:**
+- `llvm/lib/Target/V850/V850.td`
+- `llvm/lib/Target/V850/V850Subtarget.h`
+- `llvm/lib/Target/V850/V850Subtarget.cpp`
+
+**Tasks:**
+1. Add FeatureRH850G4MH, FeatureRH850G4MH2, FeatureRH850FXU, FeatureRH850MPU, FeatureRH850Virtualization
+2. Add processor definitions: `rh850g4mh`, `rh850g4mh2`
+3. Define feature implications (RH850G4MH implies RH850G3MH + FXU + MPU)
+4. Add predicates to V850InstrInfo.td
+
+**Acceptance Criteria:**
+- `clang -target v850-unknown-elf -mcpu=rh850g4mh` compiles without error
+- Feature flags properly set in subtarget
+
+#### 2.5.2 Implement FXU Register Definitions
+
+**Files:**
+- `llvm/lib/Target/V850/V850RegisterInfo.td`
+
+**Tasks:**
+1. Add wreg0-wreg31 (128-bit vector registers) for FXU
+2. Add FXSR system register (RegID=12, selID=0)
+3. Add FXU register classes (VecRegs128)
+4. Define DWARF register numbers for wreg registers
+
+**Acceptance Criteria:**
+- wreg registers accessible in inline assembly
+- FXSR accessible via LDSR/STSR
+
+#### 2.5.3 Implement RH850G4MH MPU Instructions
+
+**Files:**
+- `llvm/lib/Target/V850/V850InstrInfo.td`
+- `llvm/lib/Target/V850/V850ISelLowering.cpp`
+
+**Tasks:**
+1. Add LDM.MP [reg1], eh-et (load multiple MPU entry registers) - Format IX
+2. Add STM.MP eh-et, [reg1] (store multiple MPU entry registers) - Format IX
+3. Define MPU entry register operands (MPLA, MPUA, MPAT)
+4. Add intrinsics for MPU access
+
+**Acceptance Criteria:**
+- `ldm.mp [r10], 0-3` assembles correctly (load MPLA0, MPUA0, MPAT0)
+- MPU context switching supported via intrinsics
+
+#### 2.5.4 Implement FXU Vector Instructions (Phase 1 - Load/Store)
+
+**Files:**
+- `llvm/lib/Target/V850/V850InstrFXU.td` (new)
+- `llvm/lib/Target/V850/V850InstrInfo.td`
+
+**Tasks:**
+1. Add LDV.W wreg2, [reg1] (load 32-bit to vector element)
+2. Add LDV.DW wreg2, [reg1] (load 64-bit to vector)
+3. Add LDV.QW wreg2, [reg1] (load 128-bit to vector)
+4. Add LDVZ.H4 wreg2, [reg1] (load 4x halfword zero-extended)
+5. Add corresponding STV.W, STV.DW, STV.QW, STVZ.H4 store instructions
+
+**Acceptance Criteria:**
+- Vector load/store instructions assemble correctly
+- Memory operations work with 128-bit alignment
+
+#### 2.5.5 Implement FXU Vector Instructions (Phase 2 - Arithmetic)
+
+**Files:**
+- `llvm/lib/Target/V850/V850InstrFXU.td`
+
+**Tasks:**
+1. Add SIMD arithmetic: ADDF.S4, SUBF.S4, MULF.S4, DIVF.S4
+2. Add SIMD FMA: FMAF.S4, FMSF.S4, FNMAF.S4, FNMSF.S4
+3. Add SIMD manipulation: MOVV.W4, FLPV.S4, SHFLV.W4
+4. Add SIMD comparison: CMPF.S4, CMOVF.W4
+5. Add SIMD conversion: CVTF.WS4, CVTF.SW4, CVTF.HS4, CVTF.SH4, etc.
+
+**Acceptance Criteria:**
+- All 59 FXU instructions assemble correctly
+- SIMD patterns selected for vectorizable code (optional, via autovectorization)
+
+### Priority 2.6 (High) - RH850G4MH2 Virtualization
+
+**Estimated Effort:** 2-3 weeks (after RH850G4MH complete)
+
+#### 2.6.1 Implement RH850G4MH2 Virtualization Instructions
+
+**Files:**
+- `llvm/lib/Target/V850/V850InstrInfo.td`
+- `llvm/lib/Target/V850/V850RegisterInfo.td`
+
+**Tasks:**
+1. Add HVTRAP vector5 (hypervisor trap) - Format X
+2. Add LDM.GSR [reg1] (load guest system registers) - Format IX
+3. Add STM.GSR [reg1] (store guest system registers) - Format IX
+4. Define Host mode system registers (HVCFG, GMCFG, HVSB, PSWH, HMEIPC, etc.)
+5. Define Guest mode system registers (selID=13: GMEIPC, GMEIPSW, GMPSW, etc.)
+
+**Acceptance Criteria:**
+- `hvtrap 0` assembles correctly
+- Guest/Host system registers accessible
+- Virtualization mode transitions compile correctly
+
+#### 2.6.2 Implement RH850G4MH2 System Register Definitions
+
+**Files:**
+- `llvm/lib/Target/V850/V850RegisterInfo.td`
+
+**Tasks:**
+1. Add Host mode registers (selID=0): HVCFG, GMCFG, HVSB, PSWH
+2. Add Host exception registers (selID=0): HMEIPC, HMEIPSW, HMFEPC, HMFEPSW, HMPSW
+3. Add Guest mode registers (selID=13): Full set of guest system registers
+4. Implement PSWH.GM bit for guest mode indication
+
+**Acceptance Criteria:**
+- All virtualization registers accessible via LDSR/STSR with correct selID
+- Mode transitions (EIRET with PSWH.GM=1) supported
 
 ### Priority 3 (Medium) - Scheduling Model Improvements
 
@@ -1430,15 +1780,51 @@ Required test files:
 6. `rh850g3m-cache.ll` - CACHE/PREF/SYNCI
 7. `rh850g3m-sysregs.ll` - selID-based LDSR/STSR
 
+### 9.1.1 RH850G4MH Instruction Tests
+
+**Directory:** `llvm/test/CodeGen/V850/`
+
+Required test files:
+1. `rh850g4mh-mpu.ll` - LDM.MP/STM.MP MPU context switching
+2. `rh850g4mh-fxu-loadstore.ll` - LDV.W/DW/QW, STV.W/DW/QW vector loads/stores
+3. `rh850g4mh-fxu-arith.ll` - ADDF.S4, SUBF.S4, MULF.S4, DIVF.S4 SIMD arithmetic
+4. `rh850g4mh-fxu-fma.ll` - FMAF.S4, FMSF.S4, FNMAF.S4, FNMSF.S4 fused multiply-add
+5. `rh850g4mh-fxu-manip.ll` - MOVV.W4, FLPV.S4, SHFLV.W4 vector manipulation
+6. `rh850g4mh-fxu-cmp.ll` - CMPF.S4, CMOVF.W4 comparisons
+7. `rh850g4mh-fxu-convert.ll` - CVTF.*, TRNCF.* conversions
+8. `rh850g4mh-fxsr.ll` - FXSR register access
+
+### 9.1.2 RH850G4MH2 Instruction Tests
+
+**Directory:** `llvm/test/CodeGen/V850/`
+
+Required test files:
+1. `rh850g4mh2-hvtrap.ll` - HVTRAP hypervisor trap
+2. `rh850g4mh2-guest-regs.ll` - LDM.GSR/STM.GSR guest register access
+3. `rh850g4mh2-virt-sysregs.ll` - HVCFG, GMCFG, PSWH, GM* registers
+4. `rh850g4mh2-mode-switch.ll` - Guest/Host mode transitions
+
 ### 9.2 Assembly Syntax Tests
 
 **Directory:** `llvm/test/MC/V850/`
 
-Required test files:
+Required test files for RH850G3M:
 1. `rh850g3m-atomics.s` - Atomic instruction encoding
 2. `rh850g3m-sysreg-selid.s` - 3-operand LDSR/STSR syntax
 3. `rh850g3m-branches.s` - Extended branch encoding
 4. `rh850g3m-double-word.s` - LD.DW/ST.DW encoding
+
+Required test files for RH850G4MH:
+5. `rh850g4mh-mpu.s` - LDM.MP/STM.MP encoding
+6. `rh850g4mh-fxu-loadstore.s` - FXU load/store encoding
+7. `rh850g4mh-fxu-arith.s` - FXU arithmetic encoding (ADDF.S4, etc.)
+8. `rh850g4mh-fxu-fma.s` - FXU FMA encoding
+9. `rh850g4mh-fxu-manip.s` - FXU manipulation encoding
+10. `rh850g4mh-fxsr.s` - FXSR register access
+
+Required test files for RH850G4MH2:
+11. `rh850g4mh2-virt.s` - HVTRAP, LDM.GSR, STM.GSR encoding
+12. `rh850g4mh2-virt-regs.s` - Virtualization register encoding
 
 ### 9.3 Scheduling Tests
 
@@ -1449,15 +1835,26 @@ Required test files:
 2. `sched-rh850g3m-branch-prediction.ll` - Branch prediction effects
 3. `sched-divq-variable.ll` - Variable DIVQ latency
 4. `sched-prepare-dispose-variable.ll` - Variable PREPARE/DISPOSE latency
+5. `sched-rh850g4mh-fxu.ll` - FXU SIMD pipeline scheduling
+6. `sched-rh850g4mh-mpu.ll` - MPU instruction latencies
+7. `sched-rh850g4mh2-virt.ll` - Virtualization instruction latencies
 
 ### 9.4 C/C++ Integration Tests
 
 **Directory:** `clang/test/CodeGen/`
 
-Required test files:
+Required test files for RH850G3M:
 1. `v850-rh850g3m-atomic.c` - C11 atomic operations
 2. `v850-rh850g3m-fpu-modes.c` - FPU imprecise/precise mode selection
 3. `v850-rh850g3m-cache-hints.c` - __builtin_prefetch lowering
+
+Required test files for RH850G4MH:
+4. `v850-rh850g4mh-fxu-vector.c` - FXU vector intrinsics
+5. `v850-rh850g4mh-fxu-builtin.c` - FXU builtin functions
+6. `v850-rh850g4mh-mpu.c` - MPU intrinsics
+
+Required test files for RH850G4MH2:
+7. `v850-rh850g4mh2-virt.c` - Virtualization intrinsics
 
 ---
 
@@ -1529,11 +1926,28 @@ Content needed:
 - Week 9: Variable-latency instructions, RH850G3M scheduling model
 - Week 10: RH850G3MH scheduling model, FPU imprecise/precise modes
 
-### Phase 4: Debug and Polish (2 weeks)
-- Week 11: Debug registers, V850E2M register banking
-- Week 12: Documentation, final testing, code review
+### Phase 4: RH850G4MH Foundation (4 weeks)
+- Week 11: CPU variants, feature flags, FXU register definitions (wreg0-31, FXSR)
+- Week 12: MPU instructions (LDM.MP/STM.MP), MPU system registers
+- Week 13: FXU load/store instructions (LDV.*, STV.*)
+- Week 14: FXU arithmetic and FMA instructions, testing
 
-**Total Estimated Effort:** 12 weeks (3 months) for complete RH850G3M/G3MH support
+### Phase 5: RH850G4MH Complete (3 weeks)
+- Week 15: FXU manipulation and comparison instructions
+- Week 16: FXU conversion instructions, scheduling model
+- Week 17: Full FXU test coverage, autovectorization patterns (optional)
+
+### Phase 6: RH850G4MH2 Virtualization (2 weeks)
+- Week 18: Virtualization instructions (HVTRAP, LDM.GSR, STM.GSR)
+- Week 19: Host/Guest system registers, mode transitions
+
+### Phase 7: Debug and Polish (2 weeks)
+- Week 20: Debug registers, V850E2M register banking
+- Week 21: Documentation, final testing, code review
+
+**Total Estimated Effort:** 21 weeks (5 months) for complete RH850G3M/G3MH/G4MH/G4MH2 support
+
+**Note:** RH850G4MH/G4MH2 implementation can proceed in parallel with or after RH850G3M, depending on priority.
 
 ---
 
@@ -1547,6 +1961,11 @@ Content needed:
 | Variable-latency modeling performance overhead | Medium | Low | Use heuristics for DIVQ, optimize for common cases |
 | Insufficient RH850G3M documentation | Medium | High | Request additional documentation from Renesas |
 | Testing coverage gaps | High | Medium | Comprehensive test plan, automated validation |
+| FXU SIMD instruction complexity (59 instructions) | High | Medium | Implement in phases (load/store → arithmetic → FMA → misc) |
+| FXU register allocation (128-bit wreg) | Medium | High | Ensure proper register class definitions, test with inline asm first |
+| Virtualization mode semantics | Medium | Medium | Focus on instruction encoding first, defer mode switching semantics |
+| MPU instruction encoding ambiguity | Low | Medium | Verify encoding against hardware reference manual |
+| Autovectorization for FXU | High | Low | Optional enhancement, focus on intrinsics/builtins first |
 
 ---
 
@@ -1558,6 +1977,8 @@ Content needed:
 - **V850E1:** 100% complete, production-ready ✅ (V850ES ISA + 18 system registers including debug/CALLT)
 - **V850E2/V850E2M:** 100% complete, production-ready ✅ (all instructions and 32 system registers)
 - **RH850G3M/G3MH:** 0% complete, requires significant work ❌
+- **RH850G4MH:** 0% complete, requires G3MH + FXU (59 SIMD) + MPU ❌
+- **RH850G4MH2:** 0% complete, requires G4MH + virtualization (Host/Guest modes) ❌
 
 **Key Architecture Distinction: V850ES vs V850E1**
 
@@ -1568,6 +1989,12 @@ V850ES and V850E1 share the same instruction set architecture (ISA) but differ i
 
 Both use `FeatureV850E1` in the compiler as they share the same instruction set. The compiler does not enforce system register restrictions at compile time - this is a hardware-level distinction.
 
+**Key Architecture Distinction: RH850G3MH vs RH850G4MH**
+
+- **RH850G3MH:** Full RH850 integer ISA, FPU, atomics (LDL.W/STC.W), cache control, branch prediction
+- **RH850G4MH:** Adds FXU coprocessor (59 SIMD instructions, 32× 128-bit wreg registers) and enhanced MPU (LDM.MP/STM.MP)
+- **RH850G4MH2:** Adds hardware virtualization (Host/Guest modes, HVTRAP, LDM.GSR/STM.GSR)
+
 **Critical Path:**
 1. RH850G3M CPU variants and feature flags
 2. selID-based system register access
@@ -1575,9 +2002,15 @@ Both use `FeatureV850E1` in the compiler as they share the same instruction set.
 4. LD.DW/ST.DW 64-bit loads/stores
 5. Dual-issue scheduling model (V850E2+)
 6. RH850G3M scheduling model with branch prediction
+7. RH850G4MH FXU register definitions (wreg0-31, FXSR)
+8. RH850G4MH FXU instructions (59 SIMD operations)
+9. RH850G4MH MPU instructions (LDM.MP/STM.MP)
+10. RH850G4MH2 virtualization instructions (HVTRAP, LDM.GSR/STM.GSR)
 
 **Recommended Approach:**
 - Prioritize RH850G3M foundation (Phase 1) for immediate usability
 - Defer scheduling optimizations (Phase 3) until basic functionality complete
+- Implement RH850G4MH FXU in phases: load/store → arithmetic → FMA → misc
+- Focus on intrinsics/builtins for FXU before attempting autovectorization
 - Implement incrementally with comprehensive testing at each stage
 - Maintain backward compatibility with existing V850-V850E2M code

@@ -199,3 +199,153 @@ long long test_mac(int a, int b, long long acc) {
 unsigned long long test_macu(unsigned int a, unsigned int b, unsigned long long acc) {
   return __builtin_v850_macu(a, b, acc);
 }
+
+//===----------------------------------------------------------------------===//
+// Named System Register Access (Base V850)
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: @test_read_eipc(
+// CHECK: call i32 @llvm.v850.stsr(i32 0)
+unsigned int test_read_eipc(void) {
+  return __builtin_v850_read_eipc();
+}
+
+// CHECK-LABEL: @test_write_eipc(
+// CHECK: call void @llvm.v850.ldsr(i32 %{{.*}}, i32 0)
+void test_write_eipc(unsigned int val) {
+  __builtin_v850_write_eipc(val);
+}
+
+// CHECK-LABEL: @test_read_eipsw(
+// CHECK: call i32 @llvm.v850.stsr(i32 1)
+unsigned int test_read_eipsw(void) {
+  return __builtin_v850_read_eipsw();
+}
+
+// CHECK-LABEL: @test_write_eipsw(
+// CHECK: call void @llvm.v850.ldsr(i32 %{{.*}}, i32 1)
+void test_write_eipsw(unsigned int val) {
+  __builtin_v850_write_eipsw(val);
+}
+
+// CHECK-LABEL: @test_read_fepc(
+// CHECK: call i32 @llvm.v850.stsr(i32 2)
+unsigned int test_read_fepc(void) {
+  return __builtin_v850_read_fepc();
+}
+
+// CHECK-LABEL: @test_write_fepc(
+// CHECK: call void @llvm.v850.ldsr(i32 %{{.*}}, i32 2)
+void test_write_fepc(unsigned int val) {
+  __builtin_v850_write_fepc(val);
+}
+
+// CHECK-LABEL: @test_read_fepsw(
+// CHECK: call i32 @llvm.v850.stsr(i32 3)
+unsigned int test_read_fepsw(void) {
+  return __builtin_v850_read_fepsw();
+}
+
+// CHECK-LABEL: @test_write_fepsw(
+// CHECK: call void @llvm.v850.ldsr(i32 %{{.*}}, i32 3)
+void test_write_fepsw(unsigned int val) {
+  __builtin_v850_write_fepsw(val);
+}
+
+// CHECK-LABEL: @test_read_ecr(
+// CHECK: call i32 @llvm.v850.stsr(i32 4)
+unsigned int test_read_ecr(void) {
+  return __builtin_v850_read_ecr();
+}
+
+// CHECK-LABEL: @test_read_psw(
+// CHECK: call i32 @llvm.v850.stsr(i32 5)
+unsigned int test_read_psw(void) {
+  return __builtin_v850_read_psw();
+}
+
+// CHECK-LABEL: @test_write_psw(
+// CHECK: call void @llvm.v850.ldsr(i32 %{{.*}}, i32 5)
+void test_write_psw(unsigned int val) {
+  __builtin_v850_write_psw(val);
+}
+
+//===----------------------------------------------------------------------===//
+// Named System Register Access (V850E1+)
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: @test_read_ctpc(
+// CHECK: call i32 @llvm.v850.stsr(i32 16)
+unsigned int test_read_ctpc(void) {
+  return __builtin_v850_read_ctpc();
+}
+
+// CHECK-LABEL: @test_write_ctpc(
+// CHECK: call void @llvm.v850.ldsr(i32 %{{.*}}, i32 16)
+void test_write_ctpc(unsigned int val) {
+  __builtin_v850_write_ctpc(val);
+}
+
+// CHECK-LABEL: @test_read_ctpsw(
+// CHECK: call i32 @llvm.v850.stsr(i32 17)
+unsigned int test_read_ctpsw(void) {
+  return __builtin_v850_read_ctpsw();
+}
+
+// CHECK-LABEL: @test_write_ctpsw(
+// CHECK: call void @llvm.v850.ldsr(i32 %{{.*}}, i32 17)
+void test_write_ctpsw(unsigned int val) {
+  __builtin_v850_write_ctpsw(val);
+}
+
+// CHECK-LABEL: @test_read_ctbp(
+// CHECK: call i32 @llvm.v850.stsr(i32 20)
+unsigned int test_read_ctbp(void) {
+  return __builtin_v850_read_ctbp();
+}
+
+// CHECK-LABEL: @test_write_ctbp(
+// CHECK: call void @llvm.v850.ldsr(i32 %{{.*}}, i32 20)
+void test_write_ctbp(unsigned int val) {
+  __builtin_v850_write_ctbp(val);
+}
+
+//===----------------------------------------------------------------------===//
+// Named System Register Access (V850E2M+)
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: @test_read_eiwr(
+// CHECK: call i32 @llvm.v850.stsr(i32 28)
+unsigned int test_read_eiwr(void) {
+  return __builtin_v850_read_eiwr();
+}
+
+// CHECK-LABEL: @test_write_eiwr(
+// CHECK: call void @llvm.v850.ldsr(i32 %{{.*}}, i32 28)
+void test_write_eiwr(unsigned int val) {
+  __builtin_v850_write_eiwr(val);
+}
+
+// CHECK-LABEL: @test_read_fewr(
+// CHECK: call i32 @llvm.v850.stsr(i32 29)
+unsigned int test_read_fewr(void) {
+  return __builtin_v850_read_fewr();
+}
+
+// CHECK-LABEL: @test_write_fewr(
+// CHECK: call void @llvm.v850.ldsr(i32 %{{.*}}, i32 29)
+void test_write_fewr(unsigned int val) {
+  __builtin_v850_write_fewr(val);
+}
+
+// CHECK-LABEL: @test_read_bsel(
+// CHECK: call i32 @llvm.v850.stsr(i32 31)
+unsigned int test_read_bsel(void) {
+  return __builtin_v850_read_bsel();
+}
+
+// CHECK-LABEL: @test_write_bsel(
+// CHECK: call void @llvm.v850.ldsr(i32 %{{.*}}, i32 31)
+void test_write_bsel(unsigned int val) {
+  __builtin_v850_write_bsel(val);
+}

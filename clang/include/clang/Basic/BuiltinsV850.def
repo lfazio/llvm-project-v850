@@ -46,6 +46,47 @@ BUILTIN(__builtin_v850_satadd, "iii", "nc")
 BUILTIN(__builtin_v850_satsub, "iii", "nc")
 
 //===----------------------------------------------------------------------===//
+// Base V850 System Register Access
+//
+// Named builtins for common system registers (regID 0-5).
+// These provide compile-time type safety and documentation.
+//===----------------------------------------------------------------------===//
+
+// EIPC - Exception/Interrupt saved PC (regID 0)
+// unsigned int __builtin_v850_read_eipc(void)
+BUILTIN(__builtin_v850_read_eipc, "Ui", "n")
+// void __builtin_v850_write_eipc(unsigned int value)
+BUILTIN(__builtin_v850_write_eipc, "vUi", "n")
+
+// EIPSW - Exception/Interrupt saved PSW (regID 1)
+// unsigned int __builtin_v850_read_eipsw(void)
+BUILTIN(__builtin_v850_read_eipsw, "Ui", "n")
+// void __builtin_v850_write_eipsw(unsigned int value)
+BUILTIN(__builtin_v850_write_eipsw, "vUi", "n")
+
+// FEPC - Fatal Error saved PC (regID 2)
+// unsigned int __builtin_v850_read_fepc(void)
+BUILTIN(__builtin_v850_read_fepc, "Ui", "n")
+// void __builtin_v850_write_fepc(unsigned int value)
+BUILTIN(__builtin_v850_write_fepc, "vUi", "n")
+
+// FEPSW - Fatal Error saved PSW (regID 3)
+// unsigned int __builtin_v850_read_fepsw(void)
+BUILTIN(__builtin_v850_read_fepsw, "Ui", "n")
+// void __builtin_v850_write_fepsw(unsigned int value)
+BUILTIN(__builtin_v850_write_fepsw, "vUi", "n")
+
+// ECR - Exception Cause Register (regID 4, read-only)
+// unsigned int __builtin_v850_read_ecr(void)
+BUILTIN(__builtin_v850_read_ecr, "Ui", "n")
+
+// PSW - Program Status Word (regID 5)
+// unsigned int __builtin_v850_read_psw(void)
+BUILTIN(__builtin_v850_read_psw, "Ui", "n")
+// void __builtin_v850_write_psw(unsigned int value)
+BUILTIN(__builtin_v850_write_psw, "vUi", "n")
+
+//===----------------------------------------------------------------------===//
 // V850E1/ES Instructions
 //
 // These instructions require V850E1 or later architecture.
@@ -91,6 +132,31 @@ TARGET_BUILTIN(__builtin_v850_mac, "LLiiiLLi", "nc", "v850e1")
 TARGET_BUILTIN(__builtin_v850_macu, "ULLiUiUiULLi", "nc", "v850e1")
 
 //===----------------------------------------------------------------------===//
+// V850E1+ System Register Access
+//
+// Named builtins for V850E1+ system registers (regID 16-21).
+// These registers are NOT available on base V850 or V850ES.
+//===----------------------------------------------------------------------===//
+
+// CTPC - CALLT saved PC (regID 16)
+// unsigned int __builtin_v850_read_ctpc(void)
+TARGET_BUILTIN(__builtin_v850_read_ctpc, "Ui", "n", "v850e1")
+// void __builtin_v850_write_ctpc(unsigned int value)
+TARGET_BUILTIN(__builtin_v850_write_ctpc, "vUi", "n", "v850e1")
+
+// CTPSW - CALLT saved PSW (regID 17)
+// unsigned int __builtin_v850_read_ctpsw(void)
+TARGET_BUILTIN(__builtin_v850_read_ctpsw, "Ui", "n", "v850e1")
+// void __builtin_v850_write_ctpsw(unsigned int value)
+TARGET_BUILTIN(__builtin_v850_write_ctpsw, "vUi", "n", "v850e1")
+
+// CTBP - CALLT Base Pointer (regID 20)
+// unsigned int __builtin_v850_read_ctbp(void)
+TARGET_BUILTIN(__builtin_v850_read_ctbp, "Ui", "n", "v850e1")
+// void __builtin_v850_write_ctbp(unsigned int value)
+TARGET_BUILTIN(__builtin_v850_write_ctbp, "vUi", "n", "v850e1")
+
+//===----------------------------------------------------------------------===//
 // V850E2M Instructions
 //
 // These instructions require V850E2M or later architecture.
@@ -108,6 +174,31 @@ TARGET_BUILTIN(__builtin_v850_syncm, "v", "n", "v850e2m")
 // SYNCE - Synchronize exceptions
 // void __builtin_v850_synce(void)
 TARGET_BUILTIN(__builtin_v850_synce, "v", "n", "v850e2m")
+
+//===----------------------------------------------------------------------===//
+// V850E2M+ System Register Access
+//
+// Named builtins for V850E2M+ system registers (regID 28-31).
+// These registers are NOT available on V850, V850ES, V850E1, or V850E2.
+//===----------------------------------------------------------------------===//
+
+// EIWR - EI-level Working Register (regID 28)
+// unsigned int __builtin_v850_read_eiwr(void)
+TARGET_BUILTIN(__builtin_v850_read_eiwr, "Ui", "n", "v850e2m")
+// void __builtin_v850_write_eiwr(unsigned int value)
+TARGET_BUILTIN(__builtin_v850_write_eiwr, "vUi", "n", "v850e2m")
+
+// FEWR - FE-level Working Register (regID 29)
+// unsigned int __builtin_v850_read_fewr(void)
+TARGET_BUILTIN(__builtin_v850_read_fewr, "Ui", "n", "v850e2m")
+// void __builtin_v850_write_fewr(unsigned int value)
+TARGET_BUILTIN(__builtin_v850_write_fewr, "vUi", "n", "v850e2m")
+
+// BSEL - Bank Selection Register (regID 31)
+// unsigned int __builtin_v850_read_bsel(void)
+TARGET_BUILTIN(__builtin_v850_read_bsel, "Ui", "n", "v850e2m")
+// void __builtin_v850_write_bsel(unsigned int value)
+TARGET_BUILTIN(__builtin_v850_write_bsel, "vUi", "n", "v850e2m")
 
 //===----------------------------------------------------------------------===//
 // FPU System Register Access (V850E2M+)

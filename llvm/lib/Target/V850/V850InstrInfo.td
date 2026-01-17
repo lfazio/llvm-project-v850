@@ -2674,35 +2674,55 @@ def : Pat<(int_v850_ei), (EI)>;
 //
 // These patterns map llvm.v850.ldsr/stsr intrinsics with immediate regID
 // to the corresponding LDSR/STSR instructions with specific system registers.
+//
+// CPU variant requirements:
+// - Base V850:  regID 0-5 (EIPC, EIPSW, FEPC, FEPSW, ECR, PSW)
+// - V850E1+:    regID 16-20 (CTPC, CTPSW, CTBP)
+// - V850E2M+:   regID 28-31 (EIWR, FEWR, DBWR, BSEL)
 //===----------------------------------------------------------------------===//
 
+// Base V850 System Registers (always available)
 // STSR patterns - Read system register by regID
-// i32 @llvm.v850.stsr(i32 regID) -> STSR sysreg, GPR
 def : Pat<(int_v850_stsr (i32 0)), (STSR EIPC)>;    // EIPC
 def : Pat<(int_v850_stsr (i32 1)), (STSR EIPSW)>;   // EIPSW
 def : Pat<(int_v850_stsr (i32 2)), (STSR FEPC)>;    // FEPC
 def : Pat<(int_v850_stsr (i32 3)), (STSR FEPSW)>;   // FEPSW
 def : Pat<(int_v850_stsr (i32 4)), (STSR ECR)>;     // ECR
 def : Pat<(int_v850_stsr (i32 5)), (STSR PSW)>;     // PSW
-def : Pat<(int_v850_stsr (i32 20)), (STSR CTPC)>;   // CTPC
-def : Pat<(int_v850_stsr (i32 21)), (STSR CTPSW)>;  // CTPSW
-def : Pat<(int_v850_stsr (i32 28)), (STSR EIWR)>;   // EIWR
-def : Pat<(int_v850_stsr (i32 29)), (STSR FEWR)>;   // FEWR
-def : Pat<(int_v850_stsr (i32 31)), (STSR BSEL)>;   // BSEL
 
 // LDSR patterns - Write system register by regID
-// void @llvm.v850.ldsr(i32 value, i32 regID) -> LDSR GPR, sysreg
 def : Pat<(int_v850_ldsr GPR:$val, (i32 0)), (LDSR GPR:$val, EIPC)>;
 def : Pat<(int_v850_ldsr GPR:$val, (i32 1)), (LDSR GPR:$val, EIPSW)>;
 def : Pat<(int_v850_ldsr GPR:$val, (i32 2)), (LDSR GPR:$val, FEPC)>;
 def : Pat<(int_v850_ldsr GPR:$val, (i32 3)), (LDSR GPR:$val, FEPSW)>;
 def : Pat<(int_v850_ldsr GPR:$val, (i32 4)), (LDSR GPR:$val, ECR)>;
 def : Pat<(int_v850_ldsr GPR:$val, (i32 5)), (LDSR GPR:$val, PSW)>;
-def : Pat<(int_v850_ldsr GPR:$val, (i32 20)), (LDSR GPR:$val, CTPC)>;
-def : Pat<(int_v850_ldsr GPR:$val, (i32 21)), (LDSR GPR:$val, CTPSW)>;
-def : Pat<(int_v850_ldsr GPR:$val, (i32 28)), (LDSR GPR:$val, EIWR)>;
-def : Pat<(int_v850_ldsr GPR:$val, (i32 29)), (LDSR GPR:$val, FEWR)>;
-def : Pat<(int_v850_ldsr GPR:$val, (i32 31)), (LDSR GPR:$val, BSEL)>;
+
+// V850E1+ System Registers
+let Predicates = [HasV850E1] in {
+  // STSR patterns
+  def : Pat<(int_v850_stsr (i32 16)), (STSR CTPC)>;   // CTPC
+  def : Pat<(int_v850_stsr (i32 17)), (STSR CTPSW)>;  // CTPSW
+  def : Pat<(int_v850_stsr (i32 20)), (STSR CTBP)>;   // CTBP
+
+  // LDSR patterns
+  def : Pat<(int_v850_ldsr GPR:$val, (i32 16)), (LDSR GPR:$val, CTPC)>;
+  def : Pat<(int_v850_ldsr GPR:$val, (i32 17)), (LDSR GPR:$val, CTPSW)>;
+  def : Pat<(int_v850_ldsr GPR:$val, (i32 20)), (LDSR GPR:$val, CTBP)>;
+}
+
+// V850E2M+ System Registers
+let Predicates = [HasV850E2M] in {
+  // STSR patterns
+  def : Pat<(int_v850_stsr (i32 28)), (STSR EIWR)>;   // EIWR
+  def : Pat<(int_v850_stsr (i32 29)), (STSR FEWR)>;   // FEWR
+  def : Pat<(int_v850_stsr (i32 31)), (STSR BSEL)>;   // BSEL
+
+  // LDSR patterns
+  def : Pat<(int_v850_ldsr GPR:$val, (i32 28)), (LDSR GPR:$val, EIWR)>;
+  def : Pat<(int_v850_ldsr GPR:$val, (i32 29)), (LDSR GPR:$val, FEWR)>;
+  def : Pat<(int_v850_ldsr GPR:$val, (i32 31)), (LDSR GPR:$val, BSEL)>;
+}
 
 //===----------------------------------------------------------------------===//
 // MAC/MACU Intrinsic Patterns
