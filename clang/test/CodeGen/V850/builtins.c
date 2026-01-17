@@ -120,6 +120,12 @@ int test_satsub(int a, int b) {
   return __builtin_v850_satsub(a, b);
 }
 
+// CHECK-LABEL: @test_satsubr(
+// CHECK: call i32 @llvm.v850.satsubr(i32 %{{.*}}, i32 %{{.*}})
+int test_satsubr(int a, int b) {
+  return __builtin_v850_satsubr(a, b);
+}
+
 //===----------------------------------------------------------------------===//
 // FPU System Register Access (V850E2M+ with FPU)
 //===----------------------------------------------------------------------===//

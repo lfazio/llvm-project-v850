@@ -55,6 +55,23 @@ let TargetPrefix = "v850" in { // All intrinsics start with "llvm.v850.".
                                [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
 
   //===----------------------------------------------------------------------===//
+  // Saturating Arithmetic Operations
+  //
+  // V850 provides signed saturating arithmetic that saturates to INT_MIN/INT_MAX.
+  // Note: SATADD and SATSUB use the standard LLVM saddsat/ssubsat ISD nodes.
+  // SATSUBR (reverse subtraction) requires a dedicated intrinsic.
+  //===----------------------------------------------------------------------===//
+
+  // SATSUBR - Saturating subtract reverse
+  // i32 @llvm.v850.satsubr(i32 %a, i32 %b)
+  // Returns: saturate(a - b), where saturation is to INT_MIN/INT_MAX
+  // Note: This computes (a - b) with saturation, while ssubsat computes (b - a).
+  // The "reverse" refers to operand order relative to the 2-operand instruction
+  // encoding where reg2 is both source and destination.
+  def int_v850_satsubr : Intrinsic<[llvm_i32_ty], [llvm_i32_ty, llvm_i32_ty],
+                                   [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
+
+  //===----------------------------------------------------------------------===//
   // FPU System Register Access (V850E2M+)
   //
   // These intrinsics provide access to FPU system registers via BSEL banking.

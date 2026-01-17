@@ -402,10 +402,11 @@ def JMP : FormatI<0b000011, (outs), (ins GPR:$reg1),
 // SATSUBR reg1, reg2 - Saturated subtract reverse
 // Opcode: 000100 (0x04)
 // Flags: CY, OV, S, Z, SAT modified
+// Operation: reg2 = saturate(reg1 - reg2)
 let Constraints = "$rs = $reg2", Defs = [PSW] in
 def SATSUBR : FormatI<0b000100, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
                       "satsubr\t$reg1, $reg2",
-                      []>;
+                      [(set GPR:$reg2, (int_v850_satsubr GPR:$reg1, GPR:$rs))]>;
 
 // SATSUB reg1, reg2 - Saturated subtract
 // Opcode: 000101 (0x05)

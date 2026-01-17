@@ -2,11 +2,12 @@
 ; RUN: llc -mtriple=v850 -mcpu=v850e2 -O2 < %s | FileCheck %s --check-prefix=V850E2
 
 ; Test saturating arithmetic patterns
-; V850 has SATADD/SATSUB/SATSUBI instructions for signed saturating arithmetic
+; V850 has SATADD/SATSUB/SATSUBI/SATSUBR instructions for signed saturating arithmetic
 ; These are available on all V850 variants (base V850 and later)
 
 declare i32 @llvm.sadd.sat.i32(i32, i32)
 declare i32 @llvm.ssub.sat.i32(i32, i32)
+declare i32 @llvm.v850.satsubr(i32, i32)
 
 ;============================================================================
 ; Signed Saturating Add (saddsat)
@@ -79,5 +80,20 @@ entry:
 define i32 @sat_sub_neg_imm(i32 %a) {
 entry:
   %result = call i32 @llvm.ssub.sat.i32(i32 %a, i32 -500)
+  ret i32 %result
+}
+
+;============================================================================
+; Signed Saturating Subtract Reverse (SATSUBR)
+; SATSUBR computes saturate(a - b) using the intrinsic
+;============================================================================
+
+; V850: sat_sub_reverse:
+; V850:       satsubr r6, r7
+; V850E2: sat_sub_reverse:
+; V850E2:     satsubr r6, r7
+define i32 @sat_sub_reverse(i32 %a, i32 %b) {
+entry:
+  %result = call i32 @llvm.v850.satsubr(i32 %a, i32 %b)
   ret i32 %result
 }

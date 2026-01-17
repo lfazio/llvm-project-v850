@@ -271,6 +271,13 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
     Function *F = CGM.getIntrinsic(Intrinsic::ssub_sat, {Int32Ty});
     return Builder.CreateCall(F, {A, B});
   }
+  case V850::BI__builtin_v850_satsubr: {
+    Value *A = EmitScalarExpr(E->getArg(0));
+    Value *B = EmitScalarExpr(E->getArg(1));
+    // Use V850 SATSUBR intrinsic: saturate(a - b)
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_satsubr);
+    return Builder.CreateCall(F, {A, B});
+  }
 
   //===--------------------------------------------------------------------===//
   // Multiply-Accumulate Operations (V850E1+)

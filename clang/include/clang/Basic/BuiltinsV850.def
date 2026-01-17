@@ -39,11 +39,18 @@ BUILTIN(__builtin_v850_stsr, "UiIUi", "n")
 
 // SATADD - Saturating add (2-operand form, base V850)
 // int __builtin_v850_satadd(int a, int b)
+// Returns: saturate(a + b)
 BUILTIN(__builtin_v850_satadd, "iii", "nc")
 
 // SATSUB - Saturating subtract (2-operand form, base V850)
 // int __builtin_v850_satsub(int a, int b)
+// Returns: saturate(b - a) (note operand order matches instruction encoding)
 BUILTIN(__builtin_v850_satsub, "iii", "nc")
+
+// SATSUBR - Saturating subtract reverse (2-operand form, base V850)
+// int __builtin_v850_satsubr(int a, int b)
+// Returns: saturate(a - b) (reverse operand order from SATSUB)
+BUILTIN(__builtin_v850_satsubr, "iii", "nc")
 
 //===----------------------------------------------------------------------===//
 // Base V850 System Register Access
