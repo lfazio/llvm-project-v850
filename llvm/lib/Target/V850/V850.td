@@ -40,24 +40,57 @@ def FeatureV850E2M : SubtargetFeature<"v850e2m", "HasV850E2M", "true",
                                        "Enable V850E2M extensions (includes FPU)",
                                        [FeatureV850E2, FeatureV850FPU]>;
 
+// V850E3 feature - additional extensions
+def FeatureV850E3 : SubtargetFeature<"v850e3", "HasV850E3", "true",
+                                      "Enable V850E3 extensions",
+                                      [FeatureV850E2M]>;
+
 //===----------------------------------------------------------------------===//
-// Register File Description
+// Register File, Instruction Descriptions
 //===----------------------------------------------------------------------===//
 
 include "V850RegisterInfo.td"
-
-//===----------------------------------------------------------------------===//
-// Instruction Formats
-//===----------------------------------------------------------------------===//
-
-include "V850InstrFormats.td"
-
-//===----------------------------------------------------------------------===//
-// V850 Target
-//===----------------------------------------------------------------------===//
+include "V850InstrInfo.td"
 
 def V850InstrInfo : InstrInfo;
 
+//===----------------------------------------------------------------------===//
+// V850 processors supported
+//===----------------------------------------------------------------------===//
+
+def : ProcessorModel<"generic", NoSchedModel, []>;
+def : ProcessorModel<"v850", NoSchedModel, []>;
+def : ProcessorModel<"v850es", NoSchedModel, [FeatureV850E1]>;
+def : ProcessorModel<"v850e1", NoSchedModel, [FeatureV850E1]>;
+def : ProcessorModel<"v850e2", NoSchedModel, [FeatureV850E2]>;
+def : ProcessorModel<"v850e2m", NoSchedModel, [FeatureV850E2M]>;
+def : ProcessorModel<"v850e3", NoSchedModel, [FeatureV850E3]>;
+
+//===----------------------------------------------------------------------===//
+// V850 assembly writer
+//===----------------------------------------------------------------------===//
+
+def V850InstPrinter : AsmWriter {
+  string AsmWriterClassName = "InstPrinter";
+  bit isMCAsmWriter = 1;
+  int PassSubtarget = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// V850 assembly parser
+//===----------------------------------------------------------------------===//
+
+def V850AsmParser : AsmParser {
+  let ShouldEmitMatchRegisterAltName = 1;
+  let AllowDuplicateRegisterNames = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// Declare the target which we are implementing
+//===----------------------------------------------------------------------===//
+
 def V850 : Target {
   let InstructionSet = V850InstrInfo;
+  let AssemblyWriters = [V850InstPrinter];
+  let AssemblyParsers = [V850AsmParser];
 }
