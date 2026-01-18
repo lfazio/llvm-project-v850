@@ -1,4 +1,4 @@
-//===-- V850MCAsmInfo.cpp - V850 asm properties ---------------------------===//
+//===-- V850MCAsmInfo.cpp - V850 Asm Properties ---------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -16,14 +16,34 @@
 
 using namespace llvm;
 
-V850MCAsmInfo::V850MCAsmInfo(const Triple &TT, const MCTargetOptions &Options) {
+void V850MCAsmInfo::anchor() {}
+
+V850MCAsmInfo::V850MCAsmInfo(const Triple & /*TheTriple*/,
+                             const MCTargetOptions & /*Options*/) {
+  // V850 is little-endian
   IsLittleEndian = true;
+
+  // Use standard ELF section directive
+  UsesELFSectionDirectiveForBSS = true;
+
+  // Comment string
+  CommentString = ";";
+
+  // Private label prefix
   PrivateGlobalPrefix = ".L";
   PrivateLabelPrefix = ".L";
-  CommentString = "#";
+
+  // Instruction alignment (16-bit minimum)
+  MinInstAlignment = 2;
+
+  // Support debugging information
   SupportsDebugInformation = true;
+
+  // Exception handling
   ExceptionsType = ExceptionHandling::DwarfCFI;
-  UsesELFSectionDirectiveForBSS = true;
-  Data16bitsDirective = "\t.half\t";
+
+  // Data directives
+  Data8bitsDirective = "\t.byte\t";
+  Data16bitsDirective = "\t.hword\t";
   Data32bitsDirective = "\t.word\t";
 }

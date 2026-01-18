@@ -1,4 +1,4 @@
-//===-- V850MCAsmInfo.h - V850 asm properties ------------------*- C++ -*-===//
+//===-- V850MCAsmInfo.h - V850 Asm Info -----------------------*- C++ -*--===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -21,8 +21,10 @@ class MCTargetOptions;
 class Triple;
 
 class V850MCAsmInfo : public MCAsmInfoELF {
+  void anchor() override;
+
 public:
-  explicit V850MCAsmInfo(const Triple &TT, const MCTargetOptions &Options);
+  explicit V850MCAsmInfo(const Triple &TheTriple, const MCTargetOptions &Options);
 };
 
 } // namespace llvm
