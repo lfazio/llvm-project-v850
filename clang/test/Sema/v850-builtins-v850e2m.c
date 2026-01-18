@@ -43,6 +43,31 @@ void test_all_builtins(void *addr, unsigned int bit) {
   (void)__builtin_v850_read_ctbp();
   __builtin_v850_write_ctbp(0);
 
+  // V850E1+ debug system register builtins
+  (void)__builtin_v850_read_dbpc();
+  __builtin_v850_write_dbpc(0);
+  (void)__builtin_v850_read_dbpsw();
+  __builtin_v850_write_dbpsw(0);
+  (void)__builtin_v850_read_dir();
+  (void)__builtin_v850_read_bpc();
+  __builtin_v850_write_bpc(0);
+  (void)__builtin_v850_read_asid();
+  __builtin_v850_write_asid(0);
+  (void)__builtin_v850_read_bpav();
+  __builtin_v850_write_bpav(0);
+  (void)__builtin_v850_read_bpam();
+  __builtin_v850_write_bpam(0);
+  (void)__builtin_v850_read_bpdv();
+  __builtin_v850_write_bpdv(0);
+  (void)__builtin_v850_read_bpdm();
+  __builtin_v850_write_bpdm(0);
+
+  // V850E2+ exception cause register builtins
+  (void)__builtin_v850_read_eiic();
+  __builtin_v850_write_eiic(0);
+  (void)__builtin_v850_read_feic();
+  __builtin_v850_write_feic(0);
+
   // V850E2M builtins
   __builtin_v850_syncp();
   __builtin_v850_syncm();
@@ -53,6 +78,8 @@ void test_all_builtins(void *addr, unsigned int bit) {
   __builtin_v850_write_eiwr(0);
   (void)__builtin_v850_read_fewr();
   __builtin_v850_write_fewr(0);
+  (void)__builtin_v850_read_dbwr();
+  __builtin_v850_write_dbwr(0);
   (void)__builtin_v850_read_bsel();
   __builtin_v850_write_bsel(0);
 

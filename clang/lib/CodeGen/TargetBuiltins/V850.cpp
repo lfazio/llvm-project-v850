@@ -217,6 +217,130 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
   }
 
   //===--------------------------------------------------------------------===//
+  // Named Debug System Register Access (V850E1+)
+  //===--------------------------------------------------------------------===//
+
+  // DBPC - Debug saved PC (regID 18)
+  case V850::BI__builtin_v850_read_dbpc: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32(18));
+  }
+  case V850::BI__builtin_v850_write_dbpc: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32(18)});
+  }
+
+  // DBPSW - Debug saved PSW (regID 19)
+  case V850::BI__builtin_v850_read_dbpsw: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32(19));
+  }
+  case V850::BI__builtin_v850_write_dbpsw: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32(19)});
+  }
+
+  // DIR - Debug Interface Register (regID 21, read-only)
+  case V850::BI__builtin_v850_read_dir: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32(21));
+  }
+
+  // BPC - Breakpoint Control (regID 22)
+  case V850::BI__builtin_v850_read_bpc: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32(22));
+  }
+  case V850::BI__builtin_v850_write_bpc: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32(22)});
+  }
+
+  // ASID - Address Space ID (regID 23)
+  case V850::BI__builtin_v850_read_asid: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32(23));
+  }
+  case V850::BI__builtin_v850_write_asid: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32(23)});
+  }
+
+  // BPAV - Breakpoint Address Value (regID 24)
+  case V850::BI__builtin_v850_read_bpav: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32(24));
+  }
+  case V850::BI__builtin_v850_write_bpav: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32(24)});
+  }
+
+  // BPAM - Breakpoint Address Mask (regID 25)
+  case V850::BI__builtin_v850_read_bpam: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32(25));
+  }
+  case V850::BI__builtin_v850_write_bpam: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32(25)});
+  }
+
+  // BPDV - Breakpoint Data Value (regID 26)
+  case V850::BI__builtin_v850_read_bpdv: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32(26));
+  }
+  case V850::BI__builtin_v850_write_bpdv: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32(26)});
+  }
+
+  // BPDM - Breakpoint Data Mask (regID 27)
+  case V850::BI__builtin_v850_read_bpdm: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32(27));
+  }
+  case V850::BI__builtin_v850_write_bpdm: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32(27)});
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Named Exception Cause Register Access (V850E2+)
+  //===--------------------------------------------------------------------===//
+
+  // EIIC - EI Exception Cause (regID 13)
+  case V850::BI__builtin_v850_read_eiic: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32(13));
+  }
+  case V850::BI__builtin_v850_write_eiic: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32(13)});
+  }
+
+  // FEIC - FE Exception Cause (regID 14)
+  case V850::BI__builtin_v850_read_feic: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32(14));
+  }
+  case V850::BI__builtin_v850_write_feic: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32(14)});
+  }
+
+  //===--------------------------------------------------------------------===//
   // Named System Register Access (V850E2M+)
   //===--------------------------------------------------------------------===//
 
@@ -240,6 +364,17 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
     Value *Val = EmitScalarExpr(E->getArg(0));
     Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
     return Builder.CreateCall(F, {Val, Builder.getInt32(29)});
+  }
+
+  // DBWR - Debug Working Register (regID 30)
+  case V850::BI__builtin_v850_read_dbwr: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32(30));
+  }
+  case V850::BI__builtin_v850_write_dbwr: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32(30)});
   }
 
   // BSEL - Bank Selection Register (regID 31)

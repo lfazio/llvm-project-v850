@@ -164,6 +164,83 @@ TARGET_BUILTIN(__builtin_v850_read_ctbp, "Ui", "n", "v850e1")
 TARGET_BUILTIN(__builtin_v850_write_ctbp, "vUi", "n", "v850e1")
 
 //===----------------------------------------------------------------------===//
+// V850E1+ Debug System Register Access
+//
+// Named builtins for V850E1+ debug system registers (regID 18-27).
+// These registers are used for debugging and breakpoint control.
+//===----------------------------------------------------------------------===//
+
+// DBPC - Debug saved PC (regID 18)
+// unsigned int __builtin_v850_read_dbpc(void)
+TARGET_BUILTIN(__builtin_v850_read_dbpc, "Ui", "n", "v850e1")
+// void __builtin_v850_write_dbpc(unsigned int value)
+TARGET_BUILTIN(__builtin_v850_write_dbpc, "vUi", "n", "v850e1")
+
+// DBPSW - Debug saved PSW (regID 19)
+// unsigned int __builtin_v850_read_dbpsw(void)
+TARGET_BUILTIN(__builtin_v850_read_dbpsw, "Ui", "n", "v850e1")
+// void __builtin_v850_write_dbpsw(unsigned int value)
+TARGET_BUILTIN(__builtin_v850_write_dbpsw, "vUi", "n", "v850e1")
+
+// DIR - Debug Interface Register (regID 21)
+// unsigned int __builtin_v850_read_dir(void)
+TARGET_BUILTIN(__builtin_v850_read_dir, "Ui", "n", "v850e1")
+
+// BPC - Breakpoint Control (regID 22)
+// unsigned int __builtin_v850_read_bpc(void)
+TARGET_BUILTIN(__builtin_v850_read_bpc, "Ui", "n", "v850e1")
+// void __builtin_v850_write_bpc(unsigned int value)
+TARGET_BUILTIN(__builtin_v850_write_bpc, "vUi", "n", "v850e1")
+
+// ASID - Address Space ID (regID 23)
+// unsigned int __builtin_v850_read_asid(void)
+TARGET_BUILTIN(__builtin_v850_read_asid, "Ui", "n", "v850e1")
+// void __builtin_v850_write_asid(unsigned int value)
+TARGET_BUILTIN(__builtin_v850_write_asid, "vUi", "n", "v850e1")
+
+// BPAV - Breakpoint Address Value (regID 24)
+// unsigned int __builtin_v850_read_bpav(void)
+TARGET_BUILTIN(__builtin_v850_read_bpav, "Ui", "n", "v850e1")
+// void __builtin_v850_write_bpav(unsigned int value)
+TARGET_BUILTIN(__builtin_v850_write_bpav, "vUi", "n", "v850e1")
+
+// BPAM - Breakpoint Address Mask (regID 25)
+// unsigned int __builtin_v850_read_bpam(void)
+TARGET_BUILTIN(__builtin_v850_read_bpam, "Ui", "n", "v850e1")
+// void __builtin_v850_write_bpam(unsigned int value)
+TARGET_BUILTIN(__builtin_v850_write_bpam, "vUi", "n", "v850e1")
+
+// BPDV - Breakpoint Data Value (regID 26)
+// unsigned int __builtin_v850_read_bpdv(void)
+TARGET_BUILTIN(__builtin_v850_read_bpdv, "Ui", "n", "v850e1")
+// void __builtin_v850_write_bpdv(unsigned int value)
+TARGET_BUILTIN(__builtin_v850_write_bpdv, "vUi", "n", "v850e1")
+
+// BPDM - Breakpoint Data Mask (regID 27)
+// unsigned int __builtin_v850_read_bpdm(void)
+TARGET_BUILTIN(__builtin_v850_read_bpdm, "Ui", "n", "v850e1")
+// void __builtin_v850_write_bpdm(unsigned int value)
+TARGET_BUILTIN(__builtin_v850_write_bpdm, "vUi", "n", "v850e1")
+
+//===----------------------------------------------------------------------===//
+// V850E2+ Exception Cause Registers
+//
+// Named builtins for V850E2+ exception cause registers (regID 13-14).
+//===----------------------------------------------------------------------===//
+
+// EIIC - EI Exception Cause Register (regID 13)
+// unsigned int __builtin_v850_read_eiic(void)
+TARGET_BUILTIN(__builtin_v850_read_eiic, "Ui", "n", "v850e2")
+// void __builtin_v850_write_eiic(unsigned int value)
+TARGET_BUILTIN(__builtin_v850_write_eiic, "vUi", "n", "v850e2")
+
+// FEIC - FE Exception Cause Register (regID 14)
+// unsigned int __builtin_v850_read_feic(void)
+TARGET_BUILTIN(__builtin_v850_read_feic, "Ui", "n", "v850e2")
+// void __builtin_v850_write_feic(unsigned int value)
+TARGET_BUILTIN(__builtin_v850_write_feic, "vUi", "n", "v850e2")
+
+//===----------------------------------------------------------------------===//
 // V850E2M Instructions
 //
 // These instructions require V850E2M or later architecture.
@@ -200,6 +277,12 @@ TARGET_BUILTIN(__builtin_v850_write_eiwr, "vUi", "n", "v850e2m")
 TARGET_BUILTIN(__builtin_v850_read_fewr, "Ui", "n", "v850e2m")
 // void __builtin_v850_write_fewr(unsigned int value)
 TARGET_BUILTIN(__builtin_v850_write_fewr, "vUi", "n", "v850e2m")
+
+// DBWR - Debug Working Register (regID 30)
+// unsigned int __builtin_v850_read_dbwr(void)
+TARGET_BUILTIN(__builtin_v850_read_dbwr, "Ui", "n", "v850e2m")
+// void __builtin_v850_write_dbwr(unsigned int value)
+TARGET_BUILTIN(__builtin_v850_write_dbwr, "vUi", "n", "v850e2m")
 
 // BSEL - Bank Selection Register (regID 31)
 // unsigned int __builtin_v850_read_bsel(void)
