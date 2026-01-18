@@ -74,6 +74,13 @@ void test_all_builtins(void *addr, unsigned int bit) {
   (void)__builtin_v850_sch0l(0);
   (void)__builtin_v850_sch0r(0);
 
+  // V850E2 byte/halfword swap builtins
+  (void)__builtin_v850_hsh(0);
+
+  // V850E2 3-operand saturating arithmetic builtins
+  (void)__builtin_v850_satadd3(1, 2);
+  (void)__builtin_v850_satsub3(1, 2);
+
   // V850E2M builtins
   __builtin_v850_syncp();
   __builtin_v850_syncm();

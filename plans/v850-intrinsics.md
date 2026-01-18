@@ -20,14 +20,14 @@ This document catalogs all V850 intrinsics, their implementation status, and pro
 | FPU System Registers | 12 | 0 | 12 |
 | Memory Barriers | 3 | 1 | 4 |
 | Bit Manipulation | 4 | 0 | 4 |
-| Byte/Halfword Swap | 2 | 1 | 3 |
-| Saturating Arithmetic | 3 | 1 | 4 |
+| Byte/Halfword Swap | 3 | 0 | 3 |
+| Saturating Arithmetic | 5 | 1 | 6 |
 | Multiply-Accumulate | 2 | 0 | 2 |
 | Bit Search | 4 | 0 | 4 |
 | Atomic Operations | 1 | 3 | 4 |
 | Cache Control | 0 | 2 | 2 |
 | FXU Vector (G4MH) | 0 | 59 | 59 |
-| **Total** | **71** | **74+** | **145+** |
+| **Total** | **74** | **73+** | **147+** |
 
 ---
 
@@ -435,7 +435,7 @@ unsigned int __builtin_v850_bsh(unsigned int x);
 
 ---
 
-### 7.3 HSH - Halfword Swap Halfword [TODO]
+### 7.3 HSH - Halfword Swap Halfword [IMPLEMENTED]
 
 **Architecture:** V850E2+
 
@@ -443,9 +443,14 @@ unsigned int __builtin_v850_bsh(unsigned int x);
 unsigned int __builtin_v850_hsh(unsigned int x);
 ```
 
-**Description:** Sign-extends lower halfword and performs halfword swap.
+**Description:** Sign-extends lower halfword to 32 bits, then swaps bytes within each halfword.
 
-**Priority:** Low
+**LLVM Intrinsic:** `@llvm.v850.hsh(i32 %x)`
+
+**Files:**
+- `clang/include/clang/Basic/BuiltinsV850.def:259`
+- `clang/lib/CodeGen/TargetBuiltins/V850.cpp:70-74`
+- `llvm/include/llvm/IR/IntrinsicsV850.td:57-62`
 
 ---
 
@@ -511,19 +516,45 @@ int __builtin_v850_satsubr(int a, int b);
 
 ---
 
-### 8.5 SATADD 3-operand [TODO]
+### 8.5 SATADD3 - 3-operand Saturating Add [IMPLEMENTED]
 
 **Architecture:** V850E2+
 
 ```c
-int __builtin_v850_satadd3(int a, int b);  // result in different register
+int __builtin_v850_satadd3(int a, int b);
 ```
 
-**Priority:** Low (compiler can use 2-operand form)
+**Description:** 3-operand saturating addition. Returns `saturate(a + b)` with result in separate register.
+
+**LLVM Intrinsic:** `@llvm.v850.satadd3(i32 %a, i32 %b)`
+
+**Files:**
+- `clang/include/clang/Basic/BuiltinsV850.def:271`
+- `clang/lib/CodeGen/TargetBuiltins/V850.cpp:421-427`
+- `llvm/include/llvm/IR/IntrinsicsV850.td:74-79`
 
 ---
 
-### 8.6 SATSUBI - Saturating Subtract Immediate [TODO]
+### 8.6 SATSUB3 - 3-operand Saturating Subtract [IMPLEMENTED]
+
+**Architecture:** V850E2+
+
+```c
+int __builtin_v850_satsub3(int a, int b);
+```
+
+**Description:** 3-operand saturating subtraction. Returns `saturate(a - b)` with result in separate register.
+
+**LLVM Intrinsic:** `@llvm.v850.satsub3(i32 %a, i32 %b)`
+
+**Files:**
+- `clang/include/clang/Basic/BuiltinsV850.def:276`
+- `clang/lib/CodeGen/TargetBuiltins/V850.cpp:428-434`
+- `llvm/include/llvm/IR/IntrinsicsV850.td:81-86`
+
+---
+
+### 8.7 SATSUBI - Saturating Subtract Immediate [TODO]
 
 **Architecture:** V850 (Base)
 
@@ -998,6 +1029,7 @@ def : Pat<(int_v850_xxx args), (XXX args)>;
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-01-18 | 1.4 | Added HSH, SATADD3, SATSUB3 intrinsics |
 | 2026-01-18 | 1.3 | Added bit search intrinsics (SCH1L, SCH1R, SCH0L, SCH0R) and CAXI atomic CAS |
 | 2026-01-18 | 1.2 | Added 23 new system register intrinsics (debug regs, exception cause, DBWR) |
 | 2026-01-17 | 1.1 | Added SATSUBR intrinsic (saturating subtract reverse) |

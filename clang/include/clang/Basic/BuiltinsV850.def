@@ -250,6 +250,32 @@ TARGET_BUILTIN(__builtin_v850_sch0l, "UiUi", "nc", "v850e2")
 TARGET_BUILTIN(__builtin_v850_sch0r, "UiUi", "nc", "v850e2")
 
 //===----------------------------------------------------------------------===//
+// V850E2+ Byte/Halfword Swap Operations
+//===----------------------------------------------------------------------===//
+
+// HSH - Halfword swap halfword
+// unsigned int __builtin_v850_hsh(unsigned int x)
+// Sign-extends lower halfword to 32 bits, then swaps bytes within each halfword
+TARGET_BUILTIN(__builtin_v850_hsh, "UiUi", "nc", "v850e2")
+
+//===----------------------------------------------------------------------===//
+// V850E2+ 3-operand Saturating Arithmetic
+//
+// These instructions perform saturating arithmetic with the result in a
+// separate register (3-operand form: reg3 = saturate(reg1 op reg2)).
+//===----------------------------------------------------------------------===//
+
+// SATADD3 - 3-operand saturating add
+// int __builtin_v850_satadd3(int a, int b)
+// Returns: saturate(a + b) with result in separate register
+TARGET_BUILTIN(__builtin_v850_satadd3, "iii", "nc", "v850e2")
+
+// SATSUB3 - 3-operand saturating subtract
+// int __builtin_v850_satsub3(int a, int b)
+// Returns: saturate(a - b) with result in separate register
+TARGET_BUILTIN(__builtin_v850_satsub3, "iii", "nc", "v850e2")
+
+//===----------------------------------------------------------------------===//
 // V850E2+ Exception Cause Registers
 //
 // Named builtins for V850E2+ exception cause registers (regID 13-14).

@@ -50,6 +50,12 @@ unsigned int test_bsh(unsigned int x) {
   return __builtin_v850_bsh(x);
 }
 
+// CHECK-LABEL: @test_hsh(
+// CHECK: call i32 @llvm.v850.hsh(i32 %{{.*}})
+unsigned int test_hsh(unsigned int x) {
+  return __builtin_v850_hsh(x);
+}
+
 //===----------------------------------------------------------------------===//
 // Memory Barrier Operations (V850E2M+)
 //===----------------------------------------------------------------------===//
@@ -124,6 +130,18 @@ int test_satsub(int a, int b) {
 // CHECK: call i32 @llvm.v850.satsubr(i32 %{{.*}}, i32 %{{.*}})
 int test_satsubr(int a, int b) {
   return __builtin_v850_satsubr(a, b);
+}
+
+// CHECK-LABEL: @test_satadd3(
+// CHECK: call i32 @llvm.v850.satadd3(i32 %{{.*}}, i32 %{{.*}})
+int test_satadd3(int a, int b) {
+  return __builtin_v850_satadd3(a, b);
+}
+
+// CHECK-LABEL: @test_satsub3(
+// CHECK: call i32 @llvm.v850.satsub3(i32 %{{.*}}, i32 %{{.*}})
+int test_satsub3(int a, int b) {
+  return __builtin_v850_satsub3(a, b);
 }
 
 //===----------------------------------------------------------------------===//

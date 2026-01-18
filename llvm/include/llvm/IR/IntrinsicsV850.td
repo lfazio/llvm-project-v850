@@ -54,6 +54,13 @@ let TargetPrefix = "v850" in { // All intrinsics start with "llvm.v850.".
   def int_v850_bsh : Intrinsic<[llvm_i32_ty], [llvm_i32_ty],
                                [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
 
+  // HSH - Halfword swap halfword (V850E2+)
+  // i32 @llvm.v850.hsh(i32 %x)
+  // Sign-extends lower halfword to 32 bits, then swaps bytes within each halfword
+  // Result: sign_extend(x[15:0]) with bytes swapped in each halfword
+  def int_v850_hsh : Intrinsic<[llvm_i32_ty], [llvm_i32_ty],
+                               [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
+
   //===----------------------------------------------------------------------===//
   // Saturating Arithmetic Operations
   //
@@ -69,6 +76,20 @@ let TargetPrefix = "v850" in { // All intrinsics start with "llvm.v850.".
   // The "reverse" refers to operand order relative to the 2-operand instruction
   // encoding where reg2 is both source and destination.
   def int_v850_satsubr : Intrinsic<[llvm_i32_ty], [llvm_i32_ty, llvm_i32_ty],
+                                   [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
+
+  // SATADD3 - 3-operand saturating add (V850E2+)
+  // i32 @llvm.v850.satadd3(i32 %a, i32 %b)
+  // Returns: saturate(a + b), result in separate register
+  // This is the 3-operand form: reg3 = saturate(reg1 + reg2)
+  def int_v850_satadd3 : Intrinsic<[llvm_i32_ty], [llvm_i32_ty, llvm_i32_ty],
+                                   [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
+
+  // SATSUB3 - 3-operand saturating subtract (V850E2+)
+  // i32 @llvm.v850.satsub3(i32 %a, i32 %b)
+  // Returns: saturate(a - b), result in separate register
+  // This is the 3-operand form: reg3 = saturate(reg2 - reg1)
+  def int_v850_satsub3 : Intrinsic<[llvm_i32_ty], [llvm_i32_ty, llvm_i32_ty],
                                    [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
 
   //===----------------------------------------------------------------------===//

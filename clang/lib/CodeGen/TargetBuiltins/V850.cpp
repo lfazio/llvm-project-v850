@@ -67,6 +67,11 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
     Function *F = CGM.getIntrinsic(Intrinsic::v850_bsh);
     return Builder.CreateCall(F, X);
   }
+  case V850::BI__builtin_v850_hsh: {
+    Value *X = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_hsh);
+    return Builder.CreateCall(F, X);
+  }
 
   //===--------------------------------------------------------------------===//
   // Memory Barrier Operations
@@ -411,6 +416,20 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
     Value *B = EmitScalarExpr(E->getArg(1));
     // Use V850 SATSUBR intrinsic: saturate(a - b)
     Function *F = CGM.getIntrinsic(Intrinsic::v850_satsubr);
+    return Builder.CreateCall(F, {A, B});
+  }
+  case V850::BI__builtin_v850_satadd3: {
+    Value *A = EmitScalarExpr(E->getArg(0));
+    Value *B = EmitScalarExpr(E->getArg(1));
+    // Use V850 SATADD3 intrinsic for 3-operand form
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_satadd3);
+    return Builder.CreateCall(F, {A, B});
+  }
+  case V850::BI__builtin_v850_satsub3: {
+    Value *A = EmitScalarExpr(E->getArg(0));
+    Value *B = EmitScalarExpr(E->getArg(1));
+    // Use V850 SATSUB3 intrinsic for 3-operand form
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_satsub3);
     return Builder.CreateCall(F, {A, B});
   }
 

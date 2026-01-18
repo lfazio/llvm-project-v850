@@ -1666,6 +1666,13 @@ def HSH : FormatXII<0b111111, 0b011010, (outs GPR:$reg3), (ins GPR:$reg2),
   let cond = 0b0011;
 }
 
+// Intrinsic pattern for HSH
+def : Pat<(int_v850_hsh GPR:$src), (HSH GPR:$src)>;
+
+// Intrinsic patterns for 3-operand saturating arithmetic
+def : Pat<(int_v850_satadd3 GPR:$a, GPR:$b), (SATADD_3 GPR:$a, GPR:$b)>;
+def : Pat<(int_v850_satsub3 GPR:$a, GPR:$b), (SATSUB_3 GPR:$a, GPR:$b)>;
+
 //===----------------------------------------------------------------------===//
 // 32-bit Displacement Jump Instructions (V850E2)
 // These are 48-bit (6-byte) instructions
