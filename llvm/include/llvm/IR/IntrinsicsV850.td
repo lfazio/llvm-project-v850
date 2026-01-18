@@ -72,6 +72,48 @@ let TargetPrefix = "v850" in { // All intrinsics start with "llvm.v850.".
                                    [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
 
   //===----------------------------------------------------------------------===//
+  // Bit Search Operations (V850E2+)
+  //
+  // These instructions search for the first 0 or 1 bit from left or right.
+  // They return the bit position (0-31), or 32 if no bit is found.
+  //===----------------------------------------------------------------------===//
+
+  // SCH1L - Search for leftmost 1 (like 31 - CLZ, but returns 32 if input is 0)
+  // i32 @llvm.v850.sch1l(i32 %x)
+  // Returns: Position of leftmost 1 bit (31 = MSB, 0 = LSB), or 32 if x == 0
+  def int_v850_sch1l : Intrinsic<[llvm_i32_ty], [llvm_i32_ty],
+                                 [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
+
+  // SCH1R - Search for rightmost 1 (like CTZ, but returns 32 if input is 0)
+  // i32 @llvm.v850.sch1r(i32 %x)
+  // Returns: Position of rightmost 1 bit (0 = LSB, 31 = MSB), or 32 if x == 0
+  def int_v850_sch1r : Intrinsic<[llvm_i32_ty], [llvm_i32_ty],
+                                 [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
+
+  // SCH0L - Search for leftmost 0 (like 31 - CLO, but returns 32 if input is -1)
+  // i32 @llvm.v850.sch0l(i32 %x)
+  // Returns: Position of leftmost 0 bit, or 32 if x == 0xFFFFFFFF
+  def int_v850_sch0l : Intrinsic<[llvm_i32_ty], [llvm_i32_ty],
+                                 [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
+
+  // SCH0R - Search for rightmost 0 (like CTO, but returns 32 if input is -1)
+  // i32 @llvm.v850.sch0r(i32 %x)
+  // Returns: Position of rightmost 0 bit, or 32 if x == 0xFFFFFFFF
+  def int_v850_sch0r : Intrinsic<[llvm_i32_ty], [llvm_i32_ty],
+                                 [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
+
+  //===----------------------------------------------------------------------===//
+  // Atomic Operations (V850E2M+)
+  //===----------------------------------------------------------------------===//
+
+  // CAXI - Compare and Exchange for Interlock
+  // i32 @llvm.v850.caxi(ptr %addr, i32 %expected, i32 %desired)
+  // Atomically: if (*addr == expected) *addr = desired; return old *addr
+  def int_v850_caxi : Intrinsic<[llvm_i32_ty],
+                                [llvm_ptr_ty, llvm_i32_ty, llvm_i32_ty],
+                                [IntrArgMemOnly, NoCapture<ArgIndex<0>>]>;
+
+  //===----------------------------------------------------------------------===//
   // FPU System Register Access (V850E2M+)
   //
   // These intrinsics provide access to FPU system registers via BSEL banking.

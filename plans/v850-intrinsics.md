@@ -23,11 +23,11 @@ This document catalogs all V850 intrinsics, their implementation status, and pro
 | Byte/Halfword Swap | 2 | 1 | 3 |
 | Saturating Arithmetic | 3 | 1 | 4 |
 | Multiply-Accumulate | 2 | 0 | 2 |
-| Bit Search | 0 | 4 | 4 |
-| Atomic Operations | 0 | 3 | 3 |
+| Bit Search | 4 | 0 | 4 |
+| Atomic Operations | 1 | 3 | 4 |
 | Cache Control | 0 | 2 | 2 |
 | FXU Vector (G4MH) | 0 | 59 | 59 |
-| **Total** | **66** | **78+** | **144+** |
+| **Total** | **71** | **74+** | **145+** |
 
 ---
 
@@ -576,9 +576,9 @@ unsigned long long __builtin_v850_macu(unsigned int a, unsigned int b,
 
 ---
 
-## 10. Bit Search Intrinsics [TODO]
+## 10. Bit Search Intrinsics [IMPLEMENTED]
 
-### 10.1 SCH1L - Search for Leftmost 1 (CLZ) [TODO]
+### 10.1 SCH1L - Search for Leftmost 1 (CLZ) [IMPLEMENTED]
 
 **Architecture:** V850E2+
 
@@ -586,19 +586,18 @@ unsigned long long __builtin_v850_macu(unsigned int a, unsigned int b,
 unsigned int __builtin_v850_sch1l(unsigned int x);
 ```
 
-**Description:** Count leading zeros. Returns position of leftmost 1 bit (31 - clz).
+**Description:** Returns position of leftmost 1 bit (31 = MSB, 0 = LSB), or 32 if x == 0.
 
-**Priority:** High (maps to `__builtin_clz`)
+**LLVM Intrinsic:** `@llvm.v850.sch1l(i32 %x)`
 
-**Implementation:**
-```tablegen
-def int_v850_sch1l : Intrinsic<[llvm_i32_ty], [llvm_i32_ty],
-                               [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
-```
+**Files:**
+- `clang/include/clang/Basic/BuiltinsV850.def:235`
+- `clang/lib/CodeGen/TargetBuiltins/V850.cpp:421-425`
+- `llvm/include/llvm/IR/IntrinsicsV850.td:84-85`
 
 ---
 
-### 10.2 SCH1R - Search for Rightmost 1 (CTZ) [TODO]
+### 10.2 SCH1R - Search for Rightmost 1 (CTZ) [IMPLEMENTED]
 
 **Architecture:** V850E2+
 
@@ -606,13 +605,18 @@ def int_v850_sch1l : Intrinsic<[llvm_i32_ty], [llvm_i32_ty],
 unsigned int __builtin_v850_sch1r(unsigned int x);
 ```
 
-**Description:** Count trailing zeros.
+**Description:** Returns position of rightmost 1 bit (0 = LSB, 31 = MSB), or 32 if x == 0.
 
-**Priority:** High (maps to `__builtin_ctz`)
+**LLVM Intrinsic:** `@llvm.v850.sch1r(i32 %x)`
+
+**Files:**
+- `clang/include/clang/Basic/BuiltinsV850.def:240`
+- `clang/lib/CodeGen/TargetBuiltins/V850.cpp:426-430`
+- `llvm/include/llvm/IR/IntrinsicsV850.td:90-91`
 
 ---
 
-### 10.3 SCH0L - Search for Leftmost 0 (CLO) [TODO]
+### 10.3 SCH0L - Search for Leftmost 0 (CLO) [IMPLEMENTED]
 
 **Architecture:** V850E2+
 
@@ -620,13 +624,18 @@ unsigned int __builtin_v850_sch1r(unsigned int x);
 unsigned int __builtin_v850_sch0l(unsigned int x);
 ```
 
-**Description:** Count leading ones.
+**Description:** Returns position of leftmost 0 bit, or 32 if x == 0xFFFFFFFF.
 
-**Priority:** Medium
+**LLVM Intrinsic:** `@llvm.v850.sch0l(i32 %x)`
+
+**Files:**
+- `clang/include/clang/Basic/BuiltinsV850.def:245`
+- `clang/lib/CodeGen/TargetBuiltins/V850.cpp:431-435`
+- `llvm/include/llvm/IR/IntrinsicsV850.td:96-97`
 
 ---
 
-### 10.4 SCH0R - Search for Rightmost 0 (CTO) [TODO]
+### 10.4 SCH0R - Search for Rightmost 0 (CTO) [IMPLEMENTED]
 
 **Architecture:** V850E2+
 
@@ -634,31 +643,37 @@ unsigned int __builtin_v850_sch0l(unsigned int x);
 unsigned int __builtin_v850_sch0r(unsigned int x);
 ```
 
-**Description:** Count trailing ones.
+**Description:** Returns position of rightmost 0 bit, or 32 if x == 0xFFFFFFFF.
 
-**Priority:** Medium
+**LLVM Intrinsic:** `@llvm.v850.sch0r(i32 %x)`
+
+**Files:**
+- `clang/include/clang/Basic/BuiltinsV850.def:250`
+- `clang/lib/CodeGen/TargetBuiltins/V850.cpp:436-440`
+- `llvm/include/llvm/IR/IntrinsicsV850.td:102-103`
 
 ---
 
-## 11. Atomic Operations Intrinsics [TODO]
+## 11. Atomic Operations Intrinsics [PARTIAL]
 
-### 11.1 CAXI - Compare and Exchange [TODO]
+### 11.1 CAXI - Compare and Exchange [IMPLEMENTED]
 
 **Architecture:** V850E2M+
 
 ```c
-unsigned int __builtin_v850_caxi(volatile unsigned int *ptr,
-                                 unsigned int expected,
+unsigned int __builtin_v850_caxi(void *addr, unsigned int expected,
                                  unsigned int desired);
 ```
 
-**Description:** Atomic compare-and-swap. Returns old value.
+**Description:** Atomic compare-and-swap. Returns old value at addr.
+Atomically: if (*addr == expected) *addr = desired; return old *addr
 
-**Priority:** High (needed for lock-free algorithms)
+**LLVM Intrinsic:** `@llvm.v850.caxi(ptr %addr, i32 %expected, i32 %desired)`
 
-**Implementation Notes:**
-- Already used internally for atomic expansion
-- Should expose as user-visible intrinsic
+**Files:**
+- `clang/include/clang/Basic/BuiltinsV850.def:292`
+- `clang/lib/CodeGen/TargetBuiltins/V850.cpp:446-452`
+- `llvm/include/llvm/IR/IntrinsicsV850.td:112-114`
 
 ---
 
@@ -938,10 +953,10 @@ def : Pat<(int_v850_xxx args), (XXX args)>;
 
 ## 17. Implementation Priority
 
-### Phase 1 (High Priority)
-1. Bit search: SCH1L, SCH1R, SCH0L, SCH0R
-2. Atomics: CAXI, LDL.W, STC.W
-3. SYNCI memory barrier
+### Phase 1 (High Priority) - COMPLETE
+1. ~~Bit search: SCH1L, SCH1R, SCH0L, SCH0R~~ [DONE]
+2. ~~Atomics: CAXI~~ [DONE], LDL.W, STC.W (require RH850G3M+)
+3. SYNCI memory barrier (requires RH850G3M+)
 4. HALT instruction
 
 ### Phase 2 (Medium Priority)
@@ -983,6 +998,7 @@ def : Pat<(int_v850_xxx args), (XXX args)>;
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-01-18 | 1.3 | Added bit search intrinsics (SCH1L, SCH1R, SCH0L, SCH0R) and CAXI atomic CAS |
 | 2026-01-18 | 1.2 | Added 23 new system register intrinsics (debug regs, exception cause, DBWR) |
 | 2026-01-17 | 1.1 | Added SATSUBR intrinsic (saturating subtract reverse) |
 | 2026-01-17 | 1.0 | Initial version with implementation audit |

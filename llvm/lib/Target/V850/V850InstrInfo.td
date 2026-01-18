@@ -1587,6 +1587,12 @@ def SCH1R : FormatXI<0b111111, 0b011010, 0b01010, (outs GPR:$reg3), (ins GPR:$re
   let reg1 = 0;
 }
 
+// Intrinsic patterns for bit search operations
+def : Pat<(int_v850_sch1l GPR:$src), (SCH1L GPR:$src)>;
+def : Pat<(int_v850_sch1r GPR:$src), (SCH1R GPR:$src)>;
+def : Pat<(int_v850_sch0l GPR:$src), (SCH0L GPR:$src)>;
+def : Pat<(int_v850_sch0r GPR:$src), (SCH0R GPR:$src)>;
+
 //===----------------------------------------------------------------------===//
 // 3-operand Shift Instructions (V850E2)
 //===----------------------------------------------------------------------===//
@@ -1850,11 +1856,16 @@ def CAXI : FormatXI<0b111111, 0b000111, 0b01110, (outs GPR:$reg3),
 
 } // Predicates = [HasV850E2M]
 
-let Predicates = [HasV850E2M] in
+let Predicates = [HasV850E2M] in {
 // Pattern for atomic compare-and-swap (32-bit)
 // Maps __sync_val_compare_and_swap, __atomic_compare_exchange, etc.
 def : Pat<(atomic_cmp_swap_i32 GPR:$addr, GPR:$expected, GPR:$new),
           (CAXI GPR:$addr, GPR:$expected, GPR:$new)>;
+
+// Intrinsic pattern for CAXI
+def : Pat<(int_v850_caxi GPR:$addr, GPR:$expected, GPR:$new),
+          (CAXI GPR:$addr, GPR:$expected, GPR:$new)>;
+}
 
 let Predicates = [HasV850FPU] in {
 

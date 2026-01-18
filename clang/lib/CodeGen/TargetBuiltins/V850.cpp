@@ -415,6 +415,43 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
   }
 
   //===--------------------------------------------------------------------===//
+  // Bit Search Operations (V850E2+)
+  //===--------------------------------------------------------------------===//
+
+  case V850::BI__builtin_v850_sch1l: {
+    Value *X = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_sch1l);
+    return Builder.CreateCall(F, X);
+  }
+  case V850::BI__builtin_v850_sch1r: {
+    Value *X = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_sch1r);
+    return Builder.CreateCall(F, X);
+  }
+  case V850::BI__builtin_v850_sch0l: {
+    Value *X = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_sch0l);
+    return Builder.CreateCall(F, X);
+  }
+  case V850::BI__builtin_v850_sch0r: {
+    Value *X = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_sch0r);
+    return Builder.CreateCall(F, X);
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Atomic Operations (V850E2M+)
+  //===--------------------------------------------------------------------===//
+
+  case V850::BI__builtin_v850_caxi: {
+    Value *Addr = EmitScalarExpr(E->getArg(0));
+    Value *Expected = EmitScalarExpr(E->getArg(1));
+    Value *Desired = EmitScalarExpr(E->getArg(2));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_caxi);
+    return Builder.CreateCall(F, {Addr, Expected, Desired});
+  }
+
+  //===--------------------------------------------------------------------===//
   // Multiply-Accumulate Operations (V850E1+)
   //===--------------------------------------------------------------------===//
 

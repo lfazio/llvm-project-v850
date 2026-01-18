@@ -68,10 +68,19 @@ void test_all_builtins(void *addr, unsigned int bit) {
   (void)__builtin_v850_read_feic();
   __builtin_v850_write_feic(0);
 
+  // V850E2 bit search builtins
+  (void)__builtin_v850_sch1l(0);
+  (void)__builtin_v850_sch1r(0);
+  (void)__builtin_v850_sch0l(0);
+  (void)__builtin_v850_sch0r(0);
+
   // V850E2M builtins
   __builtin_v850_syncp();
   __builtin_v850_syncm();
   __builtin_v850_synce();
+
+  // V850E2M atomic builtins
+  (void)__builtin_v850_caxi(addr, 0, 1);
 
   // V850E2M+ system register builtins
   (void)__builtin_v850_read_eiwr();

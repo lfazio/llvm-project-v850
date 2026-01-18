@@ -223,6 +223,33 @@ TARGET_BUILTIN(__builtin_v850_read_bpdm, "Ui", "n", "v850e1")
 TARGET_BUILTIN(__builtin_v850_write_bpdm, "vUi", "n", "v850e1")
 
 //===----------------------------------------------------------------------===//
+// V850E2+ Bit Search Operations
+//
+// These instructions search for the first 0 or 1 bit from left or right.
+// They return the bit position (0-31), or 32 if no bit is found.
+//===----------------------------------------------------------------------===//
+
+// SCH1L - Search for leftmost 1 (like 31 - CLZ, but returns 32 if input is 0)
+// unsigned int __builtin_v850_sch1l(unsigned int x)
+// Returns: Position of leftmost 1 bit (31 = MSB, 0 = LSB), or 32 if x == 0
+TARGET_BUILTIN(__builtin_v850_sch1l, "UiUi", "nc", "v850e2")
+
+// SCH1R - Search for rightmost 1 (like CTZ, but returns 32 if input is 0)
+// unsigned int __builtin_v850_sch1r(unsigned int x)
+// Returns: Position of rightmost 1 bit (0 = LSB, 31 = MSB), or 32 if x == 0
+TARGET_BUILTIN(__builtin_v850_sch1r, "UiUi", "nc", "v850e2")
+
+// SCH0L - Search for leftmost 0 (like 31 - CLO, but returns 32 if input is -1)
+// unsigned int __builtin_v850_sch0l(unsigned int x)
+// Returns: Position of leftmost 0 bit, or 32 if x == 0xFFFFFFFF
+TARGET_BUILTIN(__builtin_v850_sch0l, "UiUi", "nc", "v850e2")
+
+// SCH0R - Search for rightmost 0 (like CTO, but returns 32 if input is -1)
+// unsigned int __builtin_v850_sch0r(unsigned int x)
+// Returns: Position of rightmost 0 bit, or 32 if x == 0xFFFFFFFF
+TARGET_BUILTIN(__builtin_v850_sch0r, "UiUi", "nc", "v850e2")
+
+//===----------------------------------------------------------------------===//
 // V850E2+ Exception Cause Registers
 //
 // Named builtins for V850E2+ exception cause registers (regID 13-14).
@@ -258,6 +285,11 @@ TARGET_BUILTIN(__builtin_v850_syncm, "v", "n", "v850e2m")
 // SYNCE - Synchronize exceptions
 // void __builtin_v850_synce(void)
 TARGET_BUILTIN(__builtin_v850_synce, "v", "n", "v850e2m")
+
+// CAXI - Compare and Exchange for Interlock (atomic CAS)
+// unsigned int __builtin_v850_caxi(void *addr, unsigned int expected, unsigned int desired)
+// Atomically: if (*addr == expected) *addr = desired; return old *addr
+TARGET_BUILTIN(__builtin_v850_caxi, "Uiv*UiUi", "n", "v850e2m")
 
 //===----------------------------------------------------------------------===//
 // V850E2M+ System Register Access

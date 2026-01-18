@@ -317,6 +317,44 @@ void test_write_ctbp(unsigned int val) {
 }
 
 //===----------------------------------------------------------------------===//
+// Bit Search Operations (V850E2+)
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: @test_sch1l(
+// CHECK: call i32 @llvm.v850.sch1l(i32 %{{.*}})
+unsigned int test_sch1l(unsigned int x) {
+  return __builtin_v850_sch1l(x);
+}
+
+// CHECK-LABEL: @test_sch1r(
+// CHECK: call i32 @llvm.v850.sch1r(i32 %{{.*}})
+unsigned int test_sch1r(unsigned int x) {
+  return __builtin_v850_sch1r(x);
+}
+
+// CHECK-LABEL: @test_sch0l(
+// CHECK: call i32 @llvm.v850.sch0l(i32 %{{.*}})
+unsigned int test_sch0l(unsigned int x) {
+  return __builtin_v850_sch0l(x);
+}
+
+// CHECK-LABEL: @test_sch0r(
+// CHECK: call i32 @llvm.v850.sch0r(i32 %{{.*}})
+unsigned int test_sch0r(unsigned int x) {
+  return __builtin_v850_sch0r(x);
+}
+
+//===----------------------------------------------------------------------===//
+// Atomic Operations (V850E2M+)
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: @test_caxi(
+// CHECK: call i32 @llvm.v850.caxi(ptr %{{.*}}, i32 %{{.*}}, i32 %{{.*}})
+unsigned int test_caxi(void *addr, unsigned int expected, unsigned int desired) {
+  return __builtin_v850_caxi(addr, expected, desired);
+}
+
+//===----------------------------------------------------------------------===//
 // Named System Register Access (V850E2M+)
 //===----------------------------------------------------------------------===//
 
