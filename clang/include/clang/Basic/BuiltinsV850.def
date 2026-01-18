@@ -53,6 +53,19 @@ BUILTIN(__builtin_v850_satsub, "iii", "nc")
 BUILTIN(__builtin_v850_satsubr, "iii", "nc")
 
 //===----------------------------------------------------------------------===//
+// Base V850 Special Instructions
+//===----------------------------------------------------------------------===//
+
+// HALT - Halt CPU until interrupt
+// void __builtin_v850_halt(void)
+BUILTIN(__builtin_v850_halt, "v", "n")
+
+// TRAP - Software trap
+// void __builtin_v850_trap(unsigned int vector)
+// vector must be 0-31
+BUILTIN(__builtin_v850_trap, "vIUi", "n")
+
+//===----------------------------------------------------------------------===//
 // Base V850 System Register Access
 //
 // Named builtins for common system registers (regID 0-5).
@@ -316,6 +329,16 @@ TARGET_BUILTIN(__builtin_v850_synce, "v", "n", "v850e2m")
 // unsigned int __builtin_v850_caxi(void *addr, unsigned int expected, unsigned int desired)
 // Atomically: if (*addr == expected) *addr = desired; return old *addr
 TARGET_BUILTIN(__builtin_v850_caxi, "Uiv*UiUi", "n", "v850e2m")
+
+// SYSCALL - System call
+// void __builtin_v850_syscall(unsigned int vector)
+// Triggers a system call with the specified vector (0-255)
+TARGET_BUILTIN(__builtin_v850_syscall, "vIUi", "n", "v850e2m")
+
+// FETRAP - FE-level software trap
+// void __builtin_v850_fetrap(unsigned int vector)
+// Triggers an FE-level exception with the specified vector (1-15)
+TARGET_BUILTIN(__builtin_v850_fetrap, "vIUi", "n", "v850e2m")
 
 //===----------------------------------------------------------------------===//
 // V850E2M+ System Register Access

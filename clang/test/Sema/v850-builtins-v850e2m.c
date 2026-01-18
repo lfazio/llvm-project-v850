@@ -9,6 +9,8 @@ void test_all_builtins(void *addr, unsigned int bit) {
   // Base V850 builtins
   __builtin_v850_di();
   __builtin_v850_ei();
+  __builtin_v850_halt();
+  __builtin_v850_trap(5);
   __builtin_v850_ldsr(0, 5);
   (void)__builtin_v850_stsr(5);
   (void)__builtin_v850_satadd(1, 2);
@@ -85,6 +87,8 @@ void test_all_builtins(void *addr, unsigned int bit) {
   __builtin_v850_syncp();
   __builtin_v850_syncm();
   __builtin_v850_synce();
+  __builtin_v850_syscall(10);
+  __builtin_v850_fetrap(3);
 
   // V850E2M atomic builtins
   (void)__builtin_v850_caxi(addr, 0, 1);

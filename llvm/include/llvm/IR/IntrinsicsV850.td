@@ -302,4 +302,34 @@ let TargetPrefix = "v850" in { // All intrinsics start with "llvm.v850.".
   def int_v850_switch : Intrinsic<[], [llvm_i32_ty],
                                   [IntrHasSideEffects]>;
 
+  //===----------------------------------------------------------------------===//
+  // Special Instructions
+  //
+  // These instructions provide system-level functionality for exception handling,
+  // power management, and OS interaction.
+  //===----------------------------------------------------------------------===//
+
+  // HALT - Halt CPU until interrupt
+  // void @llvm.v850.halt()
+  // Stops CPU execution until an interrupt occurs.
+  def int_v850_halt : Intrinsic<[], [], [IntrNoMem, IntrHasSideEffects]>;
+
+  // TRAP - Software trap
+  // void @llvm.v850.trap(i32 %vector)
+  // Triggers a software exception with the specified vector (0-31).
+  def int_v850_trap : Intrinsic<[], [llvm_i32_ty],
+                                [IntrNoMem, IntrHasSideEffects, ImmArg<ArgIndex<0>>]>;
+
+  // SYSCALL - System call (V850E2M+)
+  // void @llvm.v850.syscall(i32 %vector)
+  // Triggers a system call with the specified vector (0-255).
+  def int_v850_syscall : Intrinsic<[], [llvm_i32_ty],
+                                   [IntrNoMem, IntrHasSideEffects, ImmArg<ArgIndex<0>>]>;
+
+  // FETRAP - FE-level software trap (V850E2M+)
+  // void @llvm.v850.fetrap(i32 %vector)
+  // Triggers an FE-level exception with the specified vector (1-15).
+  def int_v850_fetrap : Intrinsic<[], [llvm_i32_ty],
+                                  [IntrNoMem, IntrHasSideEffects, ImmArg<ArgIndex<0>>]>;
+
 } // TargetPrefix = "v850"

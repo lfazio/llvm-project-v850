@@ -411,3 +411,35 @@ unsigned int test_read_bsel(void) {
 void test_write_bsel(unsigned int val) {
   __builtin_v850_write_bsel(val);
 }
+
+//===----------------------------------------------------------------------===//
+// Special Instructions (Base V850)
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: @test_halt(
+// CHECK: call void @llvm.v850.halt()
+void test_halt(void) {
+  __builtin_v850_halt();
+}
+
+// CHECK-LABEL: @test_trap(
+// CHECK: call void @llvm.v850.trap(i32 5)
+void test_trap(void) {
+  __builtin_v850_trap(5);
+}
+
+//===----------------------------------------------------------------------===//
+// Special Instructions (V850E2M+)
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: @test_syscall(
+// CHECK: call void @llvm.v850.syscall(i32 10)
+void test_syscall(void) {
+  __builtin_v850_syscall(10);
+}
+
+// CHECK-LABEL: @test_fetrap(
+// CHECK: call void @llvm.v850.fetrap(i32 3)
+void test_fetrap(void) {
+  __builtin_v850_fetrap(3);
+}

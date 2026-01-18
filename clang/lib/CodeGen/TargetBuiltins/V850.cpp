@@ -104,6 +104,30 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
   }
 
   //===--------------------------------------------------------------------===//
+  // Special Instructions
+  //===--------------------------------------------------------------------===//
+
+  case V850::BI__builtin_v850_halt: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_halt);
+    return Builder.CreateCall(F);
+  }
+  case V850::BI__builtin_v850_trap: {
+    Value *Vector = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_trap);
+    return Builder.CreateCall(F, Vector);
+  }
+  case V850::BI__builtin_v850_syscall: {
+    Value *Vector = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_syscall);
+    return Builder.CreateCall(F, Vector);
+  }
+  case V850::BI__builtin_v850_fetrap: {
+    Value *Vector = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_fetrap);
+    return Builder.CreateCall(F, Vector);
+  }
+
+  //===--------------------------------------------------------------------===//
   // System Register Access
   //===--------------------------------------------------------------------===//
 

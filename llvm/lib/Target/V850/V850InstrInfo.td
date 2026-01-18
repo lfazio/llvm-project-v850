@@ -756,9 +756,12 @@ def TRAP : FormatX<0b111111, 0b010000, (outs), (ins uimm5:$vector),
 let hasSideEffects = 1 in
 def HALT : FormatX<0b111111, 0b010010, (outs), (ins),
                    "halt",
-                   []> {
+                   [(int_v850_halt)]> {
   let vector = 0;
 }
+
+// Intrinsic pattern for TRAP
+def : Pat<(int_v850_trap timm:$vector), (TRAP uimm5:$vector)>;
 
 // RETI - Return from interrupt/exception
 // Opcode: 111111 (0x3F), sub-op: 010100
@@ -1872,6 +1875,12 @@ def : Pat<(atomic_cmp_swap_i32 GPR:$addr, GPR:$expected, GPR:$new),
 // Intrinsic pattern for CAXI
 def : Pat<(int_v850_caxi GPR:$addr, GPR:$expected, GPR:$new),
           (CAXI GPR:$addr, GPR:$expected, GPR:$new)>;
+}
+
+// V850E2M intrinsic patterns (separate from DecoderNamespace block)
+let Predicates = [HasV850E2M] in {
+def : Pat<(int_v850_fetrap timm:$vector), (FETRAP uimm4_nz:$vector)>;
+def : Pat<(int_v850_syscall timm:$vector), (SYSCALL uimm8:$vector)>;
 }
 
 let Predicates = [HasV850FPU] in {

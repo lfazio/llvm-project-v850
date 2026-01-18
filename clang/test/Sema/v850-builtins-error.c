@@ -5,6 +5,7 @@
 // RUN: %clang_cc1 -triple v850-unknown-elf -target-cpu v850 -DTEST_V850E1_SYSREG_ON_BASE -emit-llvm -verify -o /dev/null %s
 // RUN: %clang_cc1 -triple v850-unknown-elf -target-cpu v850 -DTEST_V850E2M_SYSREG_ON_BASE -emit-llvm -verify -o /dev/null %s
 // RUN: %clang_cc1 -triple v850-unknown-elf -target-cpu v850e1 -DTEST_V850E2M_SYSREG_ON_E1 -emit-llvm -verify -o /dev/null %s
+// RUN: %clang_cc1 -triple v850-unknown-elf -target-cpu v850 -DTEST_V850E2M_SPECIAL_ON_BASE -emit-llvm -verify -o /dev/null %s
 // REQUIRES: v850-registered-target
 //
 // Test that V850 builtins are rejected when the required features are not present.
@@ -57,5 +58,13 @@ void test_eiwr(void) {
 // Test that V850E2M+ system register builtins fail on V850E1
 void test_bsel(void) {
   __builtin_v850_write_bsel(0); // expected-error {{'__builtin_v850_write_bsel' needs target feature v850e2m}}
+}
+#endif
+
+#ifdef TEST_V850E2M_SPECIAL_ON_BASE
+// Test that V850E2M+ special instruction builtins fail on base V850
+void test_special_on_base(void) {
+  __builtin_v850_syscall(10); // expected-error {{'__builtin_v850_syscall' needs target feature v850e2m}}
+  __builtin_v850_fetrap(3); // expected-error {{'__builtin_v850_fetrap' needs target feature v850e2m}}
 }
 #endif

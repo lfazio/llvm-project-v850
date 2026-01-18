@@ -25,9 +25,10 @@ This document catalogs all V850 intrinsics, their implementation status, and pro
 | Multiply-Accumulate | 2 | 0 | 2 |
 | Bit Search | 4 | 0 | 4 |
 | Atomic Operations | 1 | 3 | 4 |
+| Special Instructions | 4 | 1 | 5 |
 | Cache Control | 0 | 2 | 2 |
 | FXU Vector (G4MH) | 0 | 59 | 59 |
-| **Total** | **74** | **73+** | **147+** |
+| **Total** | **78** | **72+** | **150+** |
 
 ---
 
@@ -787,9 +788,9 @@ void __builtin_v850_prefetch(void *addr);
 
 ---
 
-## 13. Special Instructions [TODO]
+## 13. Special Instructions [PARTIAL]
 
-### 13.1 HALT [TODO]
+### 13.1 HALT [IMPLEMENTED]
 
 **Architecture:** V850 (Base)
 
@@ -799,25 +800,16 @@ void __builtin_v850_halt(void);
 
 **Description:** Halt CPU until interrupt.
 
-**Priority:** Medium
+**LLVM Intrinsic:** `@llvm.v850.halt()`
+
+**Files:**
+- `clang/include/clang/Basic/BuiltinsV850.def:330`
+- `clang/lib/CodeGen/TargetBuiltins/V850.cpp:456-459`
+- `llvm/include/llvm/IR/IntrinsicsV850.td:206`
 
 ---
 
-### 13.2 SNOOZE [TODO]
-
-**Architecture:** RH850G3M+
-
-```c
-void __builtin_v850_snooze(void);
-```
-
-**Description:** Low-power spin-wait.
-
-**Priority:** Low
-
----
-
-### 13.3 TRAP [TODO]
+### 13.2 TRAP [IMPLEMENTED]
 
 **Architecture:** V850 (Base)
 
@@ -827,11 +819,16 @@ void __builtin_v850_trap(unsigned int vector);
 
 **Description:** Software trap (vector 0-31).
 
-**Priority:** Medium
+**LLVM Intrinsic:** `@llvm.v850.trap(i32 %vector)`
+
+**Files:**
+- `clang/include/clang/Basic/BuiltinsV850.def:331`
+- `clang/lib/CodeGen/TargetBuiltins/V850.cpp:460-464`
+- `llvm/include/llvm/IR/IntrinsicsV850.td:209-210`
 
 ---
 
-### 13.4 SYSCALL [TODO]
+### 13.3 SYSCALL [IMPLEMENTED]
 
 **Architecture:** V850E2M+
 
@@ -841,11 +838,16 @@ void __builtin_v850_syscall(unsigned int vector);
 
 **Description:** System call (vector 0-255).
 
-**Priority:** Medium
+**LLVM Intrinsic:** `@llvm.v850.syscall(i32 %vector)`
+
+**Files:**
+- `clang/include/clang/Basic/BuiltinsV850.def:336`
+- `clang/lib/CodeGen/TargetBuiltins/V850.cpp:465-469`
+- `llvm/include/llvm/IR/IntrinsicsV850.td:213-214`
 
 ---
 
-### 13.5 FETRAP [TODO]
+### 13.4 FETRAP [IMPLEMENTED]
 
 **Architecture:** V850E2M+
 
@@ -853,7 +855,26 @@ void __builtin_v850_syscall(unsigned int vector);
 void __builtin_v850_fetrap(unsigned int vector);
 ```
 
-**Description:** FE-level trap (vector 0-15).
+**Description:** FE-level trap (vector 1-15, 0 is reserved).
+
+**LLVM Intrinsic:** `@llvm.v850.fetrap(i32 %vector)`
+
+**Files:**
+- `clang/include/clang/Basic/BuiltinsV850.def:341`
+- `clang/lib/CodeGen/TargetBuiltins/V850.cpp:470-474`
+- `llvm/include/llvm/IR/IntrinsicsV850.td:217-218`
+
+---
+
+### 13.5 SNOOZE [TODO]
+
+**Architecture:** RH850G3M+
+
+```c
+void __builtin_v850_snooze(void);
+```
+
+**Description:** Low-power spin-wait.
 
 **Priority:** Low
 
@@ -988,18 +1009,18 @@ def : Pat<(int_v850_xxx args), (XXX args)>;
 1. ~~Bit search: SCH1L, SCH1R, SCH0L, SCH0R~~ [DONE]
 2. ~~Atomics: CAXI~~ [DONE], LDL.W, STC.W (require RH850G3M+)
 3. SYNCI memory barrier (requires RH850G3M+)
-4. HALT instruction
+4. ~~HALT instruction~~ [DONE]
 
 ### Phase 2 (Medium Priority)
 1. Cache: CACHE, PREF
 2. Data manipulation: BINS, ROTL
 3. Additional system registers
-4. TRAP, SYSCALL
+4. ~~TRAP, SYSCALL~~ [DONE]
 
 ### Phase 3 (Low Priority)
-1. HSH halfword swap
-2. 3-operand saturating arithmetic
-3. SNOOZE, FETRAP
+1. ~~HSH halfword swap~~ [DONE]
+2. ~~3-operand saturating arithmetic~~ [DONE]
+3. SNOOZE, ~~FETRAP~~ [DONE]
 4. CLL (clear load link)
 
 ### Phase 4 (Future)
@@ -1029,6 +1050,7 @@ def : Pat<(int_v850_xxx args), (XXX args)>;
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-01-18 | 1.5 | Added special instruction intrinsics (HALT, TRAP, SYSCALL, FETRAP) |
 | 2026-01-18 | 1.4 | Added HSH, SATADD3, SATSUB3 intrinsics |
 | 2026-01-18 | 1.3 | Added bit search intrinsics (SCH1L, SCH1R, SCH0L, SCH0R) and CAXI atomic CAS |
 | 2026-01-18 | 1.2 | Added 23 new system register intrinsics (debug regs, exception cause, DBWR) |
