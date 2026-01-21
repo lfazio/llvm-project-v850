@@ -319,6 +319,68 @@ bool V850InstrInfo::reverseBranchCondition(
 }
 
 //===----------------------------------------------------------------------===//
+// If-conversion support (CMOV)
+//===----------------------------------------------------------------------===//
+
+bool V850InstrInfo::canInsertSelect(const MachineBasicBlock &MBB,
+                                    ArrayRef<MachineOperand> Cond,
+                                    Register DstReg, Register TrueReg,
+                                    Register FalseReg, int &CondCycles,
+                                    int &TrueCycles, int &FalseCycles) const {
+  // V850 CMOV instruction can handle any GPR select.
+  // Condition must be a single condition code from a previous compare.
+  if (Cond.size() != 1)
+    return false;
+
+  // CMOV takes 1 cycle, condition is already computed in PSW
+  CondCycles = 0;
+  TrueCycles = 1;
+  FalseCycles = 1;
+  return true;
+}
+
+void V850InstrInfo::insertSelect(MachineBasicBlock &MBB,
+                                 MachineBasicBlock::iterator I,
+                                 const DebugLoc &DL, Register DstReg,
+                                 ArrayRef<MachineOperand> Cond,
+                                 Register TrueReg, Register FalseReg) const {
+  assert(Cond.size() == 1 && "V850 select requires single condition");
+
+  // Map branch condition code to CMOV condition code
+  unsigned BranchOpc = Cond[0].getImm();
+  unsigned CMOVCond;
+
+  // Convert branch opcode to CMOV condition code
+  switch (BranchOpc) {
+  default:
+    llvm_unreachable("Unknown branch condition for CMOV");
+  case V850::BV:  CMOVCond = 0;  break;  // V (overflow)
+  case V850::BC:  CMOVCond = 1;  break;  // C/L (carry/lower)
+  case V850::BZ:  CMOVCond = 2;  break;  // Z (zero)
+  case V850::BNH: CMOVCond = 3;  break;  // NH (not higher)
+  case V850::BN:  CMOVCond = 4;  break;  // S/N (negative)
+  case V850::BR:  CMOVCond = 5;  break;  // T (always) - shouldn't happen
+  case V850::BLT: CMOVCond = 6;  break;  // LT (less than signed)
+  case V850::BLE: CMOVCond = 7;  break;  // LE (less or equal signed)
+  case V850::BNV: CMOVCond = 8;  break;  // NV (no overflow)
+  case V850::BNC: CMOVCond = 9;  break;  // NC/NL (no carry)
+  case V850::BNZ: CMOVCond = 10; break;  // NZ (not zero)
+  case V850::BH:  CMOVCond = 11; break;  // H (higher)
+  case V850::BP:  CMOVCond = 12; break;  // NS/P (positive)
+  case V850::BSA: CMOVCond = 13; break;  // SA (saturated)
+  case V850::BGE: CMOVCond = 14; break;  // GE (greater or equal signed)
+  case V850::BGT: CMOVCond = 15; break;  // GT (greater than signed)
+  }
+
+  // Build: cmov cond, TrueReg, FalseReg, DstReg
+  // If condition is true, DstReg = TrueReg; else DstReg = FalseReg
+  BuildMI(MBB, I, DL, get(V850::CMOVr), DstReg)
+      .addImm(CMOVCond)
+      .addReg(TrueReg)
+      .addReg(FalseReg);
+}
+
+//===----------------------------------------------------------------------===//
 // Branch relaxation support
 //===----------------------------------------------------------------------===//
 

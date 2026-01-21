@@ -96,6 +96,7 @@ public:
 
   void addIRPasses() override;
   bool addInstSelector() override;
+  void addPreRegAlloc() override;
   void addPreEmitPass() override;
 };
 
@@ -116,6 +117,13 @@ void V850PassConfig::addIRPasses() {
 bool V850PassConfig::addInstSelector() {
   addPass(createV850ISelDag(getV850TargetMachine(), getOptLevel()));
   return false;
+}
+
+void V850PassConfig::addPreRegAlloc() {
+  // Enable if-conversion using CMOV instructions for optimized builds.
+  // This converts simple if-then-else patterns to conditional moves.
+  if (getOptLevel() != CodeGenOptLevel::None)
+    addPass(&EarlyIfConverterLegacyID);
 }
 
 void V850PassConfig::addPreEmitPass() {
