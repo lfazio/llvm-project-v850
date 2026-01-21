@@ -22,6 +22,7 @@ add_llvm_target(V850CodeGen
   V850ISelLowering.cpp
   V850LoadStoreOptimizer.cpp
   V850MCInstLower.cpp
+  V850PeepholeOptimizer.cpp
   V850RegisterInfo.cpp
   V850Subtarget.cpp
   V850TargetMachine.cpp

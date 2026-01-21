@@ -32,8 +32,13 @@ FunctionPass *createV850ISelDag(V850TargetMachine &TM,
 // operations, promoting 32-bit LD.W/ST.W to 16-bit SLD.W/SST.W when possible.
 FunctionPass *createV850LoadStoreOptimizerPass();
 
+// createV850PeepholeOptimizerPass - This pass performs peephole optimizations
+// on V850 machine code, such as folding MOV+ADD to MOV immediate.
+FunctionPass *createV850PeepholeOptimizerPass();
+
 void initializeV850DAGToDAGISelLegacyPass(PassRegistry &);
 void initializeV850LoadStoreOptimizerPass(PassRegistry &);
+void initializeV850PeepholeOptimizerPass(PassRegistry &);
 void initializeV850AsmPrinterPass(PassRegistry &);
 
 } // namespace llvm

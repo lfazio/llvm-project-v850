@@ -31,6 +31,7 @@ extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void LLVMInitializeV850Target() {
   PassRegistry &PR = *PassRegistry::getPassRegistry();
   initializeV850DAGToDAGISelLegacyPass(PR);
   initializeV850LoadStoreOptimizerPass(PR);
+  initializeV850PeepholeOptimizerPass(PR);
 }
 
 static std::string computeDataLayout(const Triple &TT) {
@@ -127,6 +128,11 @@ void V850PassConfig::addPreRegAlloc() {
 }
 
 void V850PassConfig::addPreEmitPass() {
+  // Peephole optimizer: performs local optimizations like folding MOV+ADD
+  // to MOV immediate, removing redundant ANDI after zero-extending loads.
+  if (getOptLevel() != CodeGenOptLevel::None)
+    addPass(createV850PeepholeOptimizerPass());
+
   // Load/store optimizer: promotes 32-bit LD.W/ST.W to 16-bit SLD.W/SST.W
   // when EP is the base and displacement fits. Must run before branch
   // relaxation since it changes instruction sizes.
