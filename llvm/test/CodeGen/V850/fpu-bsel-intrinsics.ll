@@ -217,15 +217,17 @@ entry:
 }
 
 ; Test read-modify-write pattern
+; The post-RA scheduler may reorder some instructions, so we use CHECK-DAG
+; for the middle section where the movhi and or can be reordered.
 ; CHECK-LABEL: test_read_modify_write:
 ; CHECK:       movhi r0, 32,
 ; CHECK:       ldsr {{r[0-9]+}}, bsel
 ; CHECK:       stsr fpsr,
 ; CHECK:       mov r0,
 ; CHECK:       ldsr {{r[0-9]+}}, bsel
-; Modify the value
-; CHECK:       or
-; CHECK:       movhi r0, 32,
+; Modify the value - movhi and or can be reordered by post-RA scheduler
+; CHECK-DAG:   movhi r0, 32,
+; CHECK-DAG:   or
 ; CHECK:       ldsr {{r[0-9]+}}, bsel
 ; CHECK:       ldsr {{r[0-9]+}}, fpsr
 ; CHECK:       mov r0,

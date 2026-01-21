@@ -80,6 +80,15 @@ public:
   bool hasV850E2M() const { return HasV850E2M; }
   bool hasV850FPU() const { return HasV850FPU; }
   bool hasV850E3() const { return HasV850E3; }
+
+  // Post-RA scheduling support
+  // Enable anti-dependency breaking for all registers to improve scheduling
+  AntiDepBreakMode getAntiDepBreakMode() const override {
+    return ANTIDEP_ALL;
+  }
+
+  // Specify GPR register class for critical path analysis during post-RA scheduling
+  void getCriticalPathRCs(RegClassVector &CriticalPathRCs) const override;
 };
 
 } // end namespace llvm

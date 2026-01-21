@@ -41,3 +41,11 @@ V850Subtarget::V850Subtarget(const Triple &TT, const std::string &CPU,
       InstrInfo(initializeSubtargetDependencies(CPU, FS)),
       TLInfo(TM, *this),
       FrameLowering(*this) {}
+
+void V850Subtarget::getCriticalPathRCs(RegClassVector &CriticalPathRCs) const {
+  // For post-RA scheduling anti-dependency breaking, prioritize GPR registers
+  // on the critical path. This helps the scheduler make better decisions about
+  // which anti-dependencies to break to reduce stalls.
+  CriticalPathRCs.clear();
+  CriticalPathRCs.push_back(&V850::GPRRegClass);
+}

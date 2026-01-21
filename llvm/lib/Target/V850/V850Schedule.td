@@ -131,6 +131,7 @@ def V850Model : SchedMachineModel {
   let LoadLatency = 2;          // Default load latency (1-1-2)
   let MispredictPenalty = 3;    // Branch taken penalty (3 cycles)
   let CompleteModel = false;    // Incomplete model - use defaults for unmodeled instrs
+  let PostRAScheduler = true;   // Enable post-RA scheduling for stall reduction
 }
 
 //===----------------------------------------------------------------------===//
