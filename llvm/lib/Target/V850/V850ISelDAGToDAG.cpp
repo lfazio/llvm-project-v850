@@ -77,25 +77,25 @@ static unsigned getSetFCondCode(ISD::CondCode CC) {
   default:
     llvm_unreachable("Unknown condition code");
   case ISD::SETEQ:
-    return 2;   // Z (zero/equal)
+    return 2; // Z (zero/equal)
   case ISD::SETNE:
-    return 10;  // NZ (not zero/not equal)
+    return 10; // NZ (not zero/not equal)
   case ISD::SETLT:
-    return 6;   // LT (less than, signed)
+    return 6; // LT (less than, signed)
   case ISD::SETLE:
-    return 7;   // LE (less or equal, signed)
+    return 7; // LE (less or equal, signed)
   case ISD::SETGT:
-    return 15;  // GT (greater than, signed)
+    return 15; // GT (greater than, signed)
   case ISD::SETGE:
-    return 14;  // GE (greater or equal, signed)
+    return 14; // GE (greater or equal, signed)
   case ISD::SETULT:
-    return 1;   // C/L (carry/unsigned less than)
+    return 1; // C/L (carry/unsigned less than)
   case ISD::SETULE:
-    return 3;   // NH (not higher/unsigned less or equal)
+    return 3; // NH (not higher/unsigned less or equal)
   case ISD::SETUGT:
-    return 11;  // H (higher/unsigned greater than)
+    return 11; // H (higher/unsigned greater than)
   case ISD::SETUGE:
-    return 9;   // NC/NL (no carry/unsigned greater or equal)
+    return 9; // NC/NL (no carry/unsigned greater or equal)
   }
 }
 
@@ -105,25 +105,25 @@ static unsigned getBranchOpcode(ISD::CondCode CC) {
   default:
     llvm_unreachable("Unknown condition code");
   case ISD::SETEQ:
-    return V850::BZ;   // Branch if Zero (equal)
+    return V850::BZ; // Branch if Zero (equal)
   case ISD::SETNE:
-    return V850::BNZ;  // Branch if Not Zero (not equal)
+    return V850::BNZ; // Branch if Not Zero (not equal)
   case ISD::SETLT:
-    return V850::BLT;  // Branch if Less Than (signed)
+    return V850::BLT; // Branch if Less Than (signed)
   case ISD::SETGE:
-    return V850::BGE;  // Branch if Greater or Equal (signed)
+    return V850::BGE; // Branch if Greater or Equal (signed)
   case ISD::SETGT:
-    return V850::BGT;  // Branch if Greater Than (signed)
+    return V850::BGT; // Branch if Greater Than (signed)
   case ISD::SETLE:
-    return V850::BLE;  // Branch if Less or Equal (signed)
+    return V850::BLE; // Branch if Less or Equal (signed)
   case ISD::SETULT:
-    return V850::BC;   // Branch if Carry (unsigned less than)
+    return V850::BC; // Branch if Carry (unsigned less than)
   case ISD::SETUGE:
-    return V850::BNC;  // Branch if No Carry (unsigned greater or equal)
+    return V850::BNC; // Branch if No Carry (unsigned greater or equal)
   case ISD::SETUGT:
-    return V850::BH;   // Branch if Higher (unsigned greater than)
+    return V850::BH; // Branch if Higher (unsigned greater than)
   case ISD::SETULE:
-    return V850::BNH;  // Branch if Not Higher (unsigned less or equal)
+    return V850::BNH; // Branch if Not Higher (unsigned less or equal)
   }
 }
 
@@ -145,8 +145,7 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
     SDValue TFI = CurDAG->getTargetFrameIndex(FI, MVT::i32);
     // Use ADDI to compute the address: addi 0, frameindex -> address
     SDValue Zero = CurDAG->getTargetConstant(0, DL, MVT::i32);
-    SDNode *Addr = CurDAG->getMachineNode(V850::ADDI, DL, MVT::i32,
-                                           TFI, Zero);
+    SDNode *Addr = CurDAG->getMachineNode(V850::ADDI, DL, MVT::i32, TFI, Zero);
     ReplaceNode(Node, Addr);
     return;
   }
@@ -158,15 +157,15 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
     ISD::CondCode CC = cast<CondCodeSDNode>(Node->getOperand(2))->get();
 
     // First emit CMP to set flags
-    SDNode *CmpNode = CurDAG->getMachineNode(V850::CMP, DL, MVT::Glue,
-                                              LHS, RHS);
+    SDNode *CmpNode =
+        CurDAG->getMachineNode(V850::CMP, DL, MVT::Glue, LHS, RHS);
     SDValue Glue = SDValue(CmpNode, 0);
 
     // Then emit SETF to read the flag
     unsigned CondCode = getSetFCondCode(CC);
     SDValue CondVal = CurDAG->getTargetConstant(CondCode, DL, MVT::i32);
-    SDNode *SetNode = CurDAG->getMachineNode(V850::SETF, DL, MVT::i32,
-                                              CondVal, Glue);
+    SDNode *SetNode =
+        CurDAG->getMachineNode(V850::SETF, DL, MVT::i32, CondVal, Glue);
     ReplaceNode(Node, SetNode);
     return;
   }
@@ -182,8 +181,8 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
       if (isInt<5>(Imm)) {
         // Use CMPi for small immediates
         SDValue ImmOp = CurDAG->getTargetConstant(Imm, DL, MVT::i32);
-        SDNode *CmpNode = CurDAG->getMachineNode(V850::CMPi, DL, MVT::Glue,
-                                                  LHS, ImmOp);
+        SDNode *CmpNode =
+            CurDAG->getMachineNode(V850::CMPi, DL, MVT::Glue, LHS, ImmOp);
         ReplaceNode(Node, CmpNode);
         return;
       }
@@ -191,8 +190,8 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
 
     // Use CMP for register-register comparison
     // V850 CMP instruction: CMP reg1, reg2 computes reg2 - reg1
-    SDNode *CmpNode = CurDAG->getMachineNode(V850::CMP, DL, MVT::Glue,
-                                              LHS, RHS);
+    SDNode *CmpNode =
+        CurDAG->getMachineNode(V850::CMP, DL, MVT::Glue, LHS, RHS);
     ReplaceNode(Node, CmpNode);
     return;
   }
@@ -207,8 +206,8 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
 
     unsigned BrOpc = getBranchOpcode(CC);
 
-    SDNode *Branch = CurDAG->getMachineNode(BrOpc, DL, MVT::Other,
-                                             Dest, Chain, Glue);
+    SDNode *Branch =
+        CurDAG->getMachineNode(BrOpc, DL, MVT::Other, Dest, Chain, Glue);
     ReplaceNode(Node, Branch);
     return;
   }
@@ -235,6 +234,26 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
     return;
   }
 
+  case V850ISD::SASF: {
+    // V850ISD::SASF input, condcode, glue
+    // SASF shifts input left by 1 and sets bit 0 based on condition code
+    // reg2 = (reg2 << 1) | (condition ? 1 : 0)
+    SDValue Input = Node->getOperand(0);
+    ConstantSDNode *CCNode = cast<ConstantSDNode>(Node->getOperand(1));
+    unsigned V850CC = CCNode->getZExtValue();
+    SDValue Glue = Node->getOperand(2);
+
+    SDValue CondVal = CurDAG->getTargetConstant(V850CC, DL, MVT::i32);
+
+    // SASF instruction format: sasf cond, reg2
+    // The instruction has constraint "$rs = $reg2" so input and output are same
+    // register Operand order for getMachineNode: (Input, CondCode, Glue)
+    SDValue Ops[] = {Input, CondVal, Glue};
+    SDNode *SasfNode = CurDAG->getMachineNode(V850::SASF, DL, MVT::i32, Ops);
+    ReplaceNode(Node, SasfNode);
+    return;
+  }
+
   case V850ISD::CALL: {
     // V850ISD::CALL chain, callee, [args...], regmask, [glue]
     SDValue Chain = Node->getOperand(0);
@@ -243,7 +262,8 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
     // Handle global address or external symbol
     if (GlobalAddressSDNode *G = dyn_cast<GlobalAddressSDNode>(Callee)) {
       Callee = CurDAG->getTargetGlobalAddress(G->getGlobal(), DL, MVT::i32);
-    } else if (ExternalSymbolSDNode *E = dyn_cast<ExternalSymbolSDNode>(Callee)) {
+    } else if (ExternalSymbolSDNode *E =
+                   dyn_cast<ExternalSymbolSDNode>(Callee)) {
       Callee = CurDAG->getTargetExternalSymbol(E->getSymbol(), MVT::i32);
     }
 
@@ -281,15 +301,22 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
     // Select the appropriate opcode
     unsigned Opc;
     switch (Node->getOpcode()) {
-    case V850ISD::SET1_MEM: Opc = V850::SET1; break;
-    case V850ISD::CLR1_MEM: Opc = V850::CLR1; break;
-    case V850ISD::NOT1_MEM: Opc = V850::NOT1; break;
-    default: llvm_unreachable("Unexpected opcode");
+    case V850ISD::SET1_MEM:
+      Opc = V850::SET1;
+      break;
+    case V850ISD::CLR1_MEM:
+      Opc = V850::CLR1;
+      break;
+    case V850ISD::NOT1_MEM:
+      Opc = V850::NOT1;
+      break;
+    default:
+      llvm_unreachable("Unexpected opcode");
     }
 
     // BitNum as target immediate (3-bit)
-    SDValue BitNum = CurDAG->getTargetConstant(BitNumNode->getZExtValue(), DL,
-                                               MVT::i32);
+    SDValue BitNum =
+        CurDAG->getTargetConstant(BitNumNode->getZExtValue(), DL, MVT::i32);
     // Displacement is 0 (address is directly in register)
     SDValue Disp = CurDAG->getTargetConstant(0, DL, MVT::i32);
 

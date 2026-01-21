@@ -275,6 +275,15 @@ def SDT_V850BrJT : SDTypeProfile<0, 2, [SDTCisVT<0, i32>, SDTCisVT<1, i32>]>;
 def V850brjt : SDNode<"V850ISD::BR_JT", SDT_V850BrJT,
                       [SDNPHasChain]>;
 
+// SASF - Shift and Set Flag (V850ES+)
+// result = (input << 1) | (condition ? 1 : 0)
+// (input, condcode, glue) -> result
+// The glue comes from a preceding CMP instruction that set PSW flags.
+def SDT_V850SASF : SDTypeProfile<1, 2, [SDTCisVT<0, i32>,
+                                         SDTCisVT<1, i32>,
+                                         SDTCisVT<2, i32>]>;
+def V850sasf : SDNode<"V850ISD::SASF", SDT_V850SASF, [SDNPInGlue]>;
+
 //===----------------------------------------------------------------------===//
 // Pattern fragments for instruction selection
 //===----------------------------------------------------------------------===//

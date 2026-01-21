@@ -70,6 +70,12 @@ enum NodeType : unsigned {
   // chain = BR_JT chain, index, jumptable
   // The SWITCH instruction reads a halfword offset from a table and branches.
   BR_JT,
+
+  // SASF: Shift and Set Flag (V850ES+)
+  // result = (input << 1) | (condition ? 1 : 0)
+  // SASF input, LHS, RHS, condcode
+  // First CMP LHS, RHS sets PSW, then SASF checks condition and shifts.
+  SASF,
 };
 } // namespace V850ISD
 

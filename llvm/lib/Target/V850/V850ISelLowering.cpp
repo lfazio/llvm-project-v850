@@ -20,8 +20,8 @@
 #include "llvm/CodeGen/CallingConvLower.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
-#include "llvm/CodeGen/MachineJumpTableInfo.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
+#include "llvm/CodeGen/MachineJumpTableInfo.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/TargetLoweringObjectFileImpl.h"
 #include "llvm/IR/CallingConv.h"
@@ -250,6 +250,12 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
   // Enable DAG combining for bit manipulation (SET1/CLR1/NOT1)
   // These instructions are available on all V850 variants
   setTargetDAGCombine(ISD::STORE);
+
+  // Enable DAG combining for SASF pattern matching (V850E1+)
+  // SASF: (shl x, 1) | (setcc a, b, cond)
+  if (STI.hasV850E1()) {
+    setTargetDAGCombine(ISD::OR);
+  }
 }
 
 SDValue V850TargetLowering::LowerOperation(SDValue Op,
@@ -333,6 +339,8 @@ const char *V850TargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "V850ISD::TST1_MEM";
   case V850ISD::BR_JT:
     return "V850ISD::BR_JT";
+  case V850ISD::SASF:
+    return "V850ISD::SASF";
   }
   return nullptr;
 }
@@ -348,13 +356,12 @@ SDValue V850TargetLowering::LowerGlobalAddress(SDValue Op,
   const GlobalObject *GO = GV->getAliaseeObject();
   const TargetMachine &TM = DAG.getTarget();
   const V850ELFTargetObjectFile *TLOF =
-      static_cast<const V850ELFTargetObjectFile *>(
-          TM.getObjFileLowering());
+      static_cast<const V850ELFTargetObjectFile *>(TM.getObjFileLowering());
 
   if (GO && TLOF->IsGlobalInSmallSection(GO, TM)) {
     // Use GP-relative addressing: add GP, %gp_rel(sym)
-    SDValue GPRelSym = DAG.getTargetGlobalAddress(GV, DL, VT, Offset,
-                                                   V850II::MO_GPREL);
+    SDValue GPRelSym =
+        DAG.getTargetGlobalAddress(GV, DL, VT, Offset, V850II::MO_GPREL);
     SDValue GPRel = DAG.getNode(V850ISD::GPRel, DL, VT, GPRelSym);
     SDValue GP = DAG.getRegister(V850::GP, VT);
     return DAG.getNode(ISD::ADD, DL, VT, GP, GPRel);
@@ -1084,6 +1091,149 @@ static SDValue performADDCombine(SDNode *N, SelectionDAG &DAG,
   return Mac.getValue(1);
 }
 
+/// Convert V850 condition code enum to ISD condition code
+static ISD::CondCode getV850CondCode(unsigned CC) {
+  switch (CC) {
+  case 0:
+    return ISD::SETFALSE; // V (always false/overflow)
+  case 1:
+    return ISD::SETUO; // C/L (carry/unsigned less)
+  case 2:
+    return ISD::SETEQ; // Z (zero/equal)
+  case 3:
+    return ISD::SETULE; // NH (not higher/unsigned <=)
+  case 4:
+    return ISD::SETLT; // S/N (negative/signed <)
+  case 5:
+    return ISD::SETTRUE; // T (always true)
+  case 6:
+    return ISD::SETLT; // LT (signed less than)
+  case 7:
+    return ISD::SETLE; // LE (signed less or equal)
+  case 8:
+    return ISD::SETTRUE; // NV (not overflow - always true approx)
+  case 9:
+    return ISD::SETUGE; // NC/NL (no carry/unsigned >=)
+  case 10:
+    return ISD::SETNE; // NZ (not zero/not equal)
+  case 11:
+    return ISD::SETUGT; // H (higher/unsigned >)
+  case 12:
+    return ISD::SETGE; // NS/P (not negative/positive)
+  case 13:
+    return ISD::SETFALSE; // SA (saturated - special)
+  case 14:
+    return ISD::SETGE; // GE (signed greater or equal)
+  case 15:
+    return ISD::SETGT; // GT (signed greater than)
+  default:
+    return ISD::SETCC_INVALID;
+  }
+}
+
+/// Convert ISD condition code to V850 condition code enum
+static unsigned getV850CondCodeValue(ISD::CondCode CC) {
+  switch (CC) {
+  case ISD::SETEQ:
+    return 2; // Z
+  case ISD::SETNE:
+    return 10; // NZ
+  case ISD::SETLT:
+    return 6; // LT (signed)
+  case ISD::SETLE:
+    return 7; // LE (signed)
+  case ISD::SETGT:
+    return 15; // GT (signed)
+  case ISD::SETGE:
+    return 14; // GE (signed)
+  case ISD::SETULT:
+    return 1; // C/L (unsigned <)
+  case ISD::SETULE:
+    return 3; // NH (unsigned <=)
+  case ISD::SETUGT:
+    return 11; // H (unsigned >)
+  case ISD::SETUGE:
+    return 9; // NC/NL (unsigned >=)
+  default:
+    return ~0U; // Invalid
+  }
+}
+
+/// Match SASF pattern: (or (shl x, 1), (setcc LHS, RHS, cond))
+/// SASF shifts left by 1 and sets bit 0 based on condition code.
+/// This is available on V850ES and later.
+static SDValue performORCombine(SDNode *N, SelectionDAG &DAG,
+                                const V850Subtarget &Subtarget) {
+  // SASF is available on V850ES (V850E1) and later
+  if (!Subtarget.hasV850E1())
+    return SDValue();
+
+  SDLoc DL(N);
+  SDValue LHS = N->getOperand(0);
+  SDValue RHS = N->getOperand(1);
+
+  // Match pattern: (or (shl x, 1), condition_value)
+  // where condition_value is 0 or 1 based on a comparison
+
+  // Find which operand is the shift
+  SDValue ShiftOp, CondOp;
+  if (LHS.getOpcode() == ISD::SHL) {
+    ShiftOp = LHS;
+    CondOp = RHS;
+  } else if (RHS.getOpcode() == ISD::SHL) {
+    ShiftOp = RHS;
+    CondOp = LHS;
+  } else {
+    return SDValue();
+  }
+
+  // Verify shift amount is 1
+  auto *ShiftAmt = dyn_cast<ConstantSDNode>(ShiftOp.getOperand(1));
+  if (!ShiftAmt || ShiftAmt->getZExtValue() != 1)
+    return SDValue();
+
+  SDValue ShiftInput = ShiftOp.getOperand(0);
+
+  // Match condition value - either direct setcc or (and (setcc ...), 1)
+  SDValue SetCC;
+  if (CondOp.getOpcode() == ISD::SETCC) {
+    SetCC = CondOp;
+  } else if (CondOp.getOpcode() == ISD::AND) {
+    // Check for (and (setcc ...), 1)
+    auto *Mask = dyn_cast<ConstantSDNode>(CondOp.getOperand(1));
+    if (!Mask || Mask->getZExtValue() != 1)
+      return SDValue();
+    if (CondOp.getOperand(0).getOpcode() != ISD::SETCC)
+      return SDValue();
+    SetCC = CondOp.getOperand(0);
+  } else if (CondOp.getOpcode() == ISD::ZERO_EXTEND) {
+    // Check for (zext (setcc ...))
+    if (CondOp.getOperand(0).getOpcode() != ISD::SETCC)
+      return SDValue();
+    SetCC = CondOp.getOperand(0);
+  } else {
+    return SDValue();
+  }
+
+  // Extract comparison operands and condition code
+  SDValue CmpLHS = SetCC.getOperand(0);
+  SDValue CmpRHS = SetCC.getOperand(1);
+  ISD::CondCode CC = cast<CondCodeSDNode>(SetCC.getOperand(2))->get();
+
+  // Convert ISD condition code to V850 condition code
+  unsigned V850CC = getV850CondCodeValue(CC);
+  if (V850CC == ~0U)
+    return SDValue(); // Unsupported condition
+
+  // Emit CMP instruction which produces Glue with PSW flags
+  SDValue Cmp = DAG.getNode(V850ISD::CMP, DL, MVT::Glue, CmpLHS, CmpRHS);
+
+  // Create V850ISD::SASF node: (input, condcode, glue)
+  // The SASF consumes the glue from CMP to use PSW flags
+  SDValue CCVal = DAG.getConstant(V850CC, DL, MVT::i32);
+  return DAG.getNode(V850ISD::SASF, DL, MVT::i32, ShiftInput, CCVal, Cmp);
+}
+
 SDValue V850TargetLowering::PerformDAGCombine(SDNode *N,
                                               DAGCombinerInfo &DCI) const {
   SelectionDAG &DAG = DCI.DAG;
@@ -1095,6 +1245,8 @@ SDValue V850TargetLowering::PerformDAGCombine(SDNode *N,
     return performADDCombine(N, DAG, Subtarget);
   case ISD::STORE:
     return performSTORECombine(N, DAG, Subtarget);
+  case ISD::OR:
+    return performORCombine(N, DAG, Subtarget);
   }
 
   return SDValue();
