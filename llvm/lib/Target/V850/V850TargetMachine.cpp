@@ -13,9 +13,9 @@
 #include "V850TargetMachine.h"
 #include "V850.h"
 #include "V850Subtarget.h"
+#include "V850TargetObjectFile.h"
 #include "TargetInfo/V850TargetInfo.h"
 #include "llvm/CodeGen/Passes.h"
-#include "llvm/CodeGen/TargetLoweringObjectFileImpl.h"
 #include "llvm/CodeGen/TargetPassConfig.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/MC/TargetRegistry.h"
@@ -55,7 +55,7 @@ V850TargetMachine::V850TargetMachine(const Target &T, const Triple &TT,
     : CodeGenTargetMachineImpl(T, computeDataLayout(TT), TT, CPU, FS, Options,
                                RM.value_or(Reloc::Static),
                                CM.value_or(CodeModel::Small), OL),
-      TLOF(std::make_unique<TargetLoweringObjectFileELF>()) {
+      TLOF(std::make_unique<V850ELFTargetObjectFile>()) {
   initAsmInfo();
 }
 

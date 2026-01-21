@@ -202,6 +202,9 @@ def V850RetGlue  : SDNode<"V850ISD::RET_GLUE", SDTNone,
 
 def V850Wrapper  : SDNode<"V850ISD::WRAPPER", SDTIntUnaryOp>;
 
+// GP-relative addressing node for small data section
+def V850GPRel    : SDNode<"V850ISD::GPRel", SDTIntUnaryOp>;
+
 // Compare node - produces PSW flags
 def SDT_V850Cmp : SDTypeProfile<0, 2, [SDTCisSameAs<0, 1>]>;
 def V850Cmp     : SDNode<"V850ISD::CMP", SDT_V850Cmp, [SDNPOutGlue]>;
@@ -2780,3 +2783,50 @@ def : Pat<(int_v850_macu GPR:$a, GPR:$b, GPR:$acc_hi, GPR:$acc_lo),
 def : Pat<(int_v850_switch GPR:$index),
           (SWITCH GPR:$index)>,
       Requires<[HasV850E1]>;
+
+//===----------------------------------------------------------------------===//
+// GP-Relative Addressing Patterns (Small Data Section)
+//
+// These patterns handle GP-relative addressing for globals in the small
+// data section (.sdata/.sbss). The V850 uses r4 (GP) as the global pointer.
+// GP-relative addressing uses MOVEA with GP as the base register.
+//===----------------------------------------------------------------------===//
+
+// Pattern to materialize a GP-relative address as: movea gp_rel(sym), gp, dst
+def : Pat<(add GP, (V850GPRel tglobaladdr:$addr)),
+          (MOVEA GP, tglobaladdr:$addr)>;
+
+// GP-relative load patterns - load via GP + offset
+def : Pat<(i32 (load (add GP, (V850GPRel tglobaladdr:$addr)))),
+          (LDW GP, tglobaladdr:$addr)>;
+
+def : Pat<(i32 (sextloadi16 (add GP, (V850GPRel tglobaladdr:$addr)))),
+          (LDH GP, tglobaladdr:$addr)>;
+
+def : Pat<(i32 (sextloadi8 (add GP, (V850GPRel tglobaladdr:$addr)))),
+          (LDB GP, tglobaladdr:$addr)>;
+
+def : Pat<(i32 (extloadi16 (add GP, (V850GPRel tglobaladdr:$addr)))),
+          (LDH GP, tglobaladdr:$addr)>;
+
+def : Pat<(i32 (extloadi8 (add GP, (V850GPRel tglobaladdr:$addr)))),
+          (LDB GP, tglobaladdr:$addr)>;
+
+// GP-relative store patterns - store via GP + offset
+def : Pat<(store GPR:$src, (add GP, (V850GPRel tglobaladdr:$addr))),
+          (STW GPR:$src, GP, tglobaladdr:$addr)>;
+
+def : Pat<(truncstorei16 GPR:$src, (add GP, (V850GPRel tglobaladdr:$addr))),
+          (STH GPR:$src, GP, tglobaladdr:$addr)>;
+
+def : Pat<(truncstorei8 GPR:$src, (add GP, (V850GPRel tglobaladdr:$addr))),
+          (STB GPR:$src, GP, tglobaladdr:$addr)>;
+
+// V850E1+ zero-extending loads with GP-relative addressing
+let Predicates = [HasV850E1] in {
+  def : Pat<(i32 (zextloadi16 (add GP, (V850GPRel tglobaladdr:$addr)))),
+            (LDHU GP, tglobaladdr:$addr)>;
+
+  def : Pat<(i32 (zextloadi8 (add GP, (V850GPRel tglobaladdr:$addr)))),
+            (LDBU GP, tglobaladdr:$addr)>;
+}

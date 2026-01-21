@@ -11,10 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "V850ISelLowering.h"
+#include "MCTargetDesc/V850BaseInfo.h"
 #include "V850.h"
 #include "V850RegisterInfo.h"
 #include "V850Subtarget.h"
 #include "V850TargetMachine.h"
+#include "V850TargetObjectFile.h"
 #include "llvm/CodeGen/CallingConvLower.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
@@ -301,6 +303,8 @@ const char *V850TargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "V850ISD::TAIL";
   case V850ISD::WRAPPER:
     return "V850ISD::WRAPPER";
+  case V850ISD::GPRel:
+    return "V850ISD::GPRel";
   case V850ISD::BR_CC:
     return "V850ISD::BR_CC";
   case V850ISD::CMP:
@@ -340,6 +344,23 @@ SDValue V850TargetLowering::LowerGlobalAddress(SDValue Op,
   const GlobalValue *GV = cast<GlobalAddressSDNode>(Op)->getGlobal();
   int64_t Offset = cast<GlobalAddressSDNode>(Op)->getOffset();
 
+  // Check if this global should use GP-relative addressing (small data section)
+  const GlobalObject *GO = GV->getAliaseeObject();
+  const TargetMachine &TM = DAG.getTarget();
+  const V850ELFTargetObjectFile *TLOF =
+      static_cast<const V850ELFTargetObjectFile *>(
+          TM.getObjFileLowering());
+
+  if (GO && TLOF->IsGlobalInSmallSection(GO, TM)) {
+    // Use GP-relative addressing: add GP, %gp_rel(sym)
+    SDValue GPRelSym = DAG.getTargetGlobalAddress(GV, DL, VT, Offset,
+                                                   V850II::MO_GPREL);
+    SDValue GPRel = DAG.getNode(V850ISD::GPRel, DL, VT, GPRelSym);
+    SDValue GP = DAG.getRegister(V850::GP, VT);
+    return DAG.getNode(ISD::ADD, DL, VT, GP, GPRel);
+  }
+
+  // Default: use absolute addressing with WRAPPER
   SDValue GA = DAG.getTargetGlobalAddress(GV, DL, VT, Offset);
   return DAG.getNode(V850ISD::WRAPPER, DL, VT, GA);
 }

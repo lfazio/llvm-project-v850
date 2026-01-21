@@ -35,6 +35,8 @@ enum Fixups {
   fixup_v850_hi16,
   /// Low 16 bits for MOVEA/ADDI
   fixup_v850_lo16,
+  /// GP-relative 16-bit offset for small data area (SDA)
+  fixup_v850_sda_16,
 
   // Marker for last fixup kind
   fixup_v850_invalid,

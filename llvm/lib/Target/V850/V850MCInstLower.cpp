@@ -12,6 +12,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "V850MCInstLower.h"
+#include "MCTargetDesc/V850BaseInfo.h"
+#include "MCTargetDesc/V850MCTargetDesc.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
@@ -66,6 +68,15 @@ V850MCInstLower::GetBlockAddressSymbol(const MachineOperand &MO) const {
 MCOperand V850MCInstLower::LowerSymbolOperand(const MachineOperand &MO,
                                                MCSymbol *Sym) const {
   const MCExpr *Expr = MCSymbolRefExpr::create(Sym, Ctx);
+
+  // Check for target flags that require special handling
+  unsigned TargetFlags = MO.getTargetFlags();
+  if (TargetFlags == V850II::MO_GPREL) {
+    // For GP-relative addressing, we need to create a fixup that will
+    // generate R_V850_SDA_16_16_OFFSET relocation. The fixup is handled
+    // during code emission, not here. We just create the symbol reference.
+    // The relocation type is determined by the instruction encoding.
+  }
 
   if (!MO.isJTI() && MO.getOffset())
     Expr = MCBinaryExpr::createAdd(

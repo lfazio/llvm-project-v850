@@ -25,6 +25,7 @@ add_llvm_target(V850CodeGen
   V850RegisterInfo.cpp
   V850Subtarget.cpp
   V850TargetMachine.cpp
+  V850TargetObjectFile.cpp
 
   LINK_COMPONENTS
   Analysis

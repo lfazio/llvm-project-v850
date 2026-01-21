@@ -50,6 +50,7 @@ public:
         {"fixup_v850_32", 0, 32, 0},
         {"fixup_v850_hi16", 16, 16, 0},
         {"fixup_v850_lo16", 16, 16, 0},
+        {"fixup_v850_sda_16", 16, 16, 0},
     };
 
     if (Kind < FirstTargetFixupKind)
@@ -103,7 +104,8 @@ public:
       return;
     case V850::fixup_v850_16:
     case V850::fixup_v850_lo16:
-      // 16-bit value in second halfword
+    case V850::fixup_v850_sda_16:
+      // 16-bit value in second halfword (GP-relative for SDA)
       support::endian::write16le(&Data[Offset + 2], Value & 0xFFFF);
       return;
     case V850::fixup_v850_hi16:

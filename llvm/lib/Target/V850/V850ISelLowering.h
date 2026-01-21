@@ -30,6 +30,7 @@ enum NodeType : unsigned {
   CALL,        // Function call
   TAIL,        // Tail call
   WRAPPER,     // Global address wrapper
+  GPRel,       // GP-relative address (small data section)
   BR_CC,       // Branch on condition code
   CMP,         // Compare
   SELECT_CC,   // Select with condition code
