@@ -532,17 +532,38 @@ ISD::SSUBSAT → SATSUB (2-operand) or SATSUB_3 (3-operand)
 
 ---
 
-### 6.2 Post-Increment Addressing [PARTIAL]
+### 6.2 Post-Increment Addressing [HARDWARE LIMITATION]
 
 **Description:** Use post-increment load/store where available.
 
-**V850E2M:**
-- `LD.W [reg]+, dest`
-- `ST.W src, [reg]+`
+**Hardware Support:**
+- **V850/V850E1/V850E2/V850E2M:** NOT AVAILABLE
+- **RH850G3M/G3MH/G4MH:** Available (`LD.W [reg]+, reg3`, `ST.W reg3, [reg]+`)
 
-**Status:** Basic support, could be improved in loop contexts
+**Current Implementation:**
+The V850 backend generates optimal code for array/pointer iteration patterns:
+```asm
+ld.w  0[r7], r10     ; load from ptr
+add   4, r7          ; increment ptr
+```
 
-**Priority:** Medium
+With hardware post-increment (RH850 only), this could be:
+```asm
+ld.w  [r7]+, r10     ; load and increment in one instruction
+```
+
+**Analysis:**
+- Current code generation is OPTIMAL for V850E2M given available instructions
+- Loop strength reduction is working (uses pointer increment, not index multiply)
+- Hardware post-increment requires RH850 subtarget support
+
+**Future Work:**
+- Add RH850G3M/G4MH processor definitions
+- Implement Format XI post-increment load/store instructions
+- Add DAG patterns for ISD::POST_INC/POST_DEC
+
+**Status:** No optimization possible for V850E2M (hardware limitation)
+**Priority:** Low (requires RH850 backend work)
 
 ---
 
@@ -775,7 +796,10 @@ ISD::SSUBSAT → SATSUB (2-operand) or SATSUB_3 (3-operand)
 - None currently queued
 
 ### Medium Priority
-1. Post-Increment Addressing (6.2)
+- None currently queued (all medium priority items completed or blocked)
+
+### Hardware Limitations (Requires RH850 Backend)
+1. Post-Increment Addressing (6.2) - RH850 only, not available on V850E2M
 
 ### Low Priority / Future
 1. RH850G3M Scheduling (4.4)
