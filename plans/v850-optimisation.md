@@ -680,13 +680,49 @@ maddf.s r6, r7, r8, r10  ; r10 = (r7 * r6) + r8
 
 ---
 
-### 7.3 FP Constant Folding [PARTIAL]
+### 7.3 FP Constant Folding [IMPLEMENTED]
 
 **Description:** Fold floating-point constants at compile time.
 
-**Status:** LLVM middle-end handles most cases
+**Implementation Details:**
+- LLVM middle-end (InstCombine) handles pure constant operations
+- DAGCombiner handles identity operations with proper IEEE 754 compliance
 
-**Priority:** Low
+**Optimizations Performed:**
+
+| Pattern | Result | Conditions |
+|---------|--------|------------|
+| `fadd c1, c2` | Computed constant | Always |
+| `fmul c1, c2` | Computed constant | Always |
+| `fdiv c1, c2` | Computed constant | Always |
+| `fma(c1, c2, c3)` | Computed constant | Always |
+| `fadd x, -0.0` | x (identity) | Always (IEEE 754 compliant) |
+| `fadd x, 0.0` | x (identity) | Only with `nsz` or `-fno-signed-zeros` |
+| `fsub x, 0.0` | x (identity) | Only with `nsz` or `-fno-signed-zeros` |
+| `fmul x, 1.0` | x (identity) | Always |
+| `fmul x, 2.0` | `addf.s x, x` | Always |
+
+**IEEE 754 Compliance Notes:**
+- `x + 0.0` is NOT always identity: `-0.0 + 0.0 = +0.0` (sign changes)
+- Optimization only applied when fast-math flags allow
+
+**Example Output:**
+```asm
+; fadd x, 0.0 with nsz flag - optimized to identity
+test_add_0_nsz:
+    mov r6, r10              ; just copy input to output
+    jmp [r31]
+
+; fadd x, 0.0 without flags - keeps operation (IEEE 754 correct)
+test_add_0_strict:
+    movhi .LCPI0_0, r0, r10
+    movea .LCPI0_0, r10, r10
+    ld.w 0[r10], r10
+    addf.s r10, r6, r10      ; must do the add
+    jmp [r31]
+```
+
+**Status:** Implemented via LLVM infrastructure (no V850-specific code needed)
 
 ---
 
@@ -881,6 +917,7 @@ maddf.s r6, r7, r8, r10  ; r10 = (r7 * r6) + r8
 14. ~~Literal Pool / Constant Pool Support (5.2)~~ - DONE (FP constant handling, LDW_F/STW_F)
 15. ~~Function Alignment Optimization (5.3)~~ - DONE (2-byte min, 4-byte preferred)
 16. ~~SIMD-like Operations (7.2)~~ - DONE (BSH for bswap16, FMA patterns fixed)
+17. ~~FP Constant Folding (7.3)~~ - DONE (LLVM infrastructure, IEEE 754 compliant)
 
 ### High Priority (Next Phase)
 - None currently queued
