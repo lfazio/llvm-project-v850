@@ -342,7 +342,11 @@ def NOP : V850Inst16<(outs), (ins), "nop", []> {
 // Return Instruction
 //===----------------------------------------------------------------------===//
 
-let isReturn = 1, isTerminator = 1, isBarrier = 1, Uses = [LP] in
+// Note: LP is not listed in Uses to allow shrink wrapping to work.
+// The LP register is implicitly used by the jmp [lp] instruction,
+// but declaring it in Uses would prevent shrink wrapping because
+// every return path would be seen as "using" the callee-saved LP.
+let isReturn = 1, isTerminator = 1, isBarrier = 1 in
 def RET : V850Pseudo<(outs), (ins), "jmp\t[lp]", [(V850RetGlue)]>;
 
 //===----------------------------------------------------------------------===//

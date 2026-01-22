@@ -56,9 +56,18 @@ bool V850FrameLowering::hasReservedCallFrame(const MachineFunction &MF) const {
   return !MF.getFrameInfo().hasVarSizedObjects();
 }
 
+bool V850FrameLowering::enableShrinkWrapping(const MachineFunction &MF) const {
+  // Keep the conventional code flow when not optimizing.
+  if (MF.getFunction().hasOptNone())
+    return false;
+
+  return true;
+}
+
 void V850FrameLowering::emitPrologue(MachineFunction &MF,
                                      MachineBasicBlock &MBB) const {
-  assert(&MF.front() == &MBB && "Shrink-wrapping not yet supported");
+  // Note: With shrink-wrapping enabled, MBB may not be the entry block.
+  // The prologue is inserted at the shrink-wrapped location.
   MachineFrameInfo &MFI = MF.getFrameInfo();
   const V850InstrInfo &TII =
       *static_cast<const V850InstrInfo *>(MF.getSubtarget().getInstrInfo());

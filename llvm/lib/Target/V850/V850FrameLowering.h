@@ -55,6 +55,11 @@ public:
 
   bool hasReservedCallFrame(const MachineFunction &MF) const override;
 
+  /// Enable shrink wrapping for V850 when optimizing.
+  /// Shrink wrapping moves prologue/epilogue code closer to where registers
+  /// are actually used, reducing overhead on early-exit paths.
+  bool enableShrinkWrapping(const MachineFunction &MF) const override;
+
   void determineCalleeSaves(MachineFunction &MF, BitVector &SavedRegs,
                             RegScavenger *RS = nullptr) const override;
 

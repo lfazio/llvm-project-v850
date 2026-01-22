@@ -367,15 +367,27 @@ ISD::SSUBSAT → SATSUB (2-operand) or SATSUB_3 (3-operand)
 
 ---
 
-### 3.3 Callee-Saved Register Shrink Wrapping [TODO]
+### 3.3 Callee-Saved Register Shrink Wrapping [IMPLEMENTED]
 
 **Description:** Move save/restore code closer to where registers are actually used.
 
+**Files:**
+- `llvm/lib/Target/V850/V850FrameLowering.h` - `enableShrinkWrapping()` declaration
+- `llvm/lib/Target/V850/V850FrameLowering.cpp` - Implementation
+- `llvm/lib/Target/V850/V850InstrInfo.td` - RET instruction fix (removed `Uses = [LP]`)
+- `llvm/test/CodeGen/V850/shrink-wrap.ll` - Test cases
+
 **Benefits:**
-- Faster early returns
+- Faster early returns (no PREPARE/DISPOSE overhead)
 - Reduced register pressure in common paths
 
-**Priority:** Medium
+**Implementation Details:**
+- `enableShrinkWrapping()` returns `true` when optimizing
+- RET instruction no longer declares LP in Uses (following RISC-V/ARM pattern)
+- Shrink wrapping moves PREPARE/DISPOSE to blocks that actually need callee-saved registers
+- Early exit paths skip prologue/epilogue entirely
+
+**Status:** Fully implemented with comprehensive tests
 
 ---
 
@@ -742,14 +754,14 @@ ISD::SSUBSAT → SATSUB (2-operand) or SATSUB_3 (3-operand)
 9. ~~Peephole Optimizer (1.5)~~ - DONE (MOV+ADD folding, redundant ANDI removal, copy propagation)
 10. ~~Post-RA Scheduler (1.7)~~ - DONE (anti-dependency breaking, dual-issue optimization)
 11. ~~SASF Shift-and-Add (2.7)~~ - DONE (DAG combine for (shl x, 1) | setcc pattern)
+12. ~~Callee-Saved Register Shrink Wrapping (3.3)~~ - DONE (enableShrinkWrapping, RET fix)
 
 ### High Priority (Next Phase)
 - None currently queued
 
 ### Medium Priority
-1. Callee-Saved Register Shrink Wrapping (3.3)
-2. Constant Materialization (5.4)
-3. Post-Increment Addressing (6.2)
+1. Constant Materialization (5.4)
+2. Post-Increment Addressing (6.2)
 
 ### Low Priority / Future
 1. RH850G3M Scheduling (4.4)
