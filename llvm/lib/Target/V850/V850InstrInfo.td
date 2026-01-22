@@ -293,9 +293,20 @@ def simm16_pred : PatLeaf<(i32 imm), [{
   return isInt<16>(N->getSExtValue());
 }]>;
 
-// Check if constant is in the range (-32768 to 65535) for combined MOVHI+MOVEA
+// Check if constant requires both MOVHI+MOVEA (doesn't fit in 16-bit signed
+// and has non-zero low 16 bits)
 def imm32_pred : PatLeaf<(i32 imm), [{
-  return !isInt<16>(N->getSExtValue());
+  int64_t Val = N->getSExtValue();
+  // Needs full MOVHI+MOVEA: doesn't fit in simm16 AND has non-zero low bits
+  return !isInt<16>(Val) && (Val & 0xFFFF) != 0;
+}]>;
+
+// Check if constant has zero low 16 bits (can use MOVHI alone)
+// This catches constants like 0x10000, 0xFFFF0000, etc.
+def imm_hi16_only : PatLeaf<(i32 imm), [{
+  int64_t Val = N->getSExtValue();
+  // Use MOVHI alone: doesn't fit in simm16 AND low 16 bits are zero
+  return !isInt<16>(Val) && (Val & 0xFFFF) == 0;
 }]>;
 
 // Extract high 16 bits of a 32-bit constant, adjusted for sign extension of low part
@@ -313,6 +324,13 @@ def LO16 : SDNodeXForm<imm, [{
   int64_t Val = N->getSExtValue();
   int32_t Lo = SignExtend32<16>(Val & 0xFFFF);
   return CurDAG->getTargetConstant((uint32_t)Lo, SDLoc(N), MVT::i32);
+}]>;
+
+// Extract high 16 bits when low 16 bits are zero (no sign-extension adjustment)
+// Used with MOVHI alone for constants like 0x10000, 0xFFFF0000
+def HI16_ONLY : SDNodeXForm<imm, [{
+  int64_t Val = N->getSExtValue();
+  return CurDAG->getTargetConstant((uint32_t)((Val >> 16) & 0xFFFF), SDLoc(N), MVT::i32);
 }]>;
 
 //===----------------------------------------------------------------------===//
@@ -1033,9 +1051,14 @@ def TST1_PSEUDO : V850Pseudo<(outs GPR:$result), (ins GPR:$bit, GPR:$addr),
 // Large constant materialization patterns
 //===----------------------------------------------------------------------===//
 
-// 32-bit constant requires MOVHI + MOVEA sequence
+// Constants with zero low 16 bits can use MOVHI alone (1 instruction)
+// Examples: 0x10000, 0x20000, 0xFFFF0000, etc.
+def : Pat<(i32 imm_hi16_only:$imm),
+          (MOVHI R0, (HI16_ONLY $imm))>;
+
+// Full 32-bit constant requires MOVHI + MOVEA sequence (2 instructions)
 // For a 32-bit value V = (Hi << 16) + Lo (signed)
-// We need to account for sign extension of Lo
+// We need to account for sign extension of Lo in HI16
 def : Pat<(i32 imm32_pred:$imm),
           (MOVEA (MOVHI R0, (HI16 $imm)), (LO16 $imm))>;
 

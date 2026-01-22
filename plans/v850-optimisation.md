@@ -493,16 +493,30 @@ ISD::SSUBSAT → SATSUB (2-operand) or SATSUB_3 (3-operand)
 
 ---
 
-### 5.4 Constant Materialization [PARTIAL]
+### 5.4 Constant Materialization [IMPLEMENTED]
 
 **Description:** Efficient loading of constants:
-- `MOV imm5, reg` for small signed constants
-- `MOVEA imm16, r0, reg` for larger constants
-- `MOVHI + MOVEA` for 32-bit constants
+- `MOV imm5, reg` for small signed constants (-16 to 15)
+- `MOVEA imm16, r0, reg` for 16-bit signed constants (-32768 to 32767)
+- `MOVHI imm16, r0, reg` for constants with zero low 16 bits (e.g., 0x10000, 0xFFFF0000)
+- `MOVHI + MOVEA` for full 32-bit constants with non-zero low bits
 
-**Status:** Basic patterns implemented, could be improved for specific constant ranges
+**Files:**
+- `llvm/lib/Target/V850/V850InstrInfo.td` - Pattern predicates and transforms
+- `llvm/test/CodeGen/V850/const-materialization.ll` - Comprehensive tests
 
-**Priority:** Medium
+**Implementation Details:**
+- `simm16_pred`: Matches constants fitting in 16-bit signed range
+- `imm_hi16_only`: Matches constants with zero low 16 bits (MOVHI optimization)
+- `imm32_pred`: Matches constants requiring both MOVHI+MOVEA
+- `HI16`/`LO16`: Transforms to split 32-bit constants with sign-extension handling
+- `HI16_ONLY`: Transform for MOVHI-only constants (no sign-extension adjustment needed)
+
+**Optimization Impact:**
+- Constants like 0x10000, 0x20000, 0xFFFF0000 now use single MOVHI (was MOVHI+MOVEA)
+- Saves one instruction for any constant where low 16 bits are zero
+
+**Status:** Fully implemented with comprehensive tests
 
 ---
 
@@ -755,13 +769,13 @@ ISD::SSUBSAT → SATSUB (2-operand) or SATSUB_3 (3-operand)
 10. ~~Post-RA Scheduler (1.7)~~ - DONE (anti-dependency breaking, dual-issue optimization)
 11. ~~SASF Shift-and-Add (2.7)~~ - DONE (DAG combine for (shl x, 1) | setcc pattern)
 12. ~~Callee-Saved Register Shrink Wrapping (3.3)~~ - DONE (enableShrinkWrapping, RET fix)
+13. ~~Constant Materialization (5.4)~~ - DONE (MOVHI-only for zero low bits)
 
 ### High Priority (Next Phase)
 - None currently queued
 
 ### Medium Priority
-1. Constant Materialization (5.4)
-2. Post-Increment Addressing (6.2)
+1. Post-Increment Addressing (6.2)
 
 ### Low Priority / Future
 1. RH850G3M Scheduling (4.4)

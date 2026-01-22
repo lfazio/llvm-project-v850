@@ -196,14 +196,13 @@ entry:
 ;===----------------------------------------------------------------------===;
 
 ; Test reading multiple FPU registers
-; Each read should have its own complete BSEL sequence
+; With constant materialization optimization, the BSEL constant may be reused
 ; CHECK-LABEL: test_read_multiple:
 ; CHECK:       movhi r0, 32,
 ; CHECK:       ldsr {{r[0-9]+}}, bsel
 ; CHECK:       stsr fpsr,
 ; CHECK:       mov r0,
 ; CHECK:       ldsr {{r[0-9]+}}, bsel
-; CHECK:       movhi r0, 32,
 ; CHECK:       ldsr {{r[0-9]+}}, bsel
 ; CHECK:       stsr fpcc,
 ; CHECK:       mov r0,
@@ -217,17 +216,14 @@ entry:
 }
 
 ; Test read-modify-write pattern
-; The post-RA scheduler may reorder some instructions, so we use CHECK-DAG
-; for the middle section where the movhi and or can be reordered.
+; With constant materialization optimization, the BSEL constant is reused
 ; CHECK-LABEL: test_read_modify_write:
 ; CHECK:       movhi r0, 32,
 ; CHECK:       ldsr {{r[0-9]+}}, bsel
 ; CHECK:       stsr fpsr,
 ; CHECK:       mov r0,
+; CHECK:       or
 ; CHECK:       ldsr {{r[0-9]+}}, bsel
-; Modify the value - movhi and or can be reordered by post-RA scheduler
-; CHECK-DAG:   movhi r0, 32,
-; CHECK-DAG:   or
 ; CHECK:       ldsr {{r[0-9]+}}, bsel
 ; CHECK:       ldsr {{r[0-9]+}}, fpsr
 ; CHECK:       mov r0,
