@@ -147,10 +147,11 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
   setOperationAction(ISD::BR_CC, MVT::i32, Custom);
   setOperationAction(ISD::BRCOND, MVT::Other, Expand);
 
-  // Global addresses
+  // Global addresses and constant pools
   setOperationAction(ISD::GlobalAddress, MVT::i32, Custom);
   setOperationAction(ISD::ExternalSymbol, MVT::i32, Custom);
   setOperationAction(ISD::BlockAddress, MVT::i32, Custom);
+  setOperationAction(ISD::ConstantPool, MVT::i32, Custom);
 
   // Jump table - V850E1+ has SWITCH instruction for table-driven branching
   if (STI.hasV850E1()) {
@@ -269,6 +270,8 @@ SDValue V850TargetLowering::LowerOperation(SDValue Op,
     return LowerExternalSymbol(Op, DAG);
   case ISD::BlockAddress:
     return LowerBlockAddress(Op, DAG);
+  case ISD::ConstantPool:
+    return LowerConstantPool(Op, DAG);
   case ISD::BR_CC:
     return LowerBR_CC(Op, DAG);
   case ISD::SELECT_CC:
@@ -389,6 +392,23 @@ SDValue V850TargetLowering::LowerBlockAddress(SDValue Op,
   const BlockAddress *BA = cast<BlockAddressSDNode>(Op)->getBlockAddress();
 
   SDValue Result = DAG.getTargetBlockAddress(BA, VT);
+  return DAG.getNode(V850ISD::WRAPPER, DL, VT, Result);
+}
+
+SDValue V850TargetLowering::LowerConstantPool(SDValue Op,
+                                               SelectionDAG &DAG) const {
+  SDLoc DL(Op);
+  EVT VT = Op.getValueType();
+  ConstantPoolSDNode *CP = cast<ConstantPoolSDNode>(Op);
+
+  SDValue Result;
+  if (CP->isMachineConstantPoolEntry())
+    Result = DAG.getTargetConstantPool(CP->getMachineCPVal(), VT,
+                                       CP->getAlign(), CP->getOffset());
+  else
+    Result = DAG.getTargetConstantPool(CP->getConstVal(), VT, CP->getAlign(),
+                                       CP->getOffset());
+
   return DAG.getNode(V850ISD::WRAPPER, DL, VT, Result);
 }
 

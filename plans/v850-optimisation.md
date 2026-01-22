@@ -477,11 +477,37 @@ ISD::SSUBSAT → SATSUB (2-operand) or SATSUB_3 (3-operand)
 
 ---
 
-### 5.2 Literal Pool Optimization [TODO]
+### 5.2 Literal Pool / Constant Pool Support [IMPLEMENTED]
 
-**Description:** Optimize placement of literal pools to reduce distance to references.
+**Description:** Support for floating-point and large constants via constant pools.
 
-**Priority:** Low
+**Files:**
+- `llvm/lib/Target/V850/V850ISelLowering.cpp` - LowerConstantPool implementation
+- `llvm/lib/Target/V850/V850ISelLowering.h` - Declaration
+- `llvm/lib/Target/V850/V850InstrInfo.td` - FPU load/store instructions and patterns
+- `llvm/test/CodeGen/V850/constant-pool.ll` - Tests
+
+**Implementation Details:**
+- Custom lowering for ISD::ConstantPool in V850ISelLowering
+- V850ISD::WRAPPER node wraps constant pool addresses
+- LDW_F/STW_F codegen-only instructions for f32 loads/stores (same encoding as LDW/STW)
+- Patterns for f32 load/store with base register and offset
+- Constants placed in .sdata section with MOVHI+MOVEA address materialization
+
+**Code Generation:**
+```
+.section .sdata
+.LCPI0_0:
+    .word 0x40490fdb          ; float constant
+
+return_float_const:
+    movhi .LCPI0_0, r0, r10   ; Address high bits
+    movea .LCPI0_0, r10, r10  ; Address low bits
+    ld.w 0[r10], r10          ; Load constant
+    jmp [r31]
+```
+
+**Status:** Implemented - floating-point constants now work correctly
 
 ---
 
@@ -791,6 +817,7 @@ ld.w  [r7]+, r10     ; load and increment in one instruction
 11. ~~SASF Shift-and-Add (2.7)~~ - DONE (DAG combine for (shl x, 1) | setcc pattern)
 12. ~~Callee-Saved Register Shrink Wrapping (3.3)~~ - DONE (enableShrinkWrapping, RET fix)
 13. ~~Constant Materialization (5.4)~~ - DONE (MOVHI-only for zero low bits)
+14. ~~Literal Pool / Constant Pool Support (5.2)~~ - DONE (FP constant handling, LDW_F/STW_F)
 
 ### High Priority (Next Phase)
 - None currently queued
@@ -804,8 +831,7 @@ ld.w  [r7]+, r10     ; load and increment in one instruction
 ### Low Priority / Future
 1. RH850G3M Scheduling (4.4)
 2. RH850G4MH Scheduling (4.5)
-3. Literal Pool Optimization (5.2)
-4. Function Alignment Optimization (5.3)
+3. Function Alignment Optimization (5.3)
 5. Hardware Loop Support (6.1)
 6. Loop Strength Reduction (6.3)
 7. SIMD-like Operations (7.2)
