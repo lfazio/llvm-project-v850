@@ -511,11 +511,37 @@ return_float_const:
 
 ---
 
-### 5.3 Function Alignment Optimization [TODO]
+### 5.3 Function Alignment Optimization [IMPLEMENTED]
 
-**Description:** Reduce function alignment for size-optimized builds.
+**Description:** Optimize function alignment based on optimization level.
 
-**Priority:** Low
+**Files:**
+- `llvm/lib/Target/V850/V850ISelLowering.cpp` - setPrefFunctionAlignment
+- `llvm/test/CodeGen/V850/function-alignment.ll` - Tests
+
+**Implementation Details:**
+- Minimum alignment: 2 bytes (for 16-bit instructions)
+- Preferred alignment: 4 bytes (for better 32-bit instruction fetch)
+- When `-Os` (optsize) is used, functions use minimum 2-byte alignment
+- Default functions use preferred 4-byte alignment for performance
+
+**Code Generation:**
+```asm
+; Normal function (-O2)
+    .globl normal_function
+    .p2align 2              ; 4-byte alignment
+
+; Size-optimized function (-Os)
+    .globl optsize_function
+    .p2align 1              ; 2-byte alignment
+```
+
+**Notes:**
+- The `minsize` attribute currently does not reduce alignment due to a known
+  LLVM limitation (MachineFunction.cpp checks `OptimizeForSize` directly
+  instead of using `hasOptSize()` which handles both attributes)
+
+**Status:** Implemented
 
 ---
 
@@ -818,6 +844,7 @@ ld.w  [r7]+, r10     ; load and increment in one instruction
 12. ~~Callee-Saved Register Shrink Wrapping (3.3)~~ - DONE (enableShrinkWrapping, RET fix)
 13. ~~Constant Materialization (5.4)~~ - DONE (MOVHI-only for zero low bits)
 14. ~~Literal Pool / Constant Pool Support (5.2)~~ - DONE (FP constant handling, LDW_F/STW_F)
+15. ~~Function Alignment Optimization (5.3)~~ - DONE (2-byte min, 4-byte preferred)
 
 ### High Priority (Next Phase)
 - None currently queued
@@ -831,13 +858,12 @@ ld.w  [r7]+, r10     ; load and increment in one instruction
 ### Low Priority / Future
 1. RH850G3M Scheduling (4.4)
 2. RH850G4MH Scheduling (4.5)
-3. Function Alignment Optimization (5.3)
-5. Hardware Loop Support (6.1)
-6. Loop Strength Reduction (6.3)
-7. SIMD-like Operations (7.2)
-8. Memory Barrier Optimization (8.3)
-9. Varargs Optimization (9.3)
-10. Cache Control Intrinsics (10.7)
+3. Hardware Loop Support (6.1)
+4. Loop Strength Reduction (6.3)
+5. SIMD-like Operations (7.2)
+6. Memory Barrier Optimization (8.3)
+7. Varargs Optimization (9.3)
+8. Cache Control Intrinsics (10.7)
 
 ---
 

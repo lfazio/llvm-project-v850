@@ -240,8 +240,12 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::BITCAST, MVT::f32, Legal);
   }
 
-  // Set minimum function alignment
+  // Set function alignment
+  // V850 has both 16-bit and 32-bit instructions, so minimum is 2 bytes.
+  // Preferred is 4 bytes for better instruction fetch of 32-bit instructions.
+  // When optimizing for size (-Os/-Oz), the minimum alignment is used.
   setMinFunctionAlignment(Align(2));
+  setPrefFunctionAlignment(Align(4));
 
   // Enable DAG combining for MAC pattern recognition (V850E2M+)
   if (STI.hasV850E2M()) {
