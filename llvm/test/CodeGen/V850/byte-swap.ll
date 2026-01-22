@@ -54,22 +54,22 @@ define i32 @test_bsh_intrinsic(i32 %x) {
   ret i32 %result
 }
 
-; Test bswap16 - uses bsw + shr 16
+; Test bswap16 with zext result - now uses bsh (optimized from bsw + shr 16)
 define i32 @test_bswap16_zext(i32 %x) {
 ; CHECK-LABEL: test_bswap16_zext:
-; CHECK:       bsw r6, r{{[0-9]+}}
-; CHECK:       shr 16, r{{[0-9]+}}
+; CHECK:       bsh r6, r10
+; CHECK-NEXT:  jmp [r31]
   %masked = and i32 %x, 65535
   %swapped = call i32 @llvm.bswap.i32(i32 %masked)
   %result = lshr i32 %swapped, 16
   ret i32 %result
 }
 
-; Test actual i16 bswap
+; Test actual i16 bswap - now uses bsh (optimized from bsw + shr 16)
 define i16 @test_bswap16(i16 %x) {
 ; CHECK-LABEL: test_bswap16:
-; CHECK:       bsw r6, r{{[0-9]+}}
-; CHECK:       shr 16, r{{[0-9]+}}
+; CHECK:       bsh r6, r10
+; CHECK-NEXT:  jmp [r31]
   %result = call i16 @llvm.bswap.i16(i16 %x)
   ret i16 %result
 }

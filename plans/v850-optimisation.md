@@ -637,11 +637,46 @@ ld.w  [r7]+, r10     ; load and increment in one instruction
 
 ---
 
-### 7.2 SIMD-like Operations [TODO]
+### 7.2 SIMD-like Operations [IMPLEMENTED]
 
-**Description:** Explore use of FPU for parallel operations when beneficial.
+**Description:** Optimize byte manipulation, saturating arithmetic, and FPU operations.
 
-**Priority:** Future
+**Files:**
+- `llvm/lib/Target/V850/V850InstrInfo.td` - BSH/FMA patterns
+- `llvm/test/CodeGen/V850/simd-like-ops.ll` - Tests
+- `llvm/test/CodeGen/V850/byte-swap.ll` - Updated tests
+
+**Optimizations Implemented:**
+
+1. **Byte Swap Operations:**
+   - `bswap i32` → `BSW` (full word byte swap)
+   - `bswap i16` → `BSH` (optimized from BSW+SHR to single instruction)
+
+2. **Rotate Operations:**
+   - `rotl/rotr by 16` → `HSW` (halfword swap)
+
+3. **Saturating Arithmetic:**
+   - `sadd.sat` → `SATADD`
+   - `ssub.sat` → `SATSUB`
+
+4. **FPU Min/Max:**
+   - `fminnum` → `MINF.S`
+   - `fmaxnum` → `MAXF.S`
+
+5. **FMA Operations (Fixed):**
+   - `fma(a, b, c)` → `MADDF.S` (was crashing, now works)
+   - `fneg(fma(a, b, c))` → `NMADDF.S` (negate-multiply-add)
+
+**Code Generation Examples:**
+```asm
+; bswap16 - optimized to single instruction
+bsh r6, r10              ; was: bsw + shr 16
+
+; FMA operation
+maddf.s r6, r7, r8, r10  ; r10 = (r7 * r6) + r8
+```
+
+**Status:** Implemented
 
 ---
 
@@ -845,6 +880,7 @@ ld.w  [r7]+, r10     ; load and increment in one instruction
 13. ~~Constant Materialization (5.4)~~ - DONE (MOVHI-only for zero low bits)
 14. ~~Literal Pool / Constant Pool Support (5.2)~~ - DONE (FP constant handling, LDW_F/STW_F)
 15. ~~Function Alignment Optimization (5.3)~~ - DONE (2-byte min, 4-byte preferred)
+16. ~~SIMD-like Operations (7.2)~~ - DONE (BSH for bswap16, FMA patterns fixed)
 
 ### High Priority (Next Phase)
 - None currently queued
@@ -860,10 +896,9 @@ ld.w  [r7]+, r10     ; load and increment in one instruction
 2. RH850G4MH Scheduling (4.5)
 3. Hardware Loop Support (6.1)
 4. Loop Strength Reduction (6.3)
-5. SIMD-like Operations (7.2)
-6. Memory Barrier Optimization (8.3)
-7. Varargs Optimization (9.3)
-8. Cache Control Intrinsics (10.7)
+5. Memory Barrier Optimization (8.3)
+6. Varargs Optimization (9.3)
+7. Cache Control Intrinsics (10.7)
 
 ---
 

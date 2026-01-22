@@ -1490,8 +1490,15 @@ def HSW : FormatXII<0b111111, 0b011010, (outs GPR:$reg3), (ins GPR:$reg2),
 def : Pat<(or (shl GPR:$rs, (i32 16)), (srl GPR:$rs, (i32 16))), (HSW GPR:$rs)>;
 def : Pat<(or (srl GPR:$rs, (i32 16)), (shl GPR:$rs, (i32 16))), (HSW GPR:$rs)>;
 
-// BSH pattern: for bswap16 with masked input
-// When upper 16 bits are known zero, bsh is more efficient than bsw + shr
+// BSH patterns for bswap16 (i16 bswap legalized to i32)
+// When bswap is followed by shift right by 16, use BSH instead of BSW+SHR.
+// BSH swaps the two bytes of the low halfword and sign-extends to 32-bit.
+//
+// Pattern 1: (srl (bswap x), 16) -> bsh x
+// This catches the common case of i16 bswap legalized to i32.
+def : Pat<(srl (bswap GPR:$src), (i32 16)), (BSH GPR:$src)>;
+
+// Pattern 2: for bswap16 with masked input (when upper bits are known zero)
 // Pattern: (srl (bswap (and x, 0xFFFF)), 16) -> bsh x
 def : Pat<(srl (bswap (and GPR:$src, 0xFFFF)), (i32 16)), (BSH GPR:$src)>;
 
@@ -2335,33 +2342,36 @@ def RSQRTFD : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2),
 //===----------------------------------------------------------------------===//
 // V850E2M FPU Instructions - Multiply-Add (Single Precision Only)
 // Format: reg4 = (reg2 * reg1) +/- reg3
+// Note: LLVM's fma(a, b, c) = (a * b) + c, so pattern is fma(reg1, reg2, reg3)
 //===----------------------------------------------------------------------===//
 
 // MADDF.S reg1, reg2, reg3, reg4 - Floating-point multiply-add
 // reg4 = (reg2 * reg1) + reg3
-def MADDFS : FormatFPU_RRRR<0b00, (outs GPR:$reg4),
-                            (ins GPR:$reg2, GPR:$reg1, GPR:$reg3),
+// fma(a, b, c) = (a * b) + c maps to: a=reg1, b=reg2, c=reg3
+def MADDFS : FormatFPU_RRRR<0b00, (outs FPR:$reg4),
+                            (ins FPR:$reg2, FPR:$reg1, FPR:$reg3),
                             "maddf.s\t$reg1, $reg2, $reg3, $reg4",
-                            []>;
+                            [(set FPR:$reg4, (fma FPR:$reg1, FPR:$reg2, FPR:$reg3))]>;
 
 // MSUBF.S reg1, reg2, reg3, reg4 - Floating-point multiply-subtract
 // reg4 = (reg2 * reg1) - reg3
-def MSUBFS : FormatFPU_RRRR<0b01, (outs GPR:$reg4),
-                            (ins GPR:$reg2, GPR:$reg1, GPR:$reg3),
+def MSUBFS : FormatFPU_RRRR<0b01, (outs FPR:$reg4),
+                            (ins FPR:$reg2, FPR:$reg1, FPR:$reg3),
                             "msubf.s\t$reg1, $reg2, $reg3, $reg4",
                             []>;
 
 // NMADDF.S reg1, reg2, reg3, reg4 - Floating-point negate multiply-add
 // reg4 = -((reg2 * reg1) + reg3)
-def NMADDFS : FormatFPU_RRRR<0b10, (outs GPR:$reg4),
-                             (ins GPR:$reg2, GPR:$reg1, GPR:$reg3),
+// fneg(fma(a, b, c)) maps to nmaddf
+def NMADDFS : FormatFPU_RRRR<0b10, (outs FPR:$reg4),
+                             (ins FPR:$reg2, FPR:$reg1, FPR:$reg3),
                              "nmaddf.s\t$reg1, $reg2, $reg3, $reg4",
-                             []>;
+                             [(set FPR:$reg4, (fneg (fma FPR:$reg1, FPR:$reg2, FPR:$reg3)))]>;
 
 // NMSUBF.S reg1, reg2, reg3, reg4 - Floating-point negate multiply-subtract
 // reg4 = -((reg2 * reg1) - reg3)
-def NMSUBFS : FormatFPU_RRRR<0b11, (outs GPR:$reg4),
-                             (ins GPR:$reg2, GPR:$reg1, GPR:$reg3),
+def NMSUBFS : FormatFPU_RRRR<0b11, (outs FPR:$reg4),
+                             (ins FPR:$reg2, FPR:$reg1, FPR:$reg3),
                              "nmsubf.s\t$reg1, $reg2, $reg3, $reg4",
                              []>;
 
