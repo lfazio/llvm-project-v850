@@ -1557,7 +1557,7 @@ def CTRET : FormatX<0b111111, 0b010001, (outs), (ins),
 let hasSideEffects = 1, Defs = [DBPC, DBPSW] in
 def DBTRAP : V850Inst16<(outs), (ins),
                         "dbtrap",
-                        []> {
+                        [(int_v850_dbtrap)]> {
   let Inst{15-0} = 0b1111100001000000;
 }
 

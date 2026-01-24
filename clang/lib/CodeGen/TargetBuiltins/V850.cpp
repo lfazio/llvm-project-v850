@@ -126,6 +126,10 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
     Function *F = CGM.getIntrinsic(Intrinsic::v850_fetrap);
     return Builder.CreateCall(F, Vector);
   }
+  case V850::BI__builtin_v850_dbtrap: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_dbtrap);
+    return Builder.CreateCall(F);
+  }
 
   //===--------------------------------------------------------------------===//
   // System Register Access

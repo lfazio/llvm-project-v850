@@ -177,6 +177,18 @@ TARGET_BUILTIN(__builtin_v850_read_ctbp, "Ui", "n", "v850e1")
 TARGET_BUILTIN(__builtin_v850_write_ctbp, "vUi", "n", "v850e1")
 
 //===----------------------------------------------------------------------===//
+// V850E1+ Debug Instructions
+//
+// Debug trap and debug return instructions for software breakpoints.
+//===----------------------------------------------------------------------===//
+
+// DBTRAP - Debug trap (software breakpoint)
+// void __builtin_v850_dbtrap(void)
+// Triggers a debug exception, saving PC to DBPC and PSW to DBPSW.
+// Use DBRET to return from the debug handler.
+TARGET_BUILTIN(__builtin_v850_dbtrap, "v", "n", "v850e1")
+
+//===----------------------------------------------------------------------===//
 // V850E1+ Debug System Register Access
 //
 // Named builtins for V850E1+ debug system registers (regID 18-27).

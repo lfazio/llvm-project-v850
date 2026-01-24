@@ -332,4 +332,10 @@ let TargetPrefix = "v850" in { // All intrinsics start with "llvm.v850.".
   def int_v850_fetrap : Intrinsic<[], [llvm_i32_ty],
                                   [IntrNoMem, IntrHasSideEffects, ImmArg<ArgIndex<0>>]>;
 
+  // DBTRAP - Debug trap (V850E1+)
+  // void @llvm.v850.dbtrap()
+  // Triggers a debug exception, saving PC to DBPC and PSW to DBPSW.
+  // Used for software breakpoints. Return from handler with DBRET.
+  def int_v850_dbtrap : Intrinsic<[], [], [IntrNoMem, IntrHasSideEffects]>;
+
 } // TargetPrefix = "v850"
