@@ -402,6 +402,38 @@ ISD::SSUBSAT → SATSUB (2-operand) or SATSUB_3 (3-operand)
 
 ---
 
+### 3.5 CFI Directive Emission [IMPLEMENTED]
+
+**File:** `llvm/lib/Target/V850/V850FrameLowering.cpp`
+
+**Description:** Emits Call Frame Information (CFI) directives for DWARF-based
+stack unwinding support. CFI directives enable debuggers and exception handlers
+to properly unwind the stack during debugging or exception handling.
+
+**Implementation Details:**
+- Uses `CFIInstBuilder` utility class from `llvm/CodeGen/CFIInstBuilder.h`
+- Emits `.cfi_def_cfa_offset` after stack pointer adjustments
+- Emits `.cfi_offset` for each callee-saved register after PREPARE
+- Handles both PREPARE-based and fallback store-based callee-saved register saving
+- Tracks callee-saved stack size in `V850MachineFunctionInfo`
+
+**CFI Directives Emitted:**
+1. After PREPARE: `.cfi_def_cfa_offset <callee_saved_size>`
+2. After PREPARE: `.cfi_offset <reg>, <offset>` for each saved register
+3. After stack allocation: `.cfi_def_cfa_offset <total_size>`
+4. With frame pointer: `.cfi_def_cfa r29, <offset>`
+
+**Benefits:**
+- Enables GDB/LLDB stack unwinding
+- Required for C++ exception handling
+- Enables accurate crash reports and profiling
+
+**Test:** `llvm/test/CodeGen/V850/cfi-directives.ll`
+
+**Status:** Fully implemented
+
+---
+
 ## 4. Scheduling Models
 
 ### 4.1 V850 Base Scheduling [IMPLEMENTED]

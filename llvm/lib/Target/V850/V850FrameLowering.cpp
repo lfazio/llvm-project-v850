@@ -12,7 +12,9 @@
 
 #include "V850FrameLowering.h"
 #include "V850InstrInfo.h"
+#include "V850MachineFunctionInfo.h"
 #include "V850Subtarget.h"
+#include "llvm/CodeGen/CFIInstBuilder.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
@@ -71,13 +73,17 @@ void V850FrameLowering::emitPrologue(MachineFunction &MF,
   MachineFrameInfo &MFI = MF.getFrameInfo();
   const V850InstrInfo &TII =
       *static_cast<const V850InstrInfo *>(MF.getSubtarget().getInstrInfo());
+  V850MachineFunctionInfo *FuncInfo = MF.getInfo<V850MachineFunctionInfo>();
 
   MachineBasicBlock::iterator MBBI = MBB.begin();
 
-  // Skip past any PREPARE instruction (CSR saves) so that prologue code
-  // (especially FP setup) comes after CSR saves. This is required because
-  // PREPARE saves the old register values before modification.
-  while (MBBI != MBB.end() && MBBI->getOpcode() == V850::PREPARE)
+  // Skip past any PREPARE instruction and its associated CFI directives
+  // so that prologue code (especially FP setup) comes after CSR saves.
+  // This is required because PREPARE saves the old register values before
+  // modification, and CFI directives must follow their associated instructions.
+  while (MBBI != MBB.end() &&
+         (MBBI->getOpcode() == V850::PREPARE ||
+          MBBI->getOpcode() == TargetOpcode::CFI_INSTRUCTION))
     ++MBBI;
 
   DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
@@ -87,6 +93,10 @@ void V850FrameLowering::emitPrologue(MachineFunction &MF,
 
   if (StackSize == 0)
     return;
+
+  // Calculate total CFA offset (callee-saved + local frame)
+  unsigned CalleeSavedSize = FuncInfo->getCalleeSavedStackSize();
+  int64_t TotalCFAOffset = CalleeSavedSize + StackSize;
 
   // Adjust stack pointer: SP = SP - StackSize
   // Prefer 16-bit ADDi for small offsets, then 32-bit ADDI, then use a register
@@ -120,11 +130,19 @@ void V850FrameLowering::emitPrologue(MachineFunction &MF,
         .setMIFlag(MachineInstr::FrameSetup);
   }
 
+  // Emit CFI directive for total CFA offset (callee-saved + locals)
+  CFIInstBuilder CFIBuilder(MBB, MBBI, MachineInstr::FrameSetup);
+  CFIBuilder.buildDefCFAOffset(TotalCFAOffset);
+
   // Set up frame pointer if needed
   if (hasFP(MF)) {
     BuildMI(MBB, MBBI, DL, TII.get(V850::MOV), V850::R29)
         .addReg(V850::SP)
         .setMIFlag(MachineInstr::FrameSetup);
+
+    // Emit CFI to indicate CFA is now FP-based
+    CFIBuilder.setInsertPoint(MBBI);
+    CFIBuilder.buildDefCFA(V850::R29, TotalCFAOffset);
   }
 }
 
@@ -193,6 +211,11 @@ bool V850FrameLowering::spillCalleeSavedRegisters(
 
   MachineFunction &MF = *MBB.getParent();
   const TargetInstrInfo &TII = *MF.getSubtarget().getInstrInfo();
+  V850MachineFunctionInfo *FuncInfo = MF.getInfo<V850MachineFunctionInfo>();
+
+  // Calculate total size of callee-saved registers
+  unsigned CalleeSavedSize = CSI.size() * 4; // Each register is 4 bytes
+  FuncInfo->setCalleeSavedStackSize(CalleeSavedSize);
 
   // Try to use PREPARE instruction (V850E1+)
   if (canUsePrepareDispose(MF, CSI)) {
@@ -203,16 +226,44 @@ bool V850FrameLowering::spillCalleeSavedRegisters(
       MBB.addLiveIn(I.getReg());
 
     // PREPARE list12, imm5
-    // imm5 = 0 (no additional stack allocation via PREPARE; emitPrologue handles it)
-    BuildMI(MBB, MI, DL, TII.get(V850::PREPARE))
-        .addImm(List12)
-        .addImm(0)
-        .setMIFlag(MachineInstr::FrameSetup);
+    // imm5 = 0 (no additional stack allocation via PREPARE; emitPrologue
+    // handles it)
+    MachineInstrBuilder MIB = BuildMI(MBB, MI, DL, TII.get(V850::PREPARE))
+                                  .addImm(List12)
+                                  .addImm(0)
+                                  .setMIFlag(MachineInstr::FrameSetup);
+
+    // Emit CFI directives immediately after PREPARE
+    // PREPARE saves registers from LP (bit 11) to r20 (bit 0) in order
+    // LP is at SP-4, next register at SP-8, etc.
+    MachineBasicBlock::iterator CFIInsertPt =
+        std::next(MIB.getInstr()->getIterator());
+    CFIInstBuilder CFIBuilder(MBB, CFIInsertPt, MachineInstr::FrameSetup);
+
+    // First emit def_cfa_offset for the total callee-saved area
+    CFIBuilder.buildDefCFAOffset(CalleeSavedSize);
+
+    // Emit cfi_offset for each saved register
+    // PREPARE pushes in this order: LP, EP, r29, r28, ..., r20
+    // We need to emit CFI in the actual push order
+    int Offset = -4; // First register at CFA-4
+    static const unsigned PrepareOrder[] = {
+        V850::LP,  V850::EP,  V850::R29, V850::R28, V850::R27, V850::R26,
+        V850::R25, V850::R24, V850::R23, V850::R22, V850::R21, V850::R20};
+    for (unsigned Reg : PrepareOrder) {
+      if (List12 & (1 << (this->TRI->getEncodingValue(Reg) - 20))) {
+        CFIBuilder.buildOffset(Reg, Offset);
+        Offset -= 4;
+      }
+    }
 
     return true;
   }
 
   // Fallback: use individual store instructions
+  CFIInstBuilder CFIBuilder(MBB, MI, MachineInstr::FrameSetup);
+  int Offset = -4;
+
   for (const CalleeSavedInfo &I : CSI) {
     Register Reg = I.getReg();
     int FI = I.getFrameIdx();
@@ -226,7 +277,14 @@ bool V850FrameLowering::spillCalleeSavedRegisters(
         .addFrameIndex(FI)
         .addImm(0)
         .setMIFlag(MachineInstr::FrameSetup);
+
+    // Emit CFI offset for this register
+    CFIBuilder.buildOffset(Reg, Offset);
+    Offset -= 4;
   }
+
+  // Emit def_cfa_offset for the total callee-saved area
+  CFIBuilder.buildDefCFAOffset(CalleeSavedSize);
 
   return true;
 }
@@ -274,6 +332,10 @@ bool V850FrameLowering::restoreCalleeSavedRegisters(
           .setMIFlag(MachineInstr::FrameDestroy);
     }
 
+    // Note: CFI restore directives are not emitted in the epilogue because
+    // unwinding uses the CFI state from the prologue. The important CFI
+    // information is emitted in spillCalleeSavedRegisters.
+
     return true;
   }
 
@@ -288,6 +350,9 @@ bool V850FrameLowering::restoreCalleeSavedRegisters(
         .addImm(0)
         .setMIFlag(MachineInstr::FrameDestroy);
   }
+
+  // Note: CFI restore directives are not emitted in the epilogue because
+  // unwinding uses the CFI state from the prologue.
 
   return true;
 }
@@ -337,8 +402,8 @@ MachineBasicBlock::iterator V850FrameLowering::eliminateCallFramePseudoInstr(
 }
 
 void V850FrameLowering::determineCalleeSaves(MachineFunction &MF,
-                                              BitVector &SavedRegs,
-                                              RegScavenger *RS) const {
+                                             BitVector &SavedRegs,
+                                             RegScavenger *RS) const {
   TargetFrameLowering::determineCalleeSaves(MF, SavedRegs, RS);
 
   // Always save LP (link pointer) if we have calls
@@ -379,14 +444,16 @@ bool V850FrameLowering::canUsePrepareDispose(
   return true;
 }
 
-unsigned V850FrameLowering::buildList12Mask(ArrayRef<CalleeSavedInfo> CSI) const {
+unsigned
+V850FrameLowering::buildList12Mask(ArrayRef<CalleeSavedInfo> CSI) const {
   unsigned List12 = 0;
 
   for (const CalleeSavedInfo &I : CSI) {
     Register Reg = I.getReg();
     unsigned HWReg = TRI->getEncodingValue(Reg);
     // list12 bit N corresponds to register r(20+N)
-    // bit 0 = r20, bit 1 = r21, ..., bit 9 = r29, bit 10 = r30(EP), bit 11 = r31(LP)
+    // bit 0 = r20, bit 1 = r21, ..., bit 9 = r29, bit 10 = r30(EP), bit 11 =
+    // r31(LP)
     if (HWReg >= 20 && HWReg <= 31) {
       List12 |= (1 << (HWReg - 20));
     }
