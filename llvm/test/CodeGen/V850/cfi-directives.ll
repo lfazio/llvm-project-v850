@@ -2,6 +2,11 @@
 
 ; Test CFI (Call Frame Information) directive emission for V850.
 ; CFI directives enable stack unwinding for debuggers and exception handling.
+;
+; The initial frame state is configured in V850MCTargetDesc.cpp:
+;   CFA = SP + 0 (DW_CFA_def_cfa r3, 0)
+; This means at function entry, the CFA (Canonical Frame Address) equals the
+; stack pointer value.
 
 ;; Test 1: Simple function with no stack frame
 ; No CFI directives needed beyond .cfi_startproc/.cfi_endproc

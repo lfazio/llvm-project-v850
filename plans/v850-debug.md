@@ -107,18 +107,37 @@ def PSW : V850SysReg<5, "psw">, DwarfRegNum<[65]>;
 // ... etc
 ```
 
-### 1.3 Initial Frame State [TODO]
+### 1.3 Initial Frame State [IMPLEMENTED]
 
-**File:** `llvm/lib/Target/V850/V850FrameLowering.h`
+**File:** `llvm/lib/Target/V850/MCTargetDesc/V850MCTargetDesc.cpp`
 
+The initial frame state is configured via `addInitialFrameState()` in the custom
+`createV850MCAsmInfo()` function. This establishes the CFA (Canonical Frame Address)
+at function entry.
+
+**Implementation:**
 ```cpp
-const MCRegisterInfo *MRI,
-                     const TargetRegisterInfo *TRI) const override;
+static MCAsmInfo *createV850MCAsmInfo(const MCRegisterInfo &MRI,
+                                       const Triple &TT,
+                                       const MCTargetOptions &Options) {
+  MCAsmInfo *MAI = new V850MCAsmInfo(TT, Options);
+
+  // Set up initial frame state: CFA = SP + 0
+  // SP is R3 on V850
+  unsigned SP = MRI.getDwarfRegNum(V850::SP, true);
+  MCCFIInstruction Inst = MCCFIInstruction::cfiDefCfa(nullptr, SP, 0);
+  MAI->addInitialFrameState(Inst);
+
+  return MAI;
+}
 ```
 
-Implementation should define:
-- CFA = SP + 0
-- Return address in LP (r31)
+**Effect:**
+- At function entry, CFA = SP + 0
+- Encoded in CIE as `DW_CFA_def_cfa r3, 0` (bytes: 0x0c 0x03 0x00)
+- Debuggers use this as the starting point for stack unwinding
+
+**Test:** `llvm/test/CodeGen/V850/initial-frame-state.ll`
 
 ---
 
@@ -639,3 +658,4 @@ lldb/test/API/functionalities/unwind/v850/
 | 2026-01-17 | 1.0 | Initial plan |
 | 2026-01-24 | 1.1 | Phase 1 (CFI Emission) completed |
 | 2026-01-24 | 1.2 | Debug intrinsics (DBTRAP, debug register access) completed |
+| 2026-01-24 | 1.3 | Initial frame state implemented |

@@ -11,9 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "V850MCTargetDesc.h"
+#include "TargetInfo/V850TargetInfo.h"
 #include "V850InstPrinter.h"
 #include "V850MCAsmInfo.h"
-#include "TargetInfo/V850TargetInfo.h"
+#include "llvm/MC/MCDwarf.h"
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/MC/MCSubtargetInfo.h"
@@ -45,6 +46,20 @@ static MCRegisterInfo *createV850MCRegisterInfo(const Triple & /*TT*/) {
   return X;
 }
 
+static MCAsmInfo *createV850MCAsmInfo(const MCRegisterInfo &MRI,
+                                      const Triple &TT,
+                                      const MCTargetOptions &Options) {
+  MCAsmInfo *MAI = new V850MCAsmInfo(TT, Options);
+
+  // Set up initial frame state: CFA = SP + 0
+  // SP is R3 on V850
+  unsigned SP = MRI.getDwarfRegNum(V850::SP, true);
+  MCCFIInstruction Inst = MCCFIInstruction::cfiDefCfa(nullptr, SP, 0);
+  MAI->addInitialFrameState(Inst);
+
+  return MAI;
+}
+
 static MCSubtargetInfo *createV850MCSubtargetInfo(const Triple &TT,
                                                   StringRef CPU, StringRef FS) {
   if (CPU.empty())
@@ -65,8 +80,8 @@ static MCInstPrinter *createV850MCInstPrinter(const Triple & /*T*/,
 extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void LLVMInitializeV850TargetMC() {
   Target &T = getTheV850Target();
 
-  // Register the MC asm info.
-  RegisterMCAsmInfo<V850MCAsmInfo> X(T);
+  // Register the MC asm info with initial frame state.
+  TargetRegistry::RegisterMCAsmInfo(T, createV850MCAsmInfo);
 
   // Register the MC instruction info.
   TargetRegistry::RegisterMCInstrInfo(T, createV850MCInstrInfo);
