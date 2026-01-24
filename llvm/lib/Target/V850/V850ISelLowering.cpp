@@ -13,6 +13,7 @@
 #include "V850ISelLowering.h"
 #include "MCTargetDesc/V850BaseInfo.h"
 #include "V850.h"
+#include "V850MachineFunctionInfo.h"
 #include "V850RegisterInfo.h"
 #include "V850Subtarget.h"
 #include "V850TargetMachine.h"
@@ -160,8 +161,8 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::BR_JT, MVT::Other, Expand);
   }
 
-  // VAARG support - expand
-  setOperationAction(ISD::VASTART, MVT::Other, Expand);
+  // VAARG support - VASTART needs custom lowering to set up va_list
+  setOperationAction(ISD::VASTART, MVT::Other, Custom);
   setOperationAction(ISD::VAARG, MVT::Other, Expand);
   setOperationAction(ISD::VAEND, MVT::Other, Expand);
   setOperationAction(ISD::VACOPY, MVT::Other, Expand);
@@ -301,6 +302,8 @@ SDValue V850TargetLowering::LowerOperation(SDValue Op,
     return LowerINTRINSIC_W_CHAIN(Op, DAG);
   case ISD::BR_JT:
     return LowerBR_JT(Op, DAG);
+  case ISD::VASTART:
+    return LowerVASTART(Op, DAG);
   }
 }
 
@@ -614,6 +617,25 @@ unsigned V850TargetLowering::getJumpTableEncoding() const {
 }
 
 //===----------------------------------------------------------------------===//
+//                      Varargs Support
+//===----------------------------------------------------------------------===//
+
+SDValue V850TargetLowering::LowerVASTART(SDValue Op, SelectionDAG &DAG) const {
+  MachineFunction &MF = DAG.getMachineFunction();
+  V850MachineFunctionInfo *FuncInfo = MF.getInfo<V850MachineFunctionInfo>();
+
+  SDLoc DL(Op);
+  SDValue FI = DAG.getFrameIndex(FuncInfo->getVarArgsFrameIndex(),
+                                 getPointerTy(MF.getDataLayout()));
+
+  // vastart just stores the address of the VarArgsFrameIndex slot into the
+  // memory location argument (the va_list pointer).
+  const Value *SV = cast<SrcValueSDNode>(Op.getOperand(2))->getValue();
+  return DAG.getStore(Op.getOperand(0), DL, FI, Op.getOperand(1),
+                      MachinePointerInfo(SV));
+}
+
+//===----------------------------------------------------------------------===//
 //                      Calling Convention Implementation
 //===----------------------------------------------------------------------===//
 
@@ -663,6 +685,17 @@ SDValue V850TargetLowering::LowerFormalArguments(
     }
 
     InVals.push_back(ArgValue);
+  }
+
+  // If the function takes variable number of arguments, make a frame index for
+  // the start of the first vararg value... for expansion of llvm.va_start.
+  if (isVarArg) {
+    V850MachineFunctionInfo *FuncInfo = MF.getInfo<V850MachineFunctionInfo>();
+    unsigned StackSize = CCInfo.getStackSize();
+    // Create a fixed stack object for the varargs area.
+    // This is the location after all fixed arguments on the stack.
+    int VarArgsFrameIndex = MFI.CreateFixedObject(4, StackSize, true);
+    FuncInfo->setVarArgsFrameIndex(VarArgsFrameIndex);
   }
 
   return Chain;

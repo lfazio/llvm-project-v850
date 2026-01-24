@@ -12,6 +12,7 @@
 
 #include "V850TargetMachine.h"
 #include "V850.h"
+#include "V850MachineFunctionInfo.h"
 #include "V850Subtarget.h"
 #include "V850TargetObjectFile.h"
 #include "TargetInfo/V850TargetInfo.h"
@@ -142,4 +143,11 @@ void V850PassConfig::addPreEmitPass() {
   // It expands conditional branches that are out of range by inverting the
   // condition and inserting an unconditional branch to the original target.
   addPass(&BranchRelaxationPassID);
+}
+
+MachineFunctionInfo *V850TargetMachine::createMachineFunctionInfo(
+    BumpPtrAllocator &Allocator, const Function &F,
+    const TargetSubtargetInfo *STI) const {
+  return V850MachineFunctionInfo::create<V850MachineFunctionInfo>(Allocator, F,
+                                                                  STI);
 }

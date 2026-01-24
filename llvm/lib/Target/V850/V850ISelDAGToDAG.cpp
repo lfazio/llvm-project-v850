@@ -255,7 +255,7 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
   }
 
   case V850ISD::CALL: {
-    // V850ISD::CALL chain, callee, [args...], regmask, [glue]
+    // V850ISD::CALL chain, callee, [reg args...], regmask, [glue]
     SDValue Chain = Node->getOperand(0);
     SDValue Callee = Node->getOperand(1);
 
@@ -269,11 +269,23 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
 
     SmallVector<SDValue, 8> Ops;
     Ops.push_back(Callee);
+
+    // Add register operands and register mask (all operands except chain,
+    // callee, and optional glue at the end)
+    unsigned NumOps = Node->getNumOperands();
+    bool HasGlue = Node->getGluedNode() != nullptr;
+    unsigned LastOp = HasGlue ? NumOps - 1 : NumOps;
+
+    // Skip chain (op 0) and callee (op 1), add remaining operands
+    for (unsigned i = 2; i < LastOp; ++i)
+      Ops.push_back(Node->getOperand(i));
+
+    // Add chain
     Ops.push_back(Chain);
 
     // Add glue if present
-    if (Node->getGluedNode())
-      Ops.push_back(Node->getOperand(Node->getNumOperands() - 1));
+    if (HasGlue)
+      Ops.push_back(Node->getOperand(NumOps - 1));
 
     SDVTList NodeTys = CurDAG->getVTList(MVT::Other, MVT::Glue);
     SDNode *Call = CurDAG->getMachineNode(V850::CALL, DL, NodeTys, Ops);

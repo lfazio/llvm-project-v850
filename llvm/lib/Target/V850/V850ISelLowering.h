@@ -108,6 +108,7 @@ public:
   SDValue LowerDivRem(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerINTRINSIC_W_CHAIN(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerBR_JT(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerVASTART(SDValue Op, SelectionDAG &DAG) const;
 
   /// getJumpTableEncoding - Return the entry encoding for jump tables.
   /// V850E1+ uses inline jump tables with SWITCH instruction.

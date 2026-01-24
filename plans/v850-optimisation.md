@@ -795,11 +795,51 @@ test_add_0_strict:
 
 ---
 
-### 9.3 Varargs Optimization [TODO]
+### 9.3 Varargs Support [IMPLEMENTED]
 
-**Description:** Optimize variable argument handling.
+**Description:** Variable argument (varargs) function support.
 
-**Priority:** Low
+**Implementation Details:**
+- `V850MachineFunctionInfo` class tracks varargs frame index
+- Custom `ISD::VASTART` lowering stores varargs area pointer to va_list
+- `LowerFormalArguments` creates fixed stack object for varargs area
+- Fixed `V850ISD::CALL` ISel to properly pass register operands
+
+**Files:**
+- `llvm/lib/Target/V850/V850MachineFunctionInfo.h` - New MFI class
+- `llvm/lib/Target/V850/V850ISelLowering.cpp` - VASTART lowering
+- `llvm/lib/Target/V850/V850ISelDAGToDAG.cpp` - Fixed CALL selection
+- `llvm/lib/Target/V850/V850TargetMachine.cpp` - MFI registration
+- `llvm/test/CodeGen/V850/varargs.ll` - Tests
+
+**Calling Convention:**
+- First 4 arguments: r6, r7, r8, r9
+- Additional arguments: on stack
+- va_list: pointer to first vararg on stack
+
+**Example:**
+```c
+int sum(int count, ...) {
+    va_list ap;
+    va_start(ap, count);
+    // ap now points to stack after 'count'
+    ...
+}
+```
+
+**Generated Assembly:**
+```asm
+varargs_receiver:
+    add -4, r3              ; allocate space for va_list
+    addi 0, r3, r10         ; r10 = address of va_list
+    addi 4, r3, r11         ; r11 = address of varargs area
+    st.w r11, 0[r10]        ; va_list = &varargs
+    mov r6, r10             ; return first arg
+    add 4, r3               ; deallocate
+    jmp [r31]
+```
+
+**Status:** Implemented
 
 ---
 
@@ -918,6 +958,7 @@ test_add_0_strict:
 15. ~~Function Alignment Optimization (5.3)~~ - DONE (2-byte min, 4-byte preferred)
 16. ~~SIMD-like Operations (7.2)~~ - DONE (BSH for bswap16, FMA patterns fixed)
 17. ~~FP Constant Folding (7.3)~~ - DONE (LLVM infrastructure, IEEE 754 compliant)
+18. ~~Varargs Support (9.3)~~ - DONE (V850MachineFunctionInfo, LowerVASTART, fixed CALL ISel)
 
 ### High Priority (Next Phase)
 - None currently queued
@@ -934,8 +975,7 @@ test_add_0_strict:
 3. Hardware Loop Support (6.1)
 4. Loop Strength Reduction (6.3)
 5. Memory Barrier Optimization (8.3)
-6. Varargs Optimization (9.3)
-7. Cache Control Intrinsics (10.7)
+6. Cache Control Intrinsics (10.7)
 
 ---
 
