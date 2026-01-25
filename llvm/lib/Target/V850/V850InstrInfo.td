@@ -700,6 +700,16 @@ def CALL : V850Pseudo<(outs), (ins brtarget22:$target),
                       "jarl\t$target, lp",
                       []>;
 
+// CALL_REG pseudo-instruction - indirect call via register
+// Synthesizes: add 4, lp followed by jmp [target]
+// This saves PC+4 to LP then jumps to the target address
+let isCall = 1, isIndirectBranch = 1,
+    Defs = [LP, R6, R7, R8, R9, R10, R11],
+    Uses = [SP] in
+def CALL_REG : V850Pseudo<(outs), (ins GPR:$target),
+                          "# indirect call via $target",
+                          []>;
+
 // TAIL_CALL pseudo-instruction for tail call optimization
 // Uses JR instead of JARL since we don't need to save return address
 let isCall = 1, isTerminator = 1, isReturn = 1, isBarrier = 1,

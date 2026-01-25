@@ -64,6 +64,9 @@ public:
   void applyFixup(const MCFragment &F, const MCFixup &Fixup,
                   const MCValue &Target, MutableArrayRef<char> Data,
                   uint64_t Value, bool IsResolved) override {
+    // Let the base class handle relocation generation
+    maybeAddReloc(F, Fixup, Target, Value, IsResolved);
+
     MCFixupKind Kind = Fixup.getKind();
     if (Kind >= FirstTargetFixupKind)
       Kind = static_cast<MCFixupKind>(unsigned(Kind - FirstTargetFixupKind));

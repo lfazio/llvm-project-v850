@@ -50,7 +50,7 @@ entry:
 ; CHECK:       movea .L.str, r4, r6
 ; CHECK:       mov 10, r7
 ; CHECK:       movea 20, r0, r8
-; CHECK:       jarl external_varargs, lp
+; CHECK:       jarl external_varargs, r31
 define i32 @call_varargs() {
   %result = call i32 (ptr, ...) @external_varargs(ptr @.str, i32 10, i32 20)
   ret i32 %result

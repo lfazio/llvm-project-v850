@@ -31,7 +31,7 @@ define i32 @simple_func(i32 %a, i32 %b) {
 ; CHECK-NEXT:  .cfi_offset r31, -4
 ; CHECK:       add -4, r3
 ; CHECK-NEXT:  .cfi_def_cfa_offset 8
-; CHECK:       jarl external_func, lp
+; CHECK:       jarl external_func, r31
 ; CHECK:       dispose 0, 2048, [r31]
 ; CHECK:       .cfi_endproc
 define i32 @func_with_call(i32 %a) {

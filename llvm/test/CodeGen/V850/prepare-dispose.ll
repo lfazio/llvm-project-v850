@@ -10,12 +10,12 @@ declare void @external()
 define void @test_save_lp() {
 ; V850E1-LABEL: test_save_lp:
 ; V850E1: prepare 2048, 0
-; V850E1: jarl external, lp
+; V850E1: jarl external, r31
 ; V850E1: dispose 0, 2048, [r31]
 
 ; V850-LABEL: test_save_lp:
 ; V850: st.w r31
-; V850: jarl external, lp
+; V850: jarl external, r31
 ; V850: ld.w {{.*}}, r31
 ; V850: jmp [r31]
   call void @external()
@@ -44,7 +44,7 @@ define void @test_with_fp() "frame-pointer"="all" {
 ; V850E1-LABEL: test_with_fp:
 ; V850E1: st.w r29
 ; V850E1: st.w r31
-; V850E1: jarl external, lp
+; V850E1: jarl external, r31
   call void @external()
   ret void
 }

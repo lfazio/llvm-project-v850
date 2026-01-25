@@ -20,7 +20,7 @@ define i32 @simple_tailcall(i32 %x) {
 define i32 @non_tailcall(i32 %x) {
 ; CHECK-LABEL: non_tailcall:
 ; CHECK: prepare
-; CHECK: jarl bar, lp
+; CHECK: jarl bar, r31
 ; CHECK: dispose
   %r = call i32 @bar(i32 %x)
   ret i32 %r
@@ -39,7 +39,7 @@ define i32 @tailcall_multi_args(i32 %x, i32 %y) {
 ; Cannot tail call if there's computation after the call
 define i32 @no_tailcall_post_compute(i32 %x) {
 ; CHECK-LABEL: no_tailcall_post_compute:
-; CHECK: jarl bar, lp
+; CHECK: jarl bar, r31
 ; CHECK-NOT: jr bar
   %r = call i32 @bar(i32 %x)
   %s = add i32 %r, 1
@@ -52,7 +52,7 @@ declare i32 @many_args(i32, i32, i32, i32, i32, i32, i32)
 
 define i32 @no_tailcall_callee_stack(i32 %a, i32 %b) {
 ; CHECK-LABEL: no_tailcall_callee_stack:
-; CHECK: jarl many_args, lp
+; CHECK: jarl many_args, r31
 ; Callee needs 7 args (3 on stack), tail call not allowed
   %r = tail call i32 @many_args(i32 %a, i32 %b, i32 1, i32 2, i32 3, i32 4, i32 5)
   ret i32 %r

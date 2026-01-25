@@ -13,6 +13,7 @@
 #include "V850MCTargetDesc.h"
 #include "llvm/MC/MCCodeEmitter.h"
 #include "llvm/MC/MCContext.h"
+#include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCFixup.h"
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCInstrInfo.h"
@@ -106,7 +107,11 @@ unsigned V850MCCodeEmitter::getMachineOpValue(const MCInst &MI,
   if (MO.isImm())
     return static_cast<unsigned>(MO.getImm());
 
-  llvm_unreachable("Unhandled expression!");
+  // Handle expression operand - add fixup and return 0 as placeholder
+  assert(MO.isExpr() && "Expected expression operand");
+  Fixups.push_back(MCFixup::create(0, MO.getExpr(),
+                                   static_cast<MCFixupKind>(V850::fixup_v850_32),
+                                   /*PCRel=*/false));
   return 0;
 }
 
@@ -117,7 +122,11 @@ unsigned V850MCCodeEmitter::getBranchTarget9OpValue(
   if (MO.isImm())
     return MO.getImm() >> 1; // Shift right by 1 (bit 0 is implicit 0)
 
-  // TODO: Handle fixups for symbolic operands
+  // Handle expression operand - add PC-relative fixup
+  assert(MO.isExpr() && "Expected expression operand");
+  Fixups.push_back(MCFixup::create(0, MO.getExpr(),
+                                   static_cast<MCFixupKind>(V850::fixup_v850_9_pcrel),
+                                   /*PCRel=*/true));
   return 0;
 }
 
@@ -128,7 +137,11 @@ unsigned V850MCCodeEmitter::getBranchTarget22OpValue(
   if (MO.isImm())
     return MO.getImm() >> 1; // Shift right by 1 (bit 0 is implicit 0)
 
-  // TODO: Handle fixups for symbolic operands
+  // Handle expression operand - add PC-relative fixup for JARL/JR
+  assert(MO.isExpr() && "Expected expression operand");
+  Fixups.push_back(MCFixup::create(0, MO.getExpr(),
+                                   static_cast<MCFixupKind>(V850::fixup_v850_22_pcrel),
+                                   /*PCRel=*/true));
   return 0;
 }
 
@@ -139,7 +152,11 @@ unsigned V850MCCodeEmitter::getBranchTarget32OpValue(
   if (MO.isImm())
     return MO.getImm() >> 1; // Shift right by 1 (bit 0 is implicit 0)
 
-  // TODO: Handle fixups for symbolic operands
+  // Handle expression operand - add PC-relative fixup for 32-bit branch
+  assert(MO.isExpr() && "Expected expression operand");
+  Fixups.push_back(MCFixup::create(0, MO.getExpr(),
+                                   static_cast<MCFixupKind>(V850::fixup_v850_32),
+                                   /*PCRel=*/true));
   return 0;
 }
 

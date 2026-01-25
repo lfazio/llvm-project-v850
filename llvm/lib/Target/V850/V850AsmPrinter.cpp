@@ -129,6 +129,114 @@ void V850AsmPrinter::emitInstruction(const MachineInstr *MI) {
     EmitToStreamer(*OutStreamer, JmpInst);
     return;
   }
+  case V850::CALL: {
+    // CALL pseudo expands to: jarl target, lp
+    // JARL MCInst operand order: (outs GPR:$reg2), (ins brtarget22:$disp22)
+    // So reg2 (LP) comes first, then the target
+    MCInst JarlInst;
+    JarlInst.setOpcode(V850::JARL);
+    // Output operand first: the register where return address is stored
+    JarlInst.addOperand(MCOperand::createReg(V850::LP));
+    // Input operand second: the call target
+    const MachineOperand &MO = MI->getOperand(0);
+    if (MO.isGlobal()) {
+      JarlInst.addOperand(MCOperand::createExpr(
+          MCSymbolRefExpr::create(getSymbol(MO.getGlobal()), OutContext)));
+    } else if (MO.isSymbol()) {
+      JarlInst.addOperand(MCOperand::createExpr(
+          MCSymbolRefExpr::create(
+              GetExternalSymbolSymbol(MO.getSymbolName()), OutContext)));
+    } else if (MO.isMBB()) {
+      JarlInst.addOperand(MCOperand::createExpr(
+          MCSymbolRefExpr::create(MO.getMBB()->getSymbol(), OutContext)));
+    } else {
+      llvm_unreachable("Unknown CALL target operand type");
+    }
+    EmitToStreamer(*OutStreamer, JarlInst);
+    return;
+  }
+  case V850::CALL_REG: {
+    // CALL_REG pseudo expands to indirect call sequence
+    // V850 doesn't have indirect JARL, so we need a trampoline:
+    //   jarl .Lhelper, lp   ; LP = addr of jmp, jump to helper
+    //   jmp [target]        ; The actual indirect jump
+    // .Lhelper:
+    //   add 4, lp           ; Adjust LP to point after jmp
+    //   br .Ljmp            ; Go back to execute the jmp
+    //
+    // This is inefficient but correct. For now, use simpler approach:
+    // Since V850 JARL saves PC+4 to reg and then jumps, we use:
+    //   jarl .+8, lp        ; LP = PC+4, jump forward 8 bytes
+    //   jmp [target]        ; At PC+4, actual call (skipped by jarl initially)
+    //   br .-4              ; At PC+8, branch back to jmp
+    //
+    // Trace: jarl sets LP=addr_of_jmp, jumps to br, br jumps to jmp,
+    // jmp executes with LP = addr_of_jmp (wrong!)
+    //
+    // Correct approach using local labels:
+    MCSymbol *JmpLabel = OutContext.createTempSymbol("call_jmp");
+    MCSymbol *HelperLabel = OutContext.createTempSymbol("call_helper");
+
+    // Emit: jarl .Lhelper, lp
+    MCInst JarlInst;
+    JarlInst.setOpcode(V850::JARL);
+    JarlInst.addOperand(MCOperand::createReg(V850::LP));
+    JarlInst.addOperand(MCOperand::createExpr(
+        MCSymbolRefExpr::create(HelperLabel, OutContext)));
+    EmitToStreamer(*OutStreamer, JarlInst);
+
+    // Emit: .Ljmp: jmp [target]
+    OutStreamer->emitLabel(JmpLabel);
+    MCInst JmpInst;
+    JmpInst.setOpcode(V850::JMP);
+    JmpInst.addOperand(MCOperand::createReg(MI->getOperand(0).getReg()));
+    EmitToStreamer(*OutStreamer, JmpInst);
+
+    // Emit: .Lhelper: add 2, lp (adjust LP past 2-byte jmp instruction)
+    OutStreamer->emitLabel(HelperLabel);
+    MCInst AddInst;
+    AddInst.setOpcode(V850::ADDi);  // add imm5, reg2
+    // Operand order: reg2 (out), imm5 (in), rs (in, same as reg2 via constraint)
+    AddInst.addOperand(MCOperand::createReg(V850::LP));  // reg2 output
+    AddInst.addOperand(MCOperand::createImm(2));         // imm5: jmp is 2 bytes
+    AddInst.addOperand(MCOperand::createReg(V850::LP));  // rs input
+    EmitToStreamer(*OutStreamer, AddInst);
+
+    // Emit: br .Ljmp (branch back to execute jmp)
+    MCInst BrInst;
+    BrInst.setOpcode(V850::BR);
+    BrInst.addOperand(MCOperand::createExpr(
+        MCSymbolRefExpr::create(JmpLabel, OutContext)));
+    EmitToStreamer(*OutStreamer, BrInst);
+    return;
+  }
+  case V850::TAIL_CALL: {
+    // TAIL_CALL pseudo expands to: jr target
+    MCInst JrInst;
+    JrInst.setOpcode(V850::JR);
+    // Lower the call target operand
+    const MachineOperand &MO = MI->getOperand(0);
+    if (MO.isGlobal()) {
+      JrInst.addOperand(MCOperand::createExpr(
+          MCSymbolRefExpr::create(getSymbol(MO.getGlobal()), OutContext)));
+    } else if (MO.isSymbol()) {
+      JrInst.addOperand(MCOperand::createExpr(
+          MCSymbolRefExpr::create(
+              GetExternalSymbolSymbol(MO.getSymbolName()), OutContext)));
+    } else {
+      llvm_unreachable("Unknown TAIL_CALL target operand type");
+    }
+    EmitToStreamer(*OutStreamer, JrInst);
+    return;
+  }
+  case V850::TAIL_CALL_REG: {
+    // TAIL_CALL_REG pseudo expands to: jmp [reg]
+    MCInst JmpInst;
+    JmpInst.setOpcode(V850::JMP);
+    JmpInst.addOperand(MCOperand::createReg(MI->getOperand(0).getReg()));
+    EmitToStreamer(*OutStreamer, JmpInst);
+    return;
+  }
   case V850::SWITCH_JT: {
     // SWITCH_JT pseudo expands to: switch reg + inline jump table
     // Emit the SWITCH instruction

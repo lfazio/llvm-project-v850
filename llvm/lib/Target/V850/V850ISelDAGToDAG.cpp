@@ -259,12 +259,15 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
     SDValue Chain = Node->getOperand(0);
     SDValue Callee = Node->getOperand(1);
 
-    // Handle global address or external symbol
+    // Determine if this is a direct or indirect call
+    bool IsIndirect = true;
     if (GlobalAddressSDNode *G = dyn_cast<GlobalAddressSDNode>(Callee)) {
       Callee = CurDAG->getTargetGlobalAddress(G->getGlobal(), DL, MVT::i32);
+      IsIndirect = false;
     } else if (ExternalSymbolSDNode *E =
                    dyn_cast<ExternalSymbolSDNode>(Callee)) {
       Callee = CurDAG->getTargetExternalSymbol(E->getSymbol(), MVT::i32);
+      IsIndirect = false;
     }
 
     SmallVector<SDValue, 8> Ops;
@@ -288,7 +291,9 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
       Ops.push_back(Node->getOperand(NumOps - 1));
 
     SDVTList NodeTys = CurDAG->getVTList(MVT::Other, MVT::Glue);
-    SDNode *Call = CurDAG->getMachineNode(V850::CALL, DL, NodeTys, Ops);
+    // Use CALL_REG for indirect calls (via register), CALL for direct calls
+    unsigned Opcode = IsIndirect ? V850::CALL_REG : V850::CALL;
+    SDNode *Call = CurDAG->getMachineNode(Opcode, DL, NodeTys, Ops);
 
     ReplaceNode(Node, Call);
     return;
