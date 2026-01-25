@@ -81,10 +81,14 @@ void V850FrameLowering::emitPrologue(MachineFunction &MF,
   // so that prologue code (especially FP setup) comes after CSR saves.
   // This is required because PREPARE saves the old register values before
   // modification, and CFI directives must follow their associated instructions.
+  bool UsedPrepare = false;
   while (MBBI != MBB.end() &&
          (MBBI->getOpcode() == V850::PREPARE ||
-          MBBI->getOpcode() == TargetOpcode::CFI_INSTRUCTION))
+          MBBI->getOpcode() == TargetOpcode::CFI_INSTRUCTION)) {
+    if (MBBI->getOpcode() == V850::PREPARE)
+      UsedPrepare = true;
     ++MBBI;
+  }
 
   DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
 
@@ -94,9 +98,13 @@ void V850FrameLowering::emitPrologue(MachineFunction &MF,
   if (StackSize == 0)
     return;
 
-  // Calculate total CFA offset (callee-saved + local frame)
+  // Calculate total CFA offset for CFI directives.
+  // - With PREPARE: CSRs are saved by PREPARE (separate from StackSize),
+  //   so total CFA offset = CalleeSavedSize + StackSize.
+  // - Without PREPARE: CSR space is included in StackSize (via frame indices),
+  //   so total CFA offset = StackSize.
   unsigned CalleeSavedSize = FuncInfo->getCalleeSavedStackSize();
-  int64_t TotalCFAOffset = CalleeSavedSize + StackSize;
+  int64_t TotalCFAOffset = UsedPrepare ? CalleeSavedSize + StackSize : StackSize;
 
   // Adjust stack pointer: SP = SP - StackSize
   // Prefer 16-bit ADDi for small offsets, then 32-bit ADDI, then use a register
@@ -135,14 +143,54 @@ void V850FrameLowering::emitPrologue(MachineFunction &MF,
   CFIBuilder.buildDefCFAOffset(TotalCFAOffset);
 
   // Set up frame pointer if needed
+  // For proper frame pointer chain, FP should point to where old FP was saved
+  // so that [FP] = previous frame's FP. This enables debuggers to walk the stack.
+  //
+  // Frame layout (growing downward):
+  //   [CFA = original SP]
+  //   [CalleeSavedSize bytes of saved registers at CFA-4, CFA-8, ...]
+  //   [LocalFrameSize bytes of local variables]
+  //   [SP after complete prologue = CFA - StackSize]
+  //
+  // FPOffset = offset from CFA to saved r29 (e.g., 12 means r29 at CFA-12)
+  // FP should point to saved r29: FP = CFA - FPOffset
+  // Since SP = CFA - StackSize: FP = SP + (StackSize - FPOffset)
   if (hasFP(MF)) {
-    BuildMI(MBB, MBBI, DL, TII.get(V850::MOV), V850::R29)
-        .addReg(V850::SP)
-        .setMIFlag(MachineInstr::FrameSetup);
+    int FPOffset = FuncInfo->getFPOffset();
+    int FPFromSP = StackSize - FPOffset;
 
-    // Emit CFI to indicate CFA is now FP-based
+    // FP = SP + FPFromSP (to point to saved r29 location)
+    if (FPFromSP == 0) {
+      // FP = SP
+      BuildMI(MBB, MBBI, DL, TII.get(V850::MOV), V850::R29)
+          .addReg(V850::SP)
+          .setMIFlag(MachineInstr::FrameSetup);
+    } else if (isInt<16>(FPFromSP)) {
+      // FP = SP + FPFromSP using ADDI
+      BuildMI(MBB, MBBI, DL, TII.get(V850::ADDI), V850::R29)
+          .addReg(V850::SP)
+          .addImm(FPFromSP)
+          .setMIFlag(MachineInstr::FrameSetup);
+    } else {
+      // For large offsets, use MOVHI + ADDI + ADD
+      BuildMI(MBB, MBBI, DL, TII.get(V850::MOVHI), V850::R29)
+          .addImm((FPFromSP >> 16) & 0xFFFF)
+          .addReg(V850::R0)
+          .setMIFlag(MachineInstr::FrameSetup);
+      BuildMI(MBB, MBBI, DL, TII.get(V850::ADDI), V850::R29)
+          .addReg(V850::R29)
+          .addImm(FPFromSP & 0xFFFF)
+          .setMIFlag(MachineInstr::FrameSetup);
+      BuildMI(MBB, MBBI, DL, TII.get(V850::ADD), V850::R29)
+          .addReg(V850::SP)
+          .addReg(V850::R29)
+          .setMIFlag(MachineInstr::FrameSetup);
+    }
+
+    // CFI: CFA = FP + FPOffset
+    // FP points to saved r29 at CFA - FPOffset, so CFA = FP + FPOffset
     CFIBuilder.setInsertPoint(MBBI);
-    CFIBuilder.buildDefCFA(V850::R29, TotalCFAOffset);
+    CFIBuilder.buildDefCFA(V850::R29, FPOffset);
   }
 }
 
@@ -151,6 +199,7 @@ void V850FrameLowering::emitEpilogue(MachineFunction &MF,
   MachineFrameInfo &MFI = MF.getFrameInfo();
   const V850InstrInfo &TII =
       *static_cast<const V850InstrInfo *>(MF.getSubtarget().getInstrInfo());
+  V850MachineFunctionInfo *FuncInfo = MF.getInfo<V850MachineFunctionInfo>();
 
   MachineBasicBlock::iterator MBBI = MBB.getLastNonDebugInstr();
   DebugLoc DL = MBBI->getDebugLoc();
@@ -161,11 +210,39 @@ void V850FrameLowering::emitEpilogue(MachineFunction &MF,
   if (StackSize == 0)
     return;
 
-  // Restore frame pointer if used
+  // Restore stack pointer from frame pointer if used
+  // FP = SP + (StackSize - FPOffset)
+  // So SP = FP - (StackSize - FPOffset) = FP - StackSize + FPOffset
   if (hasFP(MF)) {
-    BuildMI(MBB, MBBI, DL, TII.get(V850::MOV), V850::SP)
-        .addReg(V850::R29)
-        .setMIFlag(MachineInstr::FrameDestroy);
+    int FPOffset = FuncInfo->getFPOffset();
+    int SPFromFP = FPOffset - static_cast<int>(StackSize);
+
+    if (SPFromFP == 0) {
+      // SP = FP
+      BuildMI(MBB, MBBI, DL, TII.get(V850::MOV), V850::SP)
+          .addReg(V850::R29)
+          .setMIFlag(MachineInstr::FrameDestroy);
+    } else if (isInt<16>(SPFromFP)) {
+      // SP = FP + SPFromFP using ADDI
+      BuildMI(MBB, MBBI, DL, TII.get(V850::ADDI), V850::SP)
+          .addReg(V850::R29)
+          .addImm(SPFromFP)
+          .setMIFlag(MachineInstr::FrameDestroy);
+    } else {
+      // For large offsets, use MOVHI + ADDI + ADD
+      BuildMI(MBB, MBBI, DL, TII.get(V850::MOVHI), V850::R1)
+          .addImm((SPFromFP >> 16) & 0xFFFF)
+          .addReg(V850::R0)
+          .setMIFlag(MachineInstr::FrameDestroy);
+      BuildMI(MBB, MBBI, DL, TII.get(V850::ADDI), V850::R1)
+          .addReg(V850::R1)
+          .addImm(SPFromFP & 0xFFFF)
+          .setMIFlag(MachineInstr::FrameDestroy);
+      BuildMI(MBB, MBBI, DL, TII.get(V850::ADD), V850::SP)
+          .addReg(V850::R29)
+          .addReg(V850::R1)
+          .setMIFlag(MachineInstr::FrameDestroy);
+    }
   } else {
     // Adjust stack pointer: SP = SP + StackSize
     // Prefer 16-bit ADDi for small offsets
@@ -216,6 +293,29 @@ bool V850FrameLowering::spillCalleeSavedRegisters(
   // Calculate total size of callee-saved registers
   unsigned CalleeSavedSize = CSI.size() * 4; // Each register is 4 bytes
   FuncInfo->setCalleeSavedStackSize(CalleeSavedSize);
+
+  // Calculate FP offset: where is r29 saved relative to CFA?
+  // This is needed for proper frame pointer chain where [FP] = old FP.
+  //
+  // Frame layout (CSRs stored at negative offsets from CFA):
+  //   CFA - 4:  first CSR (CSI[0])
+  //   CFA - 8:  second CSR (CSI[1])
+  //   ...
+  //   CFA - (i+1)*4: CSR at index i (CSI[i])
+  //
+  // For r29 at CSI index i: r29 is at CFA - (i+1)*4
+  // FPOffset = (i+1)*4 represents the offset from CFA to where r29 is saved.
+  if (hasFP(MF)) {
+    int FPOffset = CalleeSavedSize; // Default: last position if not found
+    for (unsigned i = 0; i < CSI.size(); ++i) {
+      if (CSI[i].getReg() == V850::R29) {
+        // r29 at CFA - (i+1)*4, so FPOffset = (i+1)*4
+        FPOffset = (i + 1) * 4;
+        break;
+      }
+    }
+    FuncInfo->setFPOffset(FPOffset);
+  }
 
   // Try to use PREPARE instruction (V850E1+)
   if (canUsePrepareDispose(MF, CSI)) {
@@ -283,8 +383,11 @@ bool V850FrameLowering::spillCalleeSavedRegisters(
     Offset -= 4;
   }
 
-  // Emit def_cfa_offset for the total callee-saved area
-  CFIBuilder.buildDefCFAOffset(CalleeSavedSize);
+  // Note: In the non-PREPARE fallback case, the stack frame (including CSR
+  // space) is allocated by emitPrologue via MachineFrameInfo::getStackSize().
+  // emitPrologue handles the cfi_def_cfa_offset directive, so we don't emit
+  // it here. This is different from the PREPARE case where PREPARE allocates
+  // the CSR area and we emit cfi_def_cfa_offset immediately after.
 
   return true;
 }

@@ -13,6 +13,7 @@
 #include "V850RegisterInfo.h"
 #include "V850.h"
 #include "V850FrameLowering.h"
+#include "V850MachineFunctionInfo.h"
 #include "V850Subtarget.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
@@ -93,9 +94,20 @@ bool V850RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   Register BasePtr = TFI->hasFP(MF) ? V850::R29 : V850::SP;
   int Offset = MF.getFrameInfo().getObjectOffset(FrameIndex);
 
-  // Add the stack size to get the correct offset from SP
-  if (!TFI->hasFP(MF))
+  // Object offsets are relative to CFA (caller's SP).
+  // Convert to base register-relative offset.
+  if (!TFI->hasFP(MF)) {
+    // SP = CFA - StackSize, so offset from SP is:
+    // object at CFA + objOffset = SP + StackSize + objOffset
     Offset += MF.getFrameInfo().getStackSize();
+  } else {
+    // FP points to where old FP was saved (for frame pointer chain).
+    // FP = CFA - FPOffset (where FPOffset is offset from CFA to saved r29)
+    // Object at CFA + objOffset = FP + FPOffset + objOffset
+    V850MachineFunctionInfo *FuncInfo = MF.getInfo<V850MachineFunctionInfo>();
+    int FPOffset = FuncInfo->getFPOffset();
+    Offset += FPOffset;
+  }
 
   // Fold immediate offset if present
   if (MI.getNumOperands() > FIOperandNum + 1 &&

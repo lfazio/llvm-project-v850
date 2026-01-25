@@ -441,25 +441,49 @@ void setup_breakpoint_channel1(unsigned int addr, unsigned int mask) {
 
 ## 4. Stack Unwinding
 
-### 4.1 Frame Pointer Chain
+### 4.1 Frame Pointer Chain [IMPLEMENTED]
 
-V850 uses r29 as frame pointer when enabled:
+**Status:** Fully implemented with proper frame pointer chain support.
+
+V850 uses r29 as frame pointer when enabled. For proper debugger stack walking,
+FP points to where the old FP was saved, so `[FP] = previous frame's FP`.
 
 ```
 High Address
 +----------------+
 |  Arguments     |
++----------------+ <- CFA (Caller's SP)
+|  Saved r20     |  (CFA - 4, if saved)
 +----------------+
-|  Return Addr   | <- Old SP
+|  Saved r21     |  (CFA - 8, if saved)
 +----------------+
-|  Old FP (r29)  | <- FP points here
+|  Old FP (r29)  | <- FP points here ([FP] = old FP)
 +----------------+
-|  Saved Regs    |
+|  Saved LP      |  (FP - 4)
 +----------------+
 |  Local Vars    |
 +----------------+ <- SP
 Low Address
 ```
+
+**Key Implementation Details:**
+
+1. **FP Setup:** `FP = SP + (StackSize - FPOffset)` where FPOffset is the offset
+   from CFA to where r29 is saved.
+
+2. **Frame Chain:** `[FP] = old FP`, enabling debuggers to walk the stack by
+   following: `current_FP -> previous_FP -> grandparent_FP -> ...`
+
+3. **CFI:** `.cfi_def_cfa r29, <FPOffset>` correctly describes CFA relative to FP.
+
+4. **Files Modified:**
+   - `V850FrameLowering.cpp`: FP setup in emitPrologue, SP restore in emitEpilogue
+   - `V850RegisterInfo.cpp`: eliminateFrameIndex computes FP-relative offsets
+   - `V850MachineFunctionInfo.h`: Stores FPOffset for frame calculations
+
+**Tests:**
+- `llvm/test/CodeGen/V850/frame-pointer.ll`
+- `llvm/test/CodeGen/V850/frame-pointer-chain.ll`
 
 ### 4.2 PREPARE/DISPOSE Unwinding
 
@@ -685,3 +709,4 @@ lldb/test/API/functionalities/unwind/v850/
 | 2026-01-24 | 1.2 | Debug intrinsics (DBTRAP, debug register access) completed |
 | 2026-01-24 | 1.3 | Initial frame state implemented |
 | 2026-01-25 | 1.4 | Breakpoint channel selection implemented (write_dir, select_bp_channel) |
+| 2026-01-25 | 1.5 | Frame pointer chain implemented for proper debugger stack walking |

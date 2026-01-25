@@ -30,6 +30,11 @@ class V850MachineFunctionInfo : public MachineFunctionInfo {
   /// stack frame in bytes.
   unsigned CalleeSavedStackSize = 0;
 
+  /// FPOffset - Offset from SP to where the frame pointer (r29) was saved.
+  /// Used to set up proper frame pointer chain where [FP] = old FP.
+  /// Only valid when frame pointer is used.
+  int FPOffset = 0;
+
   /// IsInterruptHandler - Whether or not the function is an interrupt handler.
   bool IsInterruptHandler = false;
 
@@ -54,6 +59,9 @@ public:
 
   unsigned getCalleeSavedStackSize() const { return CalleeSavedStackSize; }
   void setCalleeSavedStackSize(unsigned Size) { CalleeSavedStackSize = Size; }
+
+  int getFPOffset() const { return FPOffset; }
+  void setFPOffset(int Offset) { FPOffset = Offset; }
 
   bool isInterruptHandler() const { return IsInterruptHandler; }
   void setIsInterruptHandler(bool B) { IsInterruptHandler = B; }
