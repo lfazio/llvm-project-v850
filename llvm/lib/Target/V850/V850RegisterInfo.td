@@ -113,6 +113,18 @@ let CostPerUse = [1] in
 def LP : V850Reg<31, "r31", ["lp"]>, DwarfRegNum<[31]>;
 
 //===----------------------------------------------------------------------===//
+// Program Counter (pseudo register for DWARF)
+//===----------------------------------------------------------------------===//
+
+// PC is not directly accessible on V850 but is needed for DWARF CFI.
+// It's implicitly modified by branches/calls and saved/restored via system registers.
+// We use a separate definition without HWEncoding since PC has no hardware register number.
+def PC : Register<"pc"> {
+  let Namespace = "V850";
+  let DwarfNumbers = [64];
+}
+
+//===----------------------------------------------------------------------===//
 // Register Classes
 //===----------------------------------------------------------------------===//
 
@@ -164,25 +176,34 @@ class V850SysReg<bits<5> Enc, string n> : Register<n> {
 
 //===----------------------------------------------------------------------===//
 // Base System Registers (All V850 variants: V850, V850ES, V850E1, V850E2, V850E2M)
+//
+// DWARF Register Number Mapping:
+//   DWARF 0-31:  General purpose registers r0-r31
+//   DWARF 64:    PC (Program Counter)
+//   DWARF 65:    PSW (Program Status Word)
+//   DWARF 66-69: Exception registers (EIPC, EIPSW, FEPC, FEPSW)
+//   DWARF 70:    ECR (Exception Cause Register)
+//   DWARF 71-73: CALLT registers (CTPC, CTPSW, CTBP)
+//   DWARF 74-75: Debug registers (DBPC, DBPSW)
 //===----------------------------------------------------------------------===//
 
 // Exception/Interrupt PC - saved PC when exception/interrupt occurs
-def EIPC  : V850SysReg<0, "eipc">;
+def EIPC  : V850SysReg<0, "eipc">, DwarfRegNum<[66]>;
 
 // Exception/Interrupt PSW - saved PSW when exception/interrupt occurs
-def EIPSW : V850SysReg<1, "eipsw">;
+def EIPSW : V850SysReg<1, "eipsw">, DwarfRegNum<[67]>;
 
 // Fatal Error PC - saved PC when fatal error (NMI, etc.) occurs
-def FEPC  : V850SysReg<2, "fepc">;
+def FEPC  : V850SysReg<2, "fepc">, DwarfRegNum<[68]>;
 
 // Fatal Error PSW - saved PSW when fatal error occurs
-def FEPSW : V850SysReg<3, "fepsw">;
+def FEPSW : V850SysReg<3, "fepsw">, DwarfRegNum<[69]>;
 
 // Exception Cause Register - indicates cause of exception (read-only via STSR)
-def ECR   : V850SysReg<4, "ecr">;
+def ECR   : V850SysReg<4, "ecr">, DwarfRegNum<[70]>;
 
 // Program Status Word - contains flags (Z, S, OV, CY, SAT) and control bits
-def PSW   : V850SysReg<5, "psw">;
+def PSW   : V850SysReg<5, "psw">, DwarfRegNum<[65]>;
 
 //===----------------------------------------------------------------------===//
 // V850E1 Additional System Registers (V850E1, V850E2, V850E2M, V850E3)
@@ -191,20 +212,20 @@ def PSW   : V850SysReg<5, "psw">;
 
 // CALLT caller status saving registers
 // CTPC - CALLT caller PC (return address)
-def CTPC  : V850SysReg<16, "ctpc">;
+def CTPC  : V850SysReg<16, "ctpc">, DwarfRegNum<[71]>;
 
 // CTPSW - CALLT caller PSW
-def CTPSW : V850SysReg<17, "ctpsw">;
+def CTPSW : V850SysReg<17, "ctpsw">, DwarfRegNum<[72]>;
 
 // CTBP - CALLT base pointer
-def CTBP  : V850SysReg<20, "ctbp">;
+def CTBP  : V850SysReg<20, "ctbp">, DwarfRegNum<[73]>;
 
 // Debug registers (for Type A/B products with debug function)
 // DBPC - Debug PC (return address from debug trap)
-def DBPC  : V850SysReg<18, "dbpc">;
+def DBPC  : V850SysReg<18, "dbpc">, DwarfRegNum<[74]>;
 
 // DBPSW - Debug PSW
-def DBPSW : V850SysReg<19, "dbpsw">;
+def DBPSW : V850SysReg<19, "dbpsw">, DwarfRegNum<[75]>;
 
 // DIR - Debug Interface Register
 // Controls debug mode and breakpoint channel selection (DIR.CS)

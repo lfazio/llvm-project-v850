@@ -8,7 +8,7 @@ This document outlines the plan for implementing comprehensive debugging support
 
 | Feature | Status | Location |
 |---------|--------|----------|
-| DWARF register numbers | Done | `V850RegisterInfo.td` (DwarfRegNum) |
+| DWARF register numbers | Done | `V850RegisterInfo.td` (GPR 0-31, PC 64, PSW 65, exception/debug regs 66-75) |
 | Debug info support flag | Done | `V850MCAsmInfo.cpp` (SupportsDebugInformation = true) |
 | DWARF CFI exception handling | Done | `V850MCAsmInfo.cpp` (ExceptionsType = DwarfCFI) |
 | CFI instruction handling | Done | `V850InstrInfo.cpp` |
@@ -16,7 +16,8 @@ This document outlines the plan for implementing comprehensive debugging support
 | Debug system registers | Defined | `V850RegisterInfo.td` (DBPC, DBPSW, DIR, etc.) |
 | DebugLoc propagation | Done | All CodeGen files |
 | CFI directive emission | Done | `V850FrameLowering.cpp` |
-| Stack unwinding (eh_frame) | Done | Uses DWARF CFI directives |
+| Stack unwinding (eh_frame) | Done | Uses DWARF CFI directives, object file generation verified |
+| Object file generation | Done | MCCodeEmitter, AsmBackend with proper ELF relocations |
 
 ### Not Implemented
 
@@ -73,22 +74,22 @@ func_with_call:
     .cfi_offset r31, -4
     add -4, r3
     .cfi_def_cfa_offset 8
-    jarl external_func, lp
+    jarl external_func, r31
     add 4, r3
     dispose 0, 2048, [r31]
     .cfi_endproc
 ```
 
-### 1.2 DWARF Register Mapping
+### 1.2 DWARF Register Mapping [IMPLEMENTED]
 
-**Current State:** Basic DWARF register numbers defined.
+**Status:** Fully implemented.
 
-**Required Additions:**
+All general purpose and system registers now have DWARF register numbers defined.
 
 | Register | DWARF # | Notes |
 |----------|---------|-------|
 | r0-r31 | 0-31 | Done |
-| PC | 64 | Program counter |
+| PC | 64 | Program counter (pseudo register for DWARF) |
 | PSW | 65 | Processor status word |
 | EIPC | 66 | Exception PC |
 | EIPSW | 67 | Exception PSW |
@@ -98,14 +99,17 @@ func_with_call:
 | CTPC | 71 | CALLT saved PC |
 | CTPSW | 72 | CALLT saved PSW |
 | CTBP | 73 | CALLT base pointer |
+| DBPC | 74 | Debug saved PC |
+| DBPSW | 75 | Debug saved PSW |
 
 **File:** `llvm/lib/Target/V850/V850RegisterInfo.td`
 
-```tablegen
-def PC : V850Reg<64, "pc">, DwarfRegNum<[64]>;
-def PSW : V850SysReg<5, "psw">, DwarfRegNum<[65]>;
-// ... etc
-```
+**Implementation Notes:**
+- PC is defined as a separate pseudo-register without HWEncoding (since it's not
+  directly accessible on V850)
+- System registers use DwarfRegNum<[]> syntax for DWARF number assignment
+
+**Test:** `llvm/test/CodeGen/V850/dwarf-reg-numbers.ll`
 
 ### 1.3 Initial Frame State [IMPLEMENTED]
 
@@ -540,18 +544,34 @@ test_func:
 
 **Tests:** `llvm/test/CodeGen/V850/prepare-dispose-unwind.ll`
 
-### 4.3 eh_frame Generation
+### 4.3 eh_frame Generation [IMPLEMENTED]
 
-Ensure eh_frame sections are generated with proper FDE/CIE:
+**Status:** Fully implemented and verified.
+
+eh_frame sections are generated with proper FDE/CIE. Object file generation
+with proper ELF relocations was fixed in commit fca16493e62b.
+
+**Configuration:**
 
 **File:** `llvm/lib/Target/V850/MCTargetDesc/V850MCAsmInfo.cpp`
 
 ```cpp
 // Already set:
 ExceptionsType = ExceptionHandling::DwarfCFI;
+SupportsDebugInformation = true;
 ```
 
-Verify `.eh_frame` section is emitted for all functions.
+**Key Fixes for Object File Generation:**
+- MCCodeEmitter: Added expression operand handling for fixup generation
+- AsmBackend: Added `maybeAddReloc()` call to generate ELF relocations
+- AsmPrinter: Expanded CALL pseudo to JARL, added CALL_REG for indirect calls
+
+**Test:** `llvm/test/CodeGen/V850/obj-relocation.ll`
+
+Verifies:
+- `.text` section is emitted
+- `.eh_frame` section is emitted
+- Proper relocations (R_V850_22_PCREL) are generated for function calls
 
 ---
 
@@ -754,3 +774,5 @@ lldb/test/API/functionalities/unwind/v850/
 | 2026-01-25 | 1.4 | Breakpoint channel selection implemented (write_dir, select_bp_channel) |
 | 2026-01-25 | 1.5 | Frame pointer chain implemented for proper debugger stack walking |
 | 2026-01-25 | 1.6 | PREPARE/DISPOSE unwinding documented and tested |
+| 2026-01-25 | 1.7 | Object file generation with ELF relocations and eh_frame verified |
+| 2026-01-25 | 1.8 | DWARF register mapping completed (PC, PSW, exception/debug registers) |
