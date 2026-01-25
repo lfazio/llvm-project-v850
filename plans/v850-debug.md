@@ -396,21 +396,46 @@ LLDB should use LLVM's V850 disassembler automatically.
 
 **Test:** `clang/test/CodeGen/V850/debug-intrinsics.c`
 
-### 3.4 Breakpoint Channel Selection
+### 3.4 Breakpoint Channel Selection [IMPLEMENTED]
 
-V850E1+ has 2 breakpoint channels selected via DIR.CS bit:
+**Status:** Fully implemented with dedicated builtin.
+
+V850E1+ has 2 breakpoint channels selected via DIR.CS bit (bit 0).
+Channel 0 is selected when DIR.CS = 0, channel 1 when DIR.CS = 1.
+
+**Implemented Builtins:**
+
+| Builtin | Description |
+|---------|-------------|
+| `__builtin_v850_write_dir(val)` | Write to DIR register |
+| `__builtin_v850_select_bp_channel(channel)` | Select breakpoint channel (0 or 1) |
+
+The `select_bp_channel` builtin performs an atomic read-modify-write on the
+DIR register to set or clear the CS bit based on the channel argument.
+
+**Example Usage:**
 
 ```c
-// Select breakpoint channel (0 or 1)
-static inline void v850_select_bp_channel(unsigned int channel) {
-  unsigned int dir = __builtin_v850_stsr(21); // Read DIR
-  if (channel)
-    dir |= (1 << 0);   // Set DIR.CS
-  else
-    dir &= ~(1 << 0);  // Clear DIR.CS
-  __builtin_v850_ldsr(dir, 21); // Write DIR
+// Set up a breakpoint on channel 1
+void setup_breakpoint_channel1(unsigned int addr, unsigned int mask) {
+  // Select breakpoint channel 1
+  __builtin_v850_select_bp_channel(1);
+
+  // Write breakpoint address and mask (applies to selected channel)
+  __builtin_v850_write_bpav(addr);
+  __builtin_v850_write_bpam(mask);
+
+  // Enable the breakpoint
+  unsigned int bpc = __builtin_v850_read_bpc();
+  bpc |= 0x1;
+  __builtin_v850_write_bpc(bpc);
+
+  // Switch back to channel 0 if needed
+  __builtin_v850_select_bp_channel(0);
 }
 ```
+
+**Test:** `clang/test/CodeGen/V850/debug-intrinsics.c`
 
 ---
 
@@ -659,3 +684,4 @@ lldb/test/API/functionalities/unwind/v850/
 | 2026-01-24 | 1.1 | Phase 1 (CFI Emission) completed |
 | 2026-01-24 | 1.2 | Debug intrinsics (DBTRAP, debug register access) completed |
 | 2026-01-24 | 1.3 | Initial frame state implemented |
+| 2026-01-25 | 1.4 | Breakpoint channel selection implemented (write_dir, select_bp_channel) |

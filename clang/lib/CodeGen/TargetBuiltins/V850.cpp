@@ -24,9 +24,9 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
   default:
     return nullptr;
 
-  //===--------------------------------------------------------------------===//
-  // Atomic Bit Operations
-  //===--------------------------------------------------------------------===//
+    //===--------------------------------------------------------------------===//
+    // Atomic Bit Operations
+    //===--------------------------------------------------------------------===//
 
   case V850::BI__builtin_v850_set1: {
     Value *Addr = EmitScalarExpr(E->getArg(0));
@@ -53,9 +53,9 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
     return Builder.CreateCall(F, {Addr, Bit});
   }
 
-  //===--------------------------------------------------------------------===//
-  // Byte/Halfword Swap Operations
-  //===--------------------------------------------------------------------===//
+    //===--------------------------------------------------------------------===//
+    // Byte/Halfword Swap Operations
+    //===--------------------------------------------------------------------===//
 
   case V850::BI__builtin_v850_hsw: {
     Value *X = EmitScalarExpr(E->getArg(0));
@@ -73,9 +73,9 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
     return Builder.CreateCall(F, X);
   }
 
-  //===--------------------------------------------------------------------===//
-  // Memory Barrier Operations
-  //===--------------------------------------------------------------------===//
+    //===--------------------------------------------------------------------===//
+    // Memory Barrier Operations
+    //===--------------------------------------------------------------------===//
 
   case V850::BI__builtin_v850_syncp: {
     Function *F = CGM.getIntrinsic(Intrinsic::v850_syncp);
@@ -90,9 +90,9 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
     return Builder.CreateCall(F);
   }
 
-  //===--------------------------------------------------------------------===//
-  // Interrupt Control Operations
-  //===--------------------------------------------------------------------===//
+    //===--------------------------------------------------------------------===//
+    // Interrupt Control Operations
+    //===--------------------------------------------------------------------===//
 
   case V850::BI__builtin_v850_di: {
     Function *F = CGM.getIntrinsic(Intrinsic::v850_di);
@@ -103,9 +103,9 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
     return Builder.CreateCall(F);
   }
 
-  //===--------------------------------------------------------------------===//
-  // Special Instructions
-  //===--------------------------------------------------------------------===//
+    //===--------------------------------------------------------------------===//
+    // Special Instructions
+    //===--------------------------------------------------------------------===//
 
   case V850::BI__builtin_v850_halt: {
     Function *F = CGM.getIntrinsic(Intrinsic::v850_halt);
@@ -131,9 +131,9 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
     return Builder.CreateCall(F);
   }
 
-  //===--------------------------------------------------------------------===//
-  // System Register Access
-  //===--------------------------------------------------------------------===//
+    //===--------------------------------------------------------------------===//
+    // System Register Access
+    //===--------------------------------------------------------------------===//
 
   case V850::BI__builtin_v850_ldsr: {
     Value *Val = EmitScalarExpr(E->getArg(0));
@@ -275,10 +275,40 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
     return Builder.CreateCall(F, {Val, Builder.getInt32(19)});
   }
 
-  // DIR - Debug Interface Register (regID 21, read-only)
+  // DIR - Debug Interface Register (regID 21)
   case V850::BI__builtin_v850_read_dir: {
     Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
     return Builder.CreateCall(F, Builder.getInt32(21));
+  }
+  case V850::BI__builtin_v850_write_dir: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32(21)});
+  }
+
+  // Select breakpoint channel (0 or 1) via DIR.CS bit (bit 0)
+  // Performs read-modify-write on DIR register
+  case V850::BI__builtin_v850_select_bp_channel: {
+    Value *Channel = EmitScalarExpr(E->getArg(0));
+    Function *ReadF = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    Function *WriteF = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+
+    // Read current DIR value
+    Value *Dir = Builder.CreateCall(ReadF, Builder.getInt32(21));
+
+    // Compare channel with 0
+    Value *IsZero = Builder.CreateICmpEQ(Channel, Builder.getInt32(0));
+
+    // Clear bit 0: Dir & ~1
+    Value *Cleared = Builder.CreateAnd(Dir, Builder.getInt32(~1U));
+    // Set bit 0: Dir | 1
+    Value *Set = Builder.CreateOr(Dir, Builder.getInt32(1));
+
+    // Select based on channel: if channel == 0, use cleared, else use set
+    Value *NewDir = Builder.CreateSelect(IsZero, Cleared, Set);
+
+    // Write back to DIR
+    return Builder.CreateCall(WriteF, {NewDir, Builder.getInt32(21)});
   }
 
   // BPC - Breakpoint Control (regID 22)
@@ -421,9 +451,9 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
     return Builder.CreateCall(F, {Val, Builder.getInt32(31)});
   }
 
-  //===--------------------------------------------------------------------===//
-  // Saturating Arithmetic Operations
-  //===--------------------------------------------------------------------===//
+    //===--------------------------------------------------------------------===//
+    // Saturating Arithmetic Operations
+    //===--------------------------------------------------------------------===//
 
   case V850::BI__builtin_v850_satadd: {
     Value *A = EmitScalarExpr(E->getArg(0));
@@ -461,9 +491,9 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
     return Builder.CreateCall(F, {A, B});
   }
 
-  //===--------------------------------------------------------------------===//
-  // Bit Search Operations (V850E2+)
-  //===--------------------------------------------------------------------===//
+    //===--------------------------------------------------------------------===//
+    // Bit Search Operations (V850E2+)
+    //===--------------------------------------------------------------------===//
 
   case V850::BI__builtin_v850_sch1l: {
     Value *X = EmitScalarExpr(E->getArg(0));
@@ -486,9 +516,9 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
     return Builder.CreateCall(F, X);
   }
 
-  //===--------------------------------------------------------------------===//
-  // Atomic Operations (V850E2M+)
-  //===--------------------------------------------------------------------===//
+    //===--------------------------------------------------------------------===//
+    // Atomic Operations (V850E2M+)
+    //===--------------------------------------------------------------------===//
 
   case V850::BI__builtin_v850_caxi: {
     Value *Addr = EmitScalarExpr(E->getArg(0));
@@ -498,9 +528,9 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
     return Builder.CreateCall(F, {Addr, Expected, Desired});
   }
 
-  //===--------------------------------------------------------------------===//
-  // Multiply-Accumulate Operations (V850E1+)
-  //===--------------------------------------------------------------------===//
+    //===--------------------------------------------------------------------===//
+    // Multiply-Accumulate Operations (V850E1+)
+    //===--------------------------------------------------------------------===//
 
   case V850::BI__builtin_v850_mac: {
     // long long __builtin_v850_mac(int a, int b, long long acc)
@@ -540,9 +570,9 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
     return Builder.CreateOr(Builder.CreateShl(ResHi64, 32), ResLo64);
   }
 
-  //===--------------------------------------------------------------------===//
-  // FPU System Register Access (V850E2M+)
-  //===--------------------------------------------------------------------===//
+    //===--------------------------------------------------------------------===//
+    // FPU System Register Access (V850E2M+)
+    //===--------------------------------------------------------------------===//
 
   case V850::BI__builtin_v850_read_fpsr: {
     Function *F = CGM.getIntrinsic(Intrinsic::v850_read_fpsr);

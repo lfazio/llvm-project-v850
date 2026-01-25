@@ -210,6 +210,15 @@ TARGET_BUILTIN(__builtin_v850_write_dbpsw, "vUi", "n", "v850e1")
 // DIR - Debug Interface Register (regID 21)
 // unsigned int __builtin_v850_read_dir(void)
 TARGET_BUILTIN(__builtin_v850_read_dir, "Ui", "n", "v850e1")
+// void __builtin_v850_write_dir(unsigned int value)
+TARGET_BUILTIN(__builtin_v850_write_dir, "vUi", "n", "v850e1")
+
+// Select breakpoint channel (0 or 1)
+// void __builtin_v850_select_bp_channel(unsigned int channel)
+// V850E1+ has 2 breakpoint channels selected via DIR.CS bit (bit 0).
+// Channel 0 is selected when DIR.CS = 0, channel 1 when DIR.CS = 1.
+// This builtin atomically reads DIR, modifies CS bit, and writes back.
+TARGET_BUILTIN(__builtin_v850_select_bp_channel, "vUi", "n", "v850e1")
 
 // BPC - Breakpoint Control (regID 22)
 // unsigned int __builtin_v850_read_bpc(void)
@@ -338,8 +347,9 @@ TARGET_BUILTIN(__builtin_v850_syncm, "v", "n", "v850e2m")
 TARGET_BUILTIN(__builtin_v850_synce, "v", "n", "v850e2m")
 
 // CAXI - Compare and Exchange for Interlock (atomic CAS)
-// unsigned int __builtin_v850_caxi(void *addr, unsigned int expected, unsigned int desired)
-// Atomically: if (*addr == expected) *addr = desired; return old *addr
+// unsigned int __builtin_v850_caxi(void *addr, unsigned int expected, unsigned
+// int desired) Atomically: if (*addr == expected) *addr = desired; return old
+// *addr
 TARGET_BUILTIN(__builtin_v850_caxi, "Uiv*UiUi", "n", "v850e2m")
 
 // SYSCALL - System call

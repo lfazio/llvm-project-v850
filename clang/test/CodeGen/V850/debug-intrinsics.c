@@ -50,6 +50,44 @@ unsigned int test_read_dir(void) {
   return __builtin_v850_read_dir();
 }
 
+// CHECK-LABEL: @test_write_dir
+// CHECK: call void @llvm.v850.ldsr(i32 %{{.*}}, i32 21)
+void test_write_dir(unsigned int val) {
+  __builtin_v850_write_dir(val);
+}
+
+//===----------------------------------------------------------------------===//
+// Breakpoint Channel Selection
+//===----------------------------------------------------------------------===//
+
+// V850E1+ has 2 breakpoint channels selected via DIR.CS bit (bit 0).
+// select_bp_channel performs read-modify-write on DIR to set/clear CS bit.
+
+// CHECK-LABEL: @test_select_bp_channel
+// CHECK: [[DIR:%.*]] = call i32 @llvm.v850.stsr(i32 21)
+// CHECK: [[CMP:%.*]] = icmp eq i32 %{{.*}}, 0
+// CHECK: [[CLEARED:%.*]] = and i32 [[DIR]], -2
+// CHECK: [[SET:%.*]] = or i32 [[DIR]], 1
+// CHECK: [[NEWDIR:%.*]] = select i1 [[CMP]], i32 [[CLEARED]], i32 [[SET]]
+// CHECK: call void @llvm.v850.ldsr(i32 [[NEWDIR]], i32 21)
+void test_select_bp_channel(unsigned int channel) {
+  __builtin_v850_select_bp_channel(channel);
+}
+
+// CHECK-LABEL: @test_select_channel_0
+// CHECK: call i32 @llvm.v850.stsr(i32 21)
+// CHECK: call void @llvm.v850.ldsr(i32 %{{.*}}, i32 21)
+void test_select_channel_0(void) {
+  __builtin_v850_select_bp_channel(0);
+}
+
+// CHECK-LABEL: @test_select_channel_1
+// CHECK: call i32 @llvm.v850.stsr(i32 21)
+// CHECK: call void @llvm.v850.ldsr(i32 %{{.*}}, i32 21)
+void test_select_channel_1(void) {
+  __builtin_v850_select_bp_channel(1);
+}
+
 //===----------------------------------------------------------------------===//
 // Breakpoint Control Register Access
 //===----------------------------------------------------------------------===//
@@ -129,4 +167,28 @@ void setup_address_breakpoint(unsigned int addr, unsigned int mask) {
   unsigned int bpc = __builtin_v850_read_bpc();
   bpc |= 0x1;
   __builtin_v850_write_bpc(bpc);
+}
+
+//===----------------------------------------------------------------------===//
+// Example: Setting up a breakpoint on channel 1
+//===----------------------------------------------------------------------===//
+
+// This example shows how to set up a hardware breakpoint on channel 1.
+// V850E1+ has 2 breakpoint channels (0 and 1) selected via DIR.CS bit.
+// CHECK-LABEL: @setup_breakpoint_channel1
+void setup_breakpoint_channel1(unsigned int addr, unsigned int mask) {
+  // Select breakpoint channel 1
+  __builtin_v850_select_bp_channel(1);
+
+  // Write breakpoint address and mask (applies to selected channel)
+  __builtin_v850_write_bpav(addr);
+  __builtin_v850_write_bpam(mask);
+
+  // Enable the breakpoint
+  unsigned int bpc = __builtin_v850_read_bpc();
+  bpc |= 0x1;
+  __builtin_v850_write_bpc(bpc);
+
+  // Switch back to channel 0 if needed
+  __builtin_v850_select_bp_channel(0);
 }
