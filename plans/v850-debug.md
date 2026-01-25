@@ -485,17 +485,60 @@ Low Address
 - `llvm/test/CodeGen/V850/frame-pointer.ll`
 - `llvm/test/CodeGen/V850/frame-pointer-chain.ll`
 
-### 4.2 PREPARE/DISPOSE Unwinding
+### 4.2 PREPARE/DISPOSE Unwinding [IMPLEMENTED]
 
-The PREPARE and DISPOSE instructions save/restore multiple registers atomically. Unwinding needs to account for their encoding:
+**Status:** Fully implemented with correct CFI directive emission.
+
+The PREPARE and DISPOSE instructions save/restore multiple callee-saved registers
+atomically. CFI directives are emitted to accurately describe the stack state after
+PREPARE executes.
 
 **PREPARE list12, imm5:**
-- Pushes registers specified in list12 in order: r30, r31, r29-r23, r22-r20
-- Then subtracts imm5 × 4 from SP
+- Saves registers in order: LP (r31), EP (r30), r29, r28, ..., r20
+- Only registers with corresponding bits set in list12 are saved
+- LP is saved first at CFA-4, next register at CFA-8, etc.
+- Then subtracts imm5 × 4 from SP (used for additional stack allocation)
 
 **DISPOSE imm5, list12:**
 - Adds imm5 × 4 to SP
-- Pops registers in reverse order
+- Restores registers in reverse order
+- No CFI needed in epilogue (per LLVM convention)
+
+**CFI Emission (in spillCalleeSavedRegisters):**
+```cpp
+// After PREPARE, emit CFI:
+// 1. cfi_def_cfa_offset for total callee-saved size
+CFIBuilder.buildDefCFAOffset(CalleeSavedSize);
+
+// 2. cfi_offset for each saved register in PREPARE order
+static const unsigned PrepareOrder[] = {
+    V850::LP, V850::EP, V850::R29, V850::R28, V850::R27, V850::R26,
+    V850::R25, V850::R24, V850::R23, V850::R22, V850::R21, V850::R20};
+int Offset = -4;
+for (unsigned Reg : PrepareOrder) {
+  if (List12 & (1 << (TRI->getEncodingValue(Reg) - 20))) {
+    CFIBuilder.buildOffset(Reg, Offset);
+    Offset -= 4;
+  }
+}
+```
+
+**Example Output:**
+```asm
+test_func:
+    .cfi_startproc
+    prepare 2049, 0          ; Save LP (bit 11) and r20 (bit 0)
+    .cfi_def_cfa_offset 8    ; 2 registers × 4 bytes = 8
+    .cfi_offset r31, -4      ; LP at CFA-4
+    .cfi_offset r20, -8      ; r20 at CFA-8
+    add -12, r3
+    .cfi_def_cfa_offset 20   ; 8 (CSR) + 12 (locals) = 20
+    ...
+    dispose 0, 2049, [r31]
+    .cfi_endproc
+```
+
+**Tests:** `llvm/test/CodeGen/V850/prepare-dispose-unwind.ll`
 
 ### 4.3 eh_frame Generation
 
@@ -710,3 +753,4 @@ lldb/test/API/functionalities/unwind/v850/
 | 2026-01-24 | 1.3 | Initial frame state implemented |
 | 2026-01-25 | 1.4 | Breakpoint channel selection implemented (write_dir, select_bp_channel) |
 | 2026-01-25 | 1.5 | Frame pointer chain implemented for proper debugger stack walking |
+| 2026-01-25 | 1.6 | PREPARE/DISPOSE unwinding documented and tested |
