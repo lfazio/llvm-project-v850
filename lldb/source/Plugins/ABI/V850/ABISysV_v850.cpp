@@ -847,49 +847,93 @@ ValueObjectSP ABISysV_v850::GetReturnValueObjectImpl(
 
 // Called when we are on the first instruction of a new function
 // At function entry on V850:
-// - CFA = SP
+// - CFA = SP (stack pointer at function entry)
 // - Return address is in LP (r31)
+// - Callee-saved registers (r20-r29, EP, LP) have their original values
+//
+// V850 Calling Convention:
+// - Arguments: r6-r9, additional arguments on stack
+// - Return value: r10 (32-bit), r10:r11 (64-bit)
+// - Callee-saved: r20-r29, EP (r30), LP (r31)
+// - Caller-saved: r1, r6-r19
+// - Stack pointer: r3 (SP)
+// - Frame pointer: r29 (when used)
+// - Link pointer: r31 (LP) - holds return address
 UnwindPlanSP ABISysV_v850::CreateFunctionEntryUnwindPlan() {
   UnwindPlan::Row row;
 
   // CFA = SP + 0 (at function entry, before prologue)
   row.GetCFAValue().SetIsRegisterPlusOffset(dwarf_sp, 0);
 
-  // PC is in LP (r31) at function entry
+  // PC is in LP (r31) at function entry - this is how we unwind
   row.SetRegisterLocationToRegister(dwarf_pc, dwarf_lp, true);
 
-  // SP is CFA + 0
+  // SP = CFA (stack pointer is the CFA at entry)
   row.SetRegisterLocationToIsCFAPlusOffset(dwarf_sp, 0, true);
+
+  // LP contains the return address, which is also where we get PC
+  row.SetRegisterLocationToSame(dwarf_lp, true);
 
   auto plan_sp = std::make_shared<UnwindPlan>(eRegisterKindDWARF);
   plan_sp->AppendRow(std::move(row));
   plan_sp->SetSourceName("v850 at-func-entry default");
   plan_sp->SetSourcedFromCompiler(eLazyBoolNo);
+  plan_sp->SetReturnAddressRegister(dwarf_lp);
   return plan_sp;
 }
 
-// Default unwind plan when we don't have CFI
-// Assumes frame pointer is being used
+// Default unwind plan when we don't have CFI information.
+// This is a fallback used when no debug info or eh_frame is available.
+//
+// V850 Frame Layout with Frame Pointer (r29):
+//
+// High Address
+// +----------------+
+// |  Arguments     |
+// +----------------+ <- CFA (Caller's SP)
+// |  Saved LP      |  (CFA - 4, saved first by PREPARE)
+// +----------------+
+// |  Saved EP      |  (CFA - 8, if saved)
+// +----------------+
+// |  Saved FP(r29) |  (CFA - offset) <- FP points here
+// +----------------+
+// |  Saved r28...  |
+// +----------------+
+// |  Local Vars    |
+// +----------------+ <- SP
+// Low Address
+//
+// When using frame pointer, FP points to where the old FP was saved.
+// The saved LP (return address) is typically at FP + 4 (assuming standard
+// PREPARE layout where LP is saved right before FP).
+//
+// Assumptions for default plan:
+// - Frame pointer is being used
+// - CFA = FP + 8 (LP at CFA-4, FP at CFA-8)
+// - Old FP at [FP] = [CFA - 8]
+// - LP (return address) at [FP + 4] = [CFA - 4]
 UnwindPlanSP ABISysV_v850::CreateDefaultUnwindPlan() {
   UnwindPlan::Row row;
 
-  // Default: assume CFA = SP + 4 (return address pushed)
-  row.GetCFAValue().SetIsRegisterPlusOffset(dwarf_sp, 4);
+  // Use generic register kinds for the default plan
+  // CFA = FP + 8 (assuming LP and FP are the first two saved registers)
+  row.GetCFAValue().SetIsRegisterPlusOffset(LLDB_REGNUM_GENERIC_FP, 8);
 
-  // Return address at CFA - 4
-  row.SetRegisterLocationToAtCFAPlusOffset(dwarf_pc, -4, true);
+  // Return address (PC) is at CFA - 4 (where LP was saved)
+  row.SetRegisterLocationToAtCFAPlusOffset(LLDB_REGNUM_GENERIC_PC, -4, true);
 
-  // SP = CFA
-  row.SetRegisterLocationToIsCFAPlusOffset(dwarf_sp, 0, true);
+  // Old frame pointer is at CFA - 8 (where FP was saved)
+  row.SetRegisterLocationToAtCFAPlusOffset(LLDB_REGNUM_GENERIC_FP, -8, true);
 
-  // FP location is unspecified in default plan
-  row.SetRegisterLocationToUnspecified(dwarf_fp, true);
+  // SP = CFA (after unwinding, SP should be at caller's SP)
+  row.SetRegisterLocationToIsCFAPlusOffset(LLDB_REGNUM_GENERIC_SP, 0, true);
 
-  auto plan_sp = std::make_shared<UnwindPlan>(eRegisterKindDWARF);
+  auto plan_sp = std::make_shared<UnwindPlan>(eRegisterKindGeneric);
   plan_sp->AppendRow(std::move(row));
   plan_sp->SetSourceName("v850 default unwind plan");
   plan_sp->SetSourcedFromCompiler(eLazyBoolNo);
   plan_sp->SetUnwindPlanValidAtAllInstructions(eLazyBoolNo);
+  plan_sp->SetReturnAddressRegister(LLDB_REGNUM_GENERIC_RA);
   return plan_sp;
 }
 
