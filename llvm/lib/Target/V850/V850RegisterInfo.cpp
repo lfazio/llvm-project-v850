@@ -35,13 +35,16 @@ V850RegisterInfo::V850RegisterInfo() : V850GenRegisterInfo(V850::LP) {}
 
 const MCPhysReg *
 V850RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
-  // V850 calling convention: r20-r29, r30 (EP), r31 (LP) are callee-saved
-  static const MCPhysReg CalleeSavedRegs[] = {
-      V850::R20, V850::R21, V850::R22, V850::R23, V850::R24,
-      V850::R25, V850::R26, V850::R27, V850::R28, V850::R29,
-      V850::EP,  V850::LP,  0};
+  // Interrupt handlers must preserve all registers
+  if (MF) {
+    const V850MachineFunctionInfo *FuncInfo =
+        MF->getInfo<V850MachineFunctionInfo>();
+    if (FuncInfo->isInterruptHandler())
+      return CSR_V850_Interrupt_SaveList;
+  }
 
-  return CalleeSavedRegs;
+  // V850 calling convention: r20-r29, r30 (EP), r31 (LP) are callee-saved
+  return CSR_V850_SaveList;
 }
 
 BitVector V850RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
@@ -123,6 +126,12 @@ bool V850RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
 const uint32_t *
 V850RegisterInfo::getCallPreservedMask(const MachineFunction &MF,
                                        CallingConv::ID CC) const {
+  // Interrupt handlers preserve all registers
+  const V850MachineFunctionInfo *FuncInfo =
+      MF.getInfo<V850MachineFunctionInfo>();
+  if (FuncInfo->isInterruptHandler())
+    return CSR_V850_Interrupt_RegMask;
+
   return CSR_V850_RegMask;
 }
 

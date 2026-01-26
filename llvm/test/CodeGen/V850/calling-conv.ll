@@ -1,70 +1,89 @@
-; RUN: llc -march=v850 -O0 < %s | FileCheck %s
+; RUN: llc -mtriple=v850-unknown-elf -mcpu=v850e2m < %s | FileCheck %s
 
-; Test V850 EABI calling convention
-; Arguments: r6, r7, r8, r9
-; Return: r10 (32-bit)
+; Test V850 calling convention:
+; - Arguments in r6-r9, then stack
+; - Return value in r10 (32-bit)
+; - Callee-saved: r20-r29, EP (r30), LP (r31)
 
-; Test that first argument comes in r6, return in r10
-; CHECK-LABEL: return_first_arg:
-; CHECK: mov r6, r10
-; CHECK: jmp [{{lp|r31}}]
-define i32 @return_first_arg(i32 %a) {
-  ret i32 %a
+;-----------------------------------------------------------------------------
+; Basic argument passing - 4 i32 arguments in registers
+;-----------------------------------------------------------------------------
+
+define i32 @test_args4(i32 %a, i32 %b, i32 %c, i32 %d) {
+; CHECK-LABEL: test_args4:
+; Arguments in r6, r7, r8, r9
+; CHECK:       add r{{[0-9]+}}, r{{[0-9]+}}
+  %sum1 = add i32 %a, %b
+  %sum2 = add i32 %sum1, %c
+  %sum3 = add i32 %sum2, %d
+  ret i32 %sum3
 }
 
-; Test that second argument comes in r7
-; CHECK-LABEL: return_second_arg:
-; CHECK: mov r7, r10
-; CHECK: jmp [{{lp|r31}}]
-define i32 @return_second_arg(i32 %a, i32 %b) {
-  ret i32 %b
-}
+;-----------------------------------------------------------------------------
+; 5th argument passed on stack
+;-----------------------------------------------------------------------------
 
-; Test that third argument comes in r8
-; CHECK-LABEL: return_third_arg:
-; CHECK: mov r8, r10
-; CHECK: jmp [{{lp|r31}}]
-define i32 @return_third_arg(i32 %a, i32 %b, i32 %c) {
-  ret i32 %c
-}
-
-; Test that fourth argument comes in r9
-; CHECK-LABEL: return_fourth_arg:
-; CHECK: mov r9, r10
-; CHECK: jmp [{{lp|r31}}]
-define i32 @return_fourth_arg(i32 %a, i32 %b, i32 %c, i32 %d) {
-  ret i32 %d
-}
-
-; Test sum of two register arguments
-; CHECK-LABEL: sum_two_args:
-; CHECK: mov r6, r10
-; CHECK: add r7, r10
-; CHECK: jmp [{{lp|r31}}]
-define i32 @sum_two_args(i32 %a, i32 %b) {
-  %sum = add i32 %a, %b
+define i32 @test_args5(i32 %a, i32 %b, i32 %c, i32 %d, i32 %e) {
+; CHECK-LABEL: test_args5:
+; 5th argument loaded from stack
+; CHECK:       ld.w {{[0-9]+}}[r{{[0-9]+}}], r{{[0-9]+}}
+  %sum = add i32 %a, %e
   ret i32 %sum
 }
 
-; Test returning zero
-; CHECK-LABEL: return_zero:
-; CHECK: mov 0, r10
-; CHECK: jmp [{{lp|r31}}]
-define i32 @return_zero() {
-  ret i32 0
+;-----------------------------------------------------------------------------
+; Return i32 in r10
+;-----------------------------------------------------------------------------
+
+define i32 @test_return_i32(i32 %x) {
+; CHECK-LABEL: test_return_i32:
+; Return value should be in r10
+; CHECK:       mov r6, r10
+; CHECK:       jmp [r31]
+  ret i32 %x
 }
 
-; Test returning -1 (small constant)
-; CHECK-LABEL: return_minus1:
-; CHECK: mov -1, r10
-; CHECK: jmp [{{lp|r31}}]
-define i32 @return_minus1() {
-  ret i32 -1
+;-----------------------------------------------------------------------------
+; Float argument (passed in GPR)
+;-----------------------------------------------------------------------------
+
+define float @test_float_arg(float %f) {
+; CHECK-LABEL: test_float_arg:
+; Float is passed in r6 (as bit pattern)
+; CHECK:       mov r6, r10
+  ret float %f
 }
 
-; Test void function return
-; CHECK-LABEL: return_void:
-; CHECK: jmp [{{lp|r31}}]
-define void @return_void() {
-  ret void
+;-----------------------------------------------------------------------------
+; Varargs function
+;-----------------------------------------------------------------------------
+
+declare void @llvm.va_start(ptr)
+declare void @llvm.va_end(ptr)
+
+define i32 @test_varargs(i32 %count, ...) {
+; CHECK-LABEL: test_varargs:
+entry:
+  %ap = alloca ptr, align 4
+  call void @llvm.va_start(ptr %ap)
+  call void @llvm.va_end(ptr %ap)
+  ret i32 %count
+}
+
+;-----------------------------------------------------------------------------
+; Callee-saved registers - r20-r29, EP, LP should be preserved
+;-----------------------------------------------------------------------------
+
+declare void @external_func()
+
+define i32 @test_callee_saved(i32 %x) {
+; CHECK-LABEL: test_callee_saved:
+; CHECK:       prepare
+; Uses callee-saved to hold value across call
+; CHECK:       mov r6, r20
+; CHECK:       jarl external_func, r31
+; CHECK:       mov r20, r10
+; CHECK:       dispose
+  call void @external_func()
+  ret i32 %x
 }

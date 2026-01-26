@@ -446,11 +446,19 @@ bool V850FrameLowering::restoreCalleeSavedRegisters(
     if (UseDisposeWithReturn) {
       // DISPOSEr imm5, list12, [LP] - restore, deallocate, and return
       // imm5 = 0 (emitEpilogue handles remaining stack adjustment)
-      BuildMI(MBB, MI, DL, TII.get(V850::DISPOSEr))
+      MachineInstrBuilder MIB = BuildMI(MBB, MI, DL, TII.get(V850::DISPOSEr))
           .addImm(0)
           .addImm(List12)
           .addReg(V850::LP)
           .setMIFlag(MachineInstr::FrameDestroy);
+
+      // Copy implicit operands from RET (e.g., "implicit $r10" for return value)
+      // This is essential to prevent Machine Copy Propagation from removing
+      // the return value copy as dead code.
+      for (const MachineOperand &MO : MI->operands()) {
+        if (MO.isReg() && MO.isImplicit())
+          MIB.add(MO);
+      }
 
       // Remove the original RET instruction since DISPOSEr includes the return
       MI->eraseFromParent();
@@ -536,6 +544,22 @@ void V850FrameLowering::determineCalleeSaves(MachineFunction &MF,
                                              BitVector &SavedRegs,
                                              RegScavenger *RS) const {
   TargetFrameLowering::determineCalleeSaves(MF, SavedRegs, RS);
+
+  // For interrupt handlers, save ALL caller-saved registers because we
+  // don't know what state the interrupted code was in. The CSR_V850_Interrupt
+  // list marks all registers as callee-saved for the allocator, but we also
+  // need to physically save them in the prologue.
+  const V850MachineFunctionInfo *FuncInfo =
+      MF.getInfo<V850MachineFunctionInfo>();
+  if (FuncInfo->isInterruptHandler()) {
+    // Caller-saved registers: r1, r6-r19
+    // (r0 is zero and doesn't need saving, r2-r5 are special)
+    SavedRegs.set(V850::R1);
+    for (unsigned Reg = V850::R6; Reg <= V850::R19; ++Reg)
+      SavedRegs.set(Reg);
+    // Also save LP (r31) for the return address
+    SavedRegs.set(V850::LP);
+  }
 
   // Always save LP (link pointer) if we have calls
   if (MF.getFrameInfo().hasCalls())
