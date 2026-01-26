@@ -38,6 +38,11 @@ class V850MachineFunctionInfo : public MachineFunctionInfo {
   /// IsInterruptHandler - Whether or not the function is an interrupt handler.
   bool IsInterruptHandler = false;
 
+  /// UsesPrepareDispose - Whether PREPARE/DISPOSE instructions are used for
+  /// callee-saved register save/restore. When true, CSRs are handled separately
+  /// from the local frame. When false, CSRs are part of the main stack frame.
+  bool UsesPrepareDispose = false;
+
 public:
   V850MachineFunctionInfo(const Function &F, const TargetSubtargetInfo *STI) {
     // Check for interrupt handler attribute
@@ -65,6 +70,9 @@ public:
 
   bool isInterruptHandler() const { return IsInterruptHandler; }
   void setIsInterruptHandler(bool B) { IsInterruptHandler = B; }
+
+  bool usesPrepareDispose() const { return UsesPrepareDispose; }
+  void setUsesPrepareDispose(bool B) { UsesPrepareDispose = B; }
 };
 
 } // end namespace llvm

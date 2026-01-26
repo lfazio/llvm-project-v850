@@ -50,19 +50,29 @@ This document outlines the plan for implementing comprehensive debugging support
 - Uses `CFIInstBuilder` utility class from `llvm/CodeGen/CFIInstBuilder.h`
 - Tracks callee-saved stack size in `V850MachineFunctionInfo`
 
-#### 1.1.1 Prologue CFI Emission
+#### 1.1.1 Prologue CFI Emission [IMPLEMENTED]
 
 File: `llvm/lib/Target/V850/V850FrameLowering.cpp`
 
 After stack adjustment, emits `.cfi_def_cfa_offset` with total frame size.
 When frame pointer is used, also emits `.cfi_def_cfa r29, <offset>`.
 
-#### 1.1.2 Callee-Saved Register CFI
+#### 1.1.2 Callee-Saved Register CFI [IMPLEMENTED]
 
-In `spillCalleeSavedRegisters()`:
-- After PREPARE instruction, emits `.cfi_def_cfa_offset <callee_saved_size>`
+Two paths based on CPU variant:
+
+**PREPARE path (V850E1+):**
+- Sets `UsesPrepareDispose = true` in `V850MachineFunctionInfo`
+- PREPARE allocates CSR area separately from local frame
+- Emits `.cfi_def_cfa_offset <callee_saved_size>` after PREPARE
 - Emits `.cfi_offset <reg>, <offset>` for each saved register
-- Handles PREPARE's register save order: LP, EP, r29, r28, ..., r20
+- Register save order: LP, EP, r29, r28, ..., r20
+
+**Fallback path (base V850):**
+- `UsesPrepareDispose = false` (default)
+- CSRs stored in main stack frame allocated by emitPrologue
+- emitPrologue emits `.cfi_def_cfa_offset <total_size>`
+- Emits `.cfi_offset <reg>, <offset>` for each stored register
 
 #### 1.1.3 Epilogue CFI [IMPLEMENTED]
 
@@ -871,3 +881,4 @@ lldb/test/API/functionalities/unwind/v850/
 | 2026-01-25 | 2.0 | Status update: Verified LLDB integration (ELF, disassembler automatic); identified incomplete ABI methods (GetReturnValueObjectImpl, GetArgumentValues); added Phase 2b for return value handling |
 | 2026-01-25 | 2.1 | Implemented GetReturnValueObjectImpl, GetArgumentValues, SetReturnValueObject in ABISysV_v850; ABI plugin now fully functional |
 | 2026-01-26 | 2.2 | Epilogue CFI implemented: emits .cfi_def_cfa_offset after local frame deallocation (follows prologue-only philosophy) |
+| 2026-01-26 | 2.3 | Fixed epilogue CFI for fallback path: tracks UsesPrepareDispose flag to emit correct CFA offset (CalleeSavedSize for PREPARE, 0 for fallback) |

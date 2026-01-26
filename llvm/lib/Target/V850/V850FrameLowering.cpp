@@ -245,11 +245,15 @@ void V850FrameLowering::emitEpilogue(MachineFunction &MF,
     }
 
     // After restoring SP from FP, switch CFA back to SP-based
-    // CFA was FP + FPOffset, now it should be SP + CalleeSavedSize
-    // (since we've deallocated the local frame but CSRs are still on stack)
+    // For PREPARE/DISPOSE: CSRs are still on stack, CFA = SP + CalleeSavedSize
+    // For fallback: everything is deallocated, CFA = SP + 0
     unsigned CalleeSavedSize = FuncInfo->getCalleeSavedStackSize();
     CFIInstBuilder CFIBuilder(MBB, MBBI, MachineInstr::FrameDestroy);
-    CFIBuilder.buildDefCFA(V850::SP, CalleeSavedSize);
+    if (FuncInfo->usesPrepareDispose()) {
+      CFIBuilder.buildDefCFA(V850::SP, CalleeSavedSize);
+    } else {
+      CFIBuilder.buildDefCFA(V850::SP, 0);
+    }
   } else {
     // Adjust stack pointer: SP = SP + StackSize
     // Prefer 16-bit ADDi for small offsets
@@ -281,12 +285,17 @@ void V850FrameLowering::emitEpilogue(MachineFunction &MF,
           .setMIFlag(MachineInstr::FrameDestroy);
     }
 
-    // After deallocating local frame, CFA offset changes
-    // CFA was SP + StackSize + CalleeSavedSize, now it's SP + CalleeSavedSize
+    // After stack deallocation, update CFA offset
+    // For PREPARE/DISPOSE: CSRs are still on stack, CFA = SP + CalleeSavedSize
+    // For fallback: everything is deallocated, CFA = SP + 0
     unsigned CalleeSavedSize = FuncInfo->getCalleeSavedStackSize();
-    if (CalleeSavedSize > 0) {
-      CFIInstBuilder CFIBuilder(MBB, MBBI, MachineInstr::FrameDestroy);
+    CFIInstBuilder CFIBuilder(MBB, MBBI, MachineInstr::FrameDestroy);
+    if (FuncInfo->usesPrepareDispose()) {
+      // PREPARE/DISPOSE: local frame deallocated, CSRs remain
       CFIBuilder.buildDefCFAOffset(CalleeSavedSize);
+    } else if (CalleeSavedSize > 0) {
+      // Fallback: entire frame (including CSRs) deallocated
+      CFIBuilder.buildDefCFAOffset(0);
     }
   }
 }
@@ -335,6 +344,9 @@ bool V850FrameLowering::spillCalleeSavedRegisters(
   // Try to use PREPARE instruction (V850E1+)
   if (canUsePrepareDispose(MF, CSI)) {
     unsigned List12 = buildList12Mask(CSI);
+
+    // Mark that we're using PREPARE/DISPOSE (CSR area is separate from local frame)
+    FuncInfo->setUsesPrepareDispose(true);
 
     // Add all callee-saved registers as live-in
     for (const CalleeSavedInfo &I : CSI)
