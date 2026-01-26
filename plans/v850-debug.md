@@ -23,12 +23,19 @@ This document outlines the plan for implementing comprehensive debugging support
 
 | Feature | Priority | Complexity |
 |---------|----------|------------|
-| LLDB target support | High | High |
-| LLDB ABI plugin | High | Medium |
-| LLDB register context | High | Medium |
-| Hardware breakpoint intrinsics | Done | Low |
-| Debug register access intrinsics | Done | Low |
+| LLDB architecture plugin | Low | Low |
+| LLDB instruction emulation | Low | High |
 | GDB remote stub support | Low | Medium |
+
+### Recently Implemented
+
+| Feature | Status | Location |
+|---------|--------|----------|
+| LLDB ABI plugin (basic) | Done | `lldb/source/Plugins/ABI/V850/ABISysV_v850.cpp` |
+| LLDB disassembler integration | Done | Automatic via LLVM DisassemblerLLVMC |
+| LLDB ELF object file support | Done | Automatic via ObjectFileELF (EM_V850=87) |
+| Hardware breakpoint intrinsics | Done | `clang/include/clang/Basic/BuiltinsV850.def` |
+| Debug register access intrinsics | Done | `clang/include/clang/Basic/BuiltinsV850.def` |
 
 ---
 
@@ -57,13 +64,19 @@ In `spillCalleeSavedRegisters()`:
 - Emits `.cfi_offset <reg>, <offset>` for each saved register
 - Handles PREPARE's register save order: LP, EP, r29, r28, ..., r20
 
-#### 1.1.3 Epilogue CFI
+#### 1.1.3 Epilogue CFI [IMPLEMENTED]
 
-CFI restore directives are not emitted in the epilogue as stack unwinding
-uses the CFI state from the prologue. This follows the pattern of most
-LLVM backends.
+V850 follows the "prologue-only" CFI philosophy used by most LLVM backends.
+The epilogue emits `.cfi_def_cfa_offset` after local frame deallocation to
+track the CFA offset change, but does NOT emit `.cfi_restore` directives for
+callee-saved registers. Stack unwinding uses the CFI state from the prologue.
 
-**Test:** `llvm/test/CodeGen/V850/cfi-directives.ll`
+**In `emitEpilogue()`:**
+- After local frame deallocation (`add N, r3`), emits `.cfi_def_cfa_offset <callee_saved_size>`
+- When frame pointer is used, emits `.cfi_def_cfa r3, <callee_saved_size>` after
+  restoring SP from FP
+
+**Test:** `llvm/test/CodeGen/V850/epilogue-cfi.ll`
 
 **Example Output:**
 ```asm
@@ -73,10 +86,11 @@ func_with_call:
     .cfi_def_cfa_offset 4
     .cfi_offset r31, -4
     add -4, r3
-    .cfi_def_cfa_offset 8
+    .cfi_def_cfa_offset 8        ; CFA = SP + 8 (4 CSR + 4 local)
     jarl external_func, r31
     add 4, r3
-    dispose 0, 2048, [r31]
+    .cfi_def_cfa_offset 4        ; Epilogue: local frame deallocated, CFA = SP + 4
+    dispose 0, 2048, [r31]       ; Restore LP and return
     .cfi_endproc
 ```
 
@@ -177,18 +191,39 @@ public:
 };
 ```
 
-### 2.2 ABI Plugin [HIGH PRIORITY]
+### 2.2 ABI Plugin [IMPLEMENTED]
 
-**Files to Create:**
+**Status:** Fully implemented with return value and argument extraction support.
+
+**Files Created:**
 
 ```
 lldb/source/Plugins/ABI/V850/
-├── ABISysV_v850.h
-├── ABISysV_v850.cpp
-└── CMakeLists.txt
+├── ABISysV_v850.h      - ABI class declaration
+├── ABISysV_v850.cpp    - ABI implementation with register info
+└── CMakeLists.txt      - Build configuration
 ```
 
-**Reference:** `lldb/source/Plugins/ABI/ARC/ABISysV_arc.cpp`
+**Modified:**
+- `lldb/source/Plugins/ABI/CMakeLists.txt` - Added V850 to target list
+
+**Reference:** Based on `lldb/source/Plugins/ABI/MSP430/ABISysV_msp430.cpp` and `lldb/source/Plugins/ABI/RISCV/ABISysV_riscv.cpp`
+
+**Implementation Status:**
+
+| Method | Status | Notes |
+|--------|--------|-------|
+| `CreateInstance()` | ✓ Done | Checks `llvm::Triple::v850` |
+| `GetRegisterInfoArray()` | ✓ Done | 34 registers (r0-r31, PC, PSW) |
+| `CreateFunctionEntryUnwindPlan()` | ✓ Done | CFA=SP, PC in LP |
+| `CreateDefaultUnwindPlan()` | ✓ Done | CFA=SP+4, PC at CFA-4 |
+| `PrepareTrivialCall()` | ✓ Done | Sets up r6-r9, LP, SP, PC |
+| `GetReturnValueObjectImpl()` | ✓ Done | Reads r10 (32-bit) or r10:r11 (64-bit) |
+| `GetArgumentValues()` | ✓ Done | Reads r6-r9 for first 4 arguments |
+| `SetReturnValueObject()` | ✓ Done | Writes r10/r11 for return values |
+| `RegisterIsVolatile()` | ✓ Done | r1-r19 volatile, r20-r31 callee-saved |
+| `CallFrameAddressIsValid()` | ✓ Done | Validates 4-byte aligned, non-zero |
+| `CodeAddressIsValid()` | ✓ Done | Validates 2-byte aligned (16/32-bit insns) |
 
 **Key Components:**
 
@@ -325,17 +360,21 @@ lldb/source/Plugins/Process/V850/
 └── CMakeLists.txt
 ```
 
-### 2.4 ObjectFile Support
+### 2.4 ObjectFile Support [WORKING]
 
-ELF support for V850 should work via existing ObjectFileELF.
+**Status:** ELF support works automatically via existing ObjectFileELF.
 
-**Verify:** `EM_V850 = 87` is handled in LLDB's ELF parser.
+- `EM_V850 = 87` is handled in LLDB's ELF parser
+- Architecture detected via LLVM triple (`llvm::Triple::v850`)
+- No V850-specific code needed in ObjectFileELF
 
-### 2.5 Disassembler Integration
+### 2.5 Disassembler Integration [WORKING]
 
-LLDB should use LLVM's V850 disassembler automatically.
+**Status:** V850 disassembler works automatically via LLVM's DisassemblerLLVMC.
 
-**Verify:** V850 disassembler is linked into LLDB build.
+- Uses LLVM's V850 backend disassembler
+- No explicit V850 code needed in LLDB
+- Works via LLVM triple support
 
 ---
 
@@ -628,47 +667,99 @@ llc -mtriple=v850-unknown-elf -mcpu=v850e2m test.ll -o -
 # Shows .cfi_def_cfa_offset and .cfi_offset directives
 ```
 
-### Phase 2: LLDB ABI Plugin (High Priority)
+### Phase 2: LLDB ABI Plugin (Basic) [COMPLETE]
 
-1. Create `lldb/source/Plugins/ABI/V850/` directory
-2. Implement `ABISysV_v850` class
-3. Define register info table with DWARF mapping
-4. Implement `CreateFunctionEntryUnwindPlan()`
-5. Implement `CreateDefaultUnwindPlan()`
-6. Implement `PrepareTrivialCall()` for expression evaluation
-7. Register plugin in LLDB build system
+**Status:** Basic implementation complete.
+
+1. ✅ Created `lldb/source/Plugins/ABI/V850/` directory
+2. ✅ Implemented `ABISysV_v850` class
+3. ✅ Defined register info table with DWARF mapping (r0-r31, PC, PSW)
+4. ✅ Implemented `CreateFunctionEntryUnwindPlan()` - CFA=SP, PC in LP
+5. ✅ Implemented `CreateDefaultUnwindPlan()` - CFA=SP+4, PC at CFA-4
+6. ✅ Implemented `PrepareTrivialCall()` for expression evaluation
+7. ✅ Registered plugin in LLDB build system
+
+**Files Created:**
+- `lldb/source/Plugins/ABI/V850/ABISysV_v850.h`
+- `lldb/source/Plugins/ABI/V850/ABISysV_v850.cpp`
+- `lldb/source/Plugins/ABI/V850/CMakeLists.txt`
+
+**Key Features:**
+- Register info for all 32 GPRs plus PC and PSW
+- Correct DWARF register number mapping
+- Callee-saved register identification (r20-r30, LP)
+- Argument register mapping (r6-r9 → ARG1-ARG4)
+- Generic register mapping (SP, FP, RA, PC, FLAGS)
 
 **Deliverables:**
-- Basic stack traces in LLDB
-- Function call evaluation
+- ✅ Basic stack traces in LLDB
+- ✅ Function call evaluation support
 
-**Test:**
-```bash
-lldb ./test.elf
-(lldb) bt
-# Should show stack trace
+### Phase 2b: LLDB ABI Plugin (Return Values) [COMPLETE]
+
+**Status:** Implemented. Enables `p func()` expressions in LLDB.
+
+**Completed Tasks:**
+1. ✅ Implemented `GetReturnValueObjectImpl()`:
+   - Reads r10 for 32-bit scalar return values
+   - Reads r10:r11 for 64-bit return values (r10=low, r11=high)
+   - Handles floating-point returns (float in r10, double in r10:r11)
+   - Properly handles signed/unsigned types
+
+2. ✅ Implemented `GetArgumentValues()`:
+   - Reads r6-r9 for first 4 arguments
+   - Supports scalar types with proper byte-size masking
+
+3. ✅ Implemented `SetReturnValueObject()`:
+   - Writes return values to r10/r11 for expression evaluation
+
+**V850 Calling Convention (Return Values):**
+```
+Return Type        | Location
+-------------------|------------------
+void               | (none)
+8/16/32-bit scalar | r10
+64-bit scalar      | r10:r11 (r10=low, r11=high)
+float (if FPU)     | r10 (bit pattern)
+double (if FPU)    | r10:r11 (bit pattern)
+struct ≤ 8 bytes   | r10:r11
+struct > 8 bytes   | Return via hidden pointer in r6
 ```
 
-### Phase 3: LLDB Architecture Plugin (Medium Priority)
+**Reference Implementation:** Based on `ABISysV_riscv.cpp`
 
+### Phase 3: LLDB Architecture Plugin (Low Priority - Optional)
+
+**Status:** Not implemented. Optional for embedded targets.
+
+**Notes:**
+- Most embedded targets (MSP430, AVR) don't have an Architecture plugin
+- Only needed if V850-specific address manipulation is required
+- Can be deferred indefinitely
+
+**Tasks (if needed):**
 1. Create `lldb/source/Plugins/Architecture/V850/` directory
 2. Implement `ArchitectureV850` class
 3. Handle V850-specific address manipulation
 4. Register plugin
 
 **Deliverables:**
-- Proper address handling for V850 code/data
+- Proper address handling for V850 code/data (if non-trivial)
 
-### Phase 4: Debug Intrinsics (Medium Priority)
+### Phase 4: Debug Intrinsics [COMPLETE]
 
-1. Add DBTRAP intrinsic to BuiltinsV850.def
-2. Add debug register read/write intrinsics
-3. Add breakpoint register intrinsics
-4. Implement CodeGen for all intrinsics
-5. Add tests
+**Status:** Fully implemented.
+
+1. ✅ Added DBTRAP intrinsic to BuiltinsV850.def
+2. ✅ Added debug register read/write intrinsics (DBPC, DBPSW, DIR, BPC, etc.)
+3. ✅ Added breakpoint register intrinsics (BPAV, BPAM, BPDV, BPDM)
+4. ✅ Implemented CodeGen for all intrinsics
+5. ✅ Added tests: `clang/test/CodeGen/V850/debug-intrinsics.c`
 
 **Deliverables:**
-- User-accessible debug functionality from C code
+- ✅ User-accessible debug functionality from C code
+- ✅ Software breakpoint via `__builtin_v850_dbtrap()`
+- ✅ Hardware breakpoint configuration via BPC/BPAV/BPAM intrinsics
 
 ### Phase 5: Hardware Debug Support (Low Priority)
 
@@ -776,3 +867,7 @@ lldb/test/API/functionalities/unwind/v850/
 | 2026-01-25 | 1.6 | PREPARE/DISPOSE unwinding documented and tested |
 | 2026-01-25 | 1.7 | Object file generation with ELF relocations and eh_frame verified |
 | 2026-01-25 | 1.8 | DWARF register mapping completed (PC, PSW, exception/debug registers) |
+| 2026-01-25 | 1.9 | LLDB ABI plugin implemented (ABISysV_v850) |
+| 2026-01-25 | 2.0 | Status update: Verified LLDB integration (ELF, disassembler automatic); identified incomplete ABI methods (GetReturnValueObjectImpl, GetArgumentValues); added Phase 2b for return value handling |
+| 2026-01-25 | 2.1 | Implemented GetReturnValueObjectImpl, GetArgumentValues, SetReturnValueObject in ABISysV_v850; ABI plugin now fully functional |
+| 2026-01-26 | 2.2 | Epilogue CFI implemented: emits .cfi_def_cfa_offset after local frame deallocation (follows prologue-only philosophy) |

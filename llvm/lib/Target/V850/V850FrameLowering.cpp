@@ -243,6 +243,13 @@ void V850FrameLowering::emitEpilogue(MachineFunction &MF,
           .addReg(V850::R1)
           .setMIFlag(MachineInstr::FrameDestroy);
     }
+
+    // After restoring SP from FP, switch CFA back to SP-based
+    // CFA was FP + FPOffset, now it should be SP + CalleeSavedSize
+    // (since we've deallocated the local frame but CSRs are still on stack)
+    unsigned CalleeSavedSize = FuncInfo->getCalleeSavedStackSize();
+    CFIInstBuilder CFIBuilder(MBB, MBBI, MachineInstr::FrameDestroy);
+    CFIBuilder.buildDefCFA(V850::SP, CalleeSavedSize);
   } else {
     // Adjust stack pointer: SP = SP + StackSize
     // Prefer 16-bit ADDi for small offsets
@@ -272,6 +279,14 @@ void V850FrameLowering::emitEpilogue(MachineFunction &MF,
           .addReg(V850::R1)
           .addReg(V850::SP)
           .setMIFlag(MachineInstr::FrameDestroy);
+    }
+
+    // After deallocating local frame, CFA offset changes
+    // CFA was SP + StackSize + CalleeSavedSize, now it's SP + CalleeSavedSize
+    unsigned CalleeSavedSize = FuncInfo->getCalleeSavedStackSize();
+    if (CalleeSavedSize > 0) {
+      CFIInstBuilder CFIBuilder(MBB, MBBI, MachineInstr::FrameDestroy);
+      CFIBuilder.buildDefCFAOffset(CalleeSavedSize);
     }
   }
 }
@@ -436,8 +451,9 @@ bool V850FrameLowering::restoreCalleeSavedRegisters(
     }
 
     // Note: CFI restore directives are not emitted in the epilogue because
-    // unwinding uses the CFI state from the prologue. The important CFI
-    // information is emitted in spillCalleeSavedRegisters.
+    // unwinding uses the CFI state from the prologue. This follows the
+    // "prologue-only" CFI philosophy used by most LLVM backends.
+    // The key CFI information for unwinding is emitted in spillCalleeSavedRegisters.
 
     return true;
   }
