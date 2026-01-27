@@ -23,7 +23,6 @@ This document outlines the plan for implementing comprehensive debugging support
 
 | Feature | Priority | Complexity |
 |---------|----------|------------|
-| LLDB architecture plugin | Low | Low |
 | LLDB instruction emulation | Low | High |
 | GDB remote stub support | Low | Medium |
 
@@ -31,6 +30,7 @@ This document outlines the plan for implementing comprehensive debugging support
 
 | Feature | Status | Location |
 |---------|--------|----------|
+| LLDB architecture plugin | Done | `lldb/source/Plugins/Architecture/V850/ArchitectureV850.cpp` |
 | LLDB ABI plugin | Done | `lldb/source/Plugins/ABI/V850/ABISysV_v850.cpp` |
 | LLDB unwind plans | Done | `CreateFunctionEntryUnwindPlan`, `CreateDefaultUnwindPlan` |
 | LLDB disassembler integration | Done | Automatic via LLVM DisassemblerLLVMC |
@@ -176,18 +176,23 @@ static MCAsmInfo *createV850MCAsmInfo(const MCRegisterInfo &MRI,
 
 ## 2. LLDB Support
 
-### 2.1 Architecture Plugin
+### 2.1 Architecture Plugin [IMPLEMENTED]
 
-**Files to Create:**
+**Status:** Fully implemented.
+
+**Files Created:**
 
 ```
 lldb/source/Plugins/Architecture/V850/
-├── ArchitectureV850.h
-├── ArchitectureV850.cpp
-└── CMakeLists.txt
+├── ArchitectureV850.h      - Architecture class declaration
+├── ArchitectureV850.cpp    - Architecture implementation
+└── CMakeLists.txt          - Build configuration
 ```
 
-**Key Methods:**
+**Modified:**
+- `lldb/source/Plugins/Architecture/CMakeLists.txt` - Added V850 subdirectory
+
+**Key Features:**
 
 ```cpp
 class ArchitectureV850 : public Architecture {
@@ -196,15 +201,23 @@ public:
 
   llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
 
-  void OverrideStopInfo(Thread &thread) const override;
+  void OverrideStopInfo(Thread &thread) const override {}
 
-  lldb::addr_t GetCallableLoadAddress(lldb::addr_t addr,
+  lldb::addr_t GetBreakableLoadAddress(lldb::addr_t addr,
+                                       Target &target) const override;
+
+  lldb::addr_t GetCallableLoadAddress(lldb::addr_t load_addr,
                                       AddressClass addr_class) const override;
 
-  lldb::addr_t GetOpcodeLoadAddress(lldb::addr_t addr,
+  lldb::addr_t GetOpcodeLoadAddress(lldb::addr_t load_addr,
                                     AddressClass addr_class) const override;
 };
 ```
+
+**Implementation Notes:**
+- V850 has no delay slots, so `GetBreakableLoadAddress()` returns the address as-is
+- V850 has no ISA mode bits (unlike ARM Thumb or MIPS16), so address manipulation is trivial
+- All methods have simple implementations since V850 addresses are straightforward
 
 ### 2.2 ABI Plugin [IMPLEMENTED]
 
@@ -911,3 +924,4 @@ llvm-readelf -r test.o
 | 2026-01-26 | 2.2 | Epilogue CFI implemented: emits .cfi_def_cfa_offset after local frame deallocation (follows prologue-only philosophy) |
 | 2026-01-27 | 2.3 | Line number information: Added V850 support to LLVM Object library (ELF.cpp, RelocationResolver.cpp, ELFObjectFile.h) for proper debug section parsing |
 | 2026-01-26 | 2.3 | Fixed epilogue CFI for fallback path: tracks UsesPrepareDispose flag to emit correct CFA offset (CalleeSavedSize for PREPARE, 0 for fallback) |
+| 2026-01-27 | 2.4 | LLDB architecture plugin implemented (ArchitectureV850.cpp) |
