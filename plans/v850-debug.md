@@ -225,8 +225,8 @@ lldb/source/Plugins/ABI/V850/
 |--------|--------|-------|
 | `CreateInstance()` | ✓ Done | Checks `llvm::Triple::v850` |
 | `GetRegisterInfoArray()` | ✓ Done | 34 registers (r0-r31, PC, PSW) |
-| `CreateFunctionEntryUnwindPlan()` | ✓ Done | CFA=SP, PC in LP |
-| `CreateDefaultUnwindPlan()` | ✓ Done | CFA=SP+4, PC at CFA-4 |
+| `CreateFunctionEntryUnwindPlan()` | ✓ Done | CFA=SP, PC in LP, RA=LP |
+| `CreateDefaultUnwindPlan()` | ✓ Done | CFA=FP+8, PC at CFA-4, FP at CFA-8 |
 | `PrepareTrivialCall()` | ✓ Done | Sets up r6-r9, LP, SP, PC |
 | `GetReturnValueObjectImpl()` | ✓ Done | Reads r10 (32-bit) or r10:r11 (64-bit) |
 | `GetArgumentValues()` | ✓ Done | Reads r6-r9 for first 4 arguments |
@@ -321,43 +321,37 @@ Status ABISysV_v850::SetReturnValueObject(StackFrame *frame,
 }
 ```
 
-#### 2.2.3 Unwind Plan
+#### 2.2.3 Unwind Plan [IMPLEMENTED]
 
-```cpp
-bool ABISysV_v850::CreateFunctionEntryUnwindPlan(UnwindPlan &unwind_plan) {
-  unwind_plan.Clear();
-  unwind_plan.SetRegisterKind(eRegisterKindDWARF);
+**Function Entry Unwind Plan:** Used at the first instruction of a function.
+- CFA = SP (stack pointer at function entry)
+- PC is obtained from LP (r31) - V850's link register
+- LP contains the return address directly
+- SetReturnAddressRegister(dwarf_lp) identifies RA register
 
-  // At function entry:
-  // CFA = SP
-  // Return address = [lp]
-  UnwindPlan::RowSP row(new UnwindPlan::Row);
-  row->GetCFAValue().SetIsRegisterPlusOffset(dwarf::sp, 0);
-  row->SetRegisterLocationToRegister(dwarf::pc, dwarf::lp, true);
-  unwind_plan.AppendRow(row);
+**Default Unwind Plan:** Fallback when no CFI/debug info available.
+Assumes frame pointer (r29) is being used with standard PREPARE layout:
 
-  unwind_plan.SetSourceName("v850 at-func-entry default");
-  unwind_plan.SetSourcedFromCompiler(eLazyBoolNo);
-
-  return true;
-}
-
-bool ABISysV_v850::CreateDefaultUnwindPlan(UnwindPlan &unwind_plan) {
-  unwind_plan.Clear();
-  unwind_plan.SetRegisterKind(eRegisterKindDWARF);
-
-  // Default: use frame pointer if available
-  UnwindPlan::RowSP row(new UnwindPlan::Row);
-  row->GetCFAValue().SetIsRegisterPlusOffset(dwarf::r29, 0);
-  row->SetRegisterLocationToAtCFAPlusOffset(dwarf::pc, -4, true);
-  unwind_plan.AppendRow(row);
-
-  unwind_plan.SetSourceName("v850 default unwind plan");
-  unwind_plan.SetSourcedFromCompiler(eLazyBoolNo);
-
-  return true;
-}
 ```
+High Address
++----------------+ <- CFA (Caller's SP)
+|  Saved LP      |  (CFA - 4)
++----------------+
+|  Saved FP(r29) |  (CFA - 8) <- FP points here
++----------------+
+|  Other CSRs    |
++----------------+
+|  Local Vars    |
++----------------+ <- SP
+Low Address
+```
+
+- CFA = FP + 8 (LP and FP saved first by PREPARE)
+- PC (return address) at CFA - 4
+- Old FP at CFA - 8
+- Uses generic register kinds for portability
+
+**Files:** `lldb/source/Plugins/ABI/V850/ABISysV_v850.cpp`
 
 ### 2.3 Process Plugin (Optional)
 
@@ -679,15 +673,16 @@ llc -mtriple=v850-unknown-elf -mcpu=v850e2m test.ll -o -
 
 ### Phase 2: LLDB ABI Plugin (Basic) [COMPLETE]
 
-**Status:** Basic implementation complete.
+**Status:** Basic implementation complete with improved unwind plans.
 
 1. ✅ Created `lldb/source/Plugins/ABI/V850/` directory
 2. ✅ Implemented `ABISysV_v850` class
 3. ✅ Defined register info table with DWARF mapping (r0-r31, PC, PSW)
-4. ✅ Implemented `CreateFunctionEntryUnwindPlan()` - CFA=SP, PC in LP
-5. ✅ Implemented `CreateDefaultUnwindPlan()` - CFA=SP+4, PC at CFA-4
+4. ✅ Implemented `CreateFunctionEntryUnwindPlan()` - CFA=SP, PC in LP, RA=LP
+5. ✅ Implemented `CreateDefaultUnwindPlan()` - FP-based: CFA=FP+8, PC at CFA-4, FP at CFA-8
 6. ✅ Implemented `PrepareTrivialCall()` for expression evaluation
 7. ✅ Registered plugin in LLDB build system
+8. ✅ Fixed default unwind to use FP-based unwinding (V850 doesn't push RA to stack)
 
 **Files Created:**
 - `lldb/source/Plugins/ABI/V850/ABISysV_v850.h`
@@ -880,5 +875,6 @@ lldb/test/API/functionalities/unwind/v850/
 | 2026-01-25 | 1.9 | LLDB ABI plugin implemented (ABISysV_v850) |
 | 2026-01-25 | 2.0 | Status update: Verified LLDB integration (ELF, disassembler automatic); identified incomplete ABI methods (GetReturnValueObjectImpl, GetArgumentValues); added Phase 2b for return value handling |
 | 2026-01-25 | 2.1 | Implemented GetReturnValueObjectImpl, GetArgumentValues, SetReturnValueObject in ABISysV_v850; ABI plugin now fully functional |
+| 2026-01-27 | 2.2 | Improved LLDB unwind plans: CreateFunctionEntryUnwindPlan now sets RA register; CreateDefaultUnwindPlan fixed to use FP-based unwinding (V850 stores RA in LP register, not on stack) |
 | 2026-01-26 | 2.2 | Epilogue CFI implemented: emits .cfi_def_cfa_offset after local frame deallocation (follows prologue-only philosophy) |
 | 2026-01-26 | 2.3 | Fixed epilogue CFI for fallback path: tracks UsesPrepareDispose flag to emit correct CFA offset (CalleeSavedSize for PREPARE, 0 for fallback) |
