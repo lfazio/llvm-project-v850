@@ -31,11 +31,16 @@ This document outlines the plan for implementing comprehensive debugging support
 
 | Feature | Status | Location |
 |---------|--------|----------|
-| LLDB ABI plugin (basic) | Done | `lldb/source/Plugins/ABI/V850/ABISysV_v850.cpp` |
+| LLDB ABI plugin | Done | `lldb/source/Plugins/ABI/V850/ABISysV_v850.cpp` |
+| LLDB unwind plans | Done | `CreateFunctionEntryUnwindPlan`, `CreateDefaultUnwindPlan` |
 | LLDB disassembler integration | Done | Automatic via LLVM DisassemblerLLVMC |
 | LLDB ELF object file support | Done | Automatic via ObjectFileELF (EM_V850=87) |
 | Hardware breakpoint intrinsics | Done | `clang/include/clang/Basic/BuiltinsV850.def` |
 | Debug register access intrinsics | Done | `clang/include/clang/Basic/BuiltinsV850.def` |
+| Calling convention (i64/sret/byval) | Done | `V850CallingConv.td`, `V850FrameLowering.cpp` |
+| Interrupt handler CSRs | Done | `V850CallingConv.td` (CSR_V850_Interrupt) |
+| Object library V850 support | Done | `ELF.cpp`, `RelocationResolver.cpp`, `ELFObjectFile.h` |
+| Line number information | Done | llvm-dwarfdump parses V850 debug sections |
 
 ---
 
@@ -787,23 +792,27 @@ struct > 8 bytes   | Return via hidden pointer in r6
 
 ## 7. Testing Strategy
 
-### 7.1 Unit Tests
+### 7.1 Unit Tests [IMPLEMENTED]
 
 ```
 llvm/test/CodeGen/V850/
-├── debug-info.ll          # Basic debug info generation
-├── cfi-prologue.ll        # CFI directive emission
-├── cfi-epilogue.ll        # CFI restoration
-├── prepare-dispose-cfi.ll # PREPARE/DISPOSE CFI
-└── eh-frame.ll            # Exception handling frame
+├── debug-info.ll            # ✅ Debug info section generation
+├── debug-line.ll            # ✅ Line number information
+├── cfi-directives.ll        # ✅ CFI directive emission
+├── epilogue-cfi.ll          # ✅ Epilogue CFI tracking
+├── frame-pointer.ll         # ✅ Frame pointer handling
+├── frame-pointer-chain.ll   # ✅ FP chain for debugger walking
+├── prepare-dispose-unwind.ll # ✅ PREPARE/DISPOSE CFI
+├── obj-relocation.ll        # ✅ ELF relocation generation
+└── calling-conv.ll          # ✅ Calling convention verification
 ```
 
-### 7.2 Integration Tests
+### 7.2 Clang Tests [IMPLEMENTED]
 
 ```
-lldb/test/API/functionalities/unwind/v850/
-├── TestV850Unwind.py
-└── main.c
+clang/test/CodeGen/V850/
+├── debug-intrinsics.c       # ✅ Debug register intrinsics
+└── builtins-*.c             # ✅ Various builtin tests
 ```
 
 ### 7.3 Manual Testing
@@ -813,6 +822,18 @@ lldb/test/API/functionalities/unwind/v850/
 3. Set breakpoints, step through code
 4. Verify backtrace at various points
 5. Test variable inspection
+
+**Verification Commands:**
+```bash
+# Test line number info generation
+llvm-dwarfdump --debug-line test.o
+
+# Test debug info generation
+llvm-dwarfdump --debug-info test.o
+
+# Test relocation naming
+llvm-readelf -r test.o
+```
 
 ---
 
