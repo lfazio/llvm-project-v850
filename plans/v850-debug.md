@@ -620,21 +620,32 @@ Verifies:
 
 ## 5. Source-Level Debugging
 
-### 5.1 Line Number Information
+### 5.1 Line Number Information [IMPLEMENTED]
 
-**Status:** Handled by LLVM's debug info infrastructure.
+**Status:** Fully implemented with LLVM Object library support.
 
-**Verify:**
+**Implementation Details:**
 - `-g` flag generates proper `.debug_line` sections
 - Line tables map correctly to V850 instructions
+- `llvm-dwarfdump` can properly parse V850 ELF debug sections
 
-### 5.2 Variable Location
+**Object Library Support Added:**
+- `llvm/lib/Object/ELF.cpp`: Added V850 relocation type name mapping
+- `llvm/lib/Object/RelocationResolver.cpp`: Added V850 relocation resolver for R_V850_32, R_V850_16, R_V850_8
+- `llvm/include/llvm/Object/ELFObjectFile.h`: Added V850 architecture detection and file format name
+
+**Tests:**
+- `llvm/test/CodeGen/V850/debug-line.ll`
+- `llvm/test/CodeGen/V850/debug-info.ll`
+
+### 5.2 Variable Location [IMPLEMENTED]
 
 **Status:** Handled by LLVM's debug info infrastructure.
 
-**Potential Issues:**
-- Register allocation may affect variable locations
-- PREPARE/DISPOSE may complicate stack slot tracking
+**Implementation Notes:**
+- Register locations use DWARF register numbers (r0-r31 = 0-31)
+- Stack locations use DW_OP_fbreg with frame pointer (r29) relative offsets
+- PREPARE/DISPOSE register save/restore is tracked via CFI directives
 
 ### 5.3 DWARF Expression Support
 
@@ -877,4 +888,5 @@ lldb/test/API/functionalities/unwind/v850/
 | 2026-01-25 | 2.1 | Implemented GetReturnValueObjectImpl, GetArgumentValues, SetReturnValueObject in ABISysV_v850; ABI plugin now fully functional |
 | 2026-01-27 | 2.2 | Improved LLDB unwind plans: CreateFunctionEntryUnwindPlan now sets RA register; CreateDefaultUnwindPlan fixed to use FP-based unwinding (V850 stores RA in LP register, not on stack) |
 | 2026-01-26 | 2.2 | Epilogue CFI implemented: emits .cfi_def_cfa_offset after local frame deallocation (follows prologue-only philosophy) |
+| 2026-01-27 | 2.3 | Line number information: Added V850 support to LLVM Object library (ELF.cpp, RelocationResolver.cpp, ELFObjectFile.h) for proper debug section parsing |
 | 2026-01-26 | 2.3 | Fixed epilogue CFI for fallback path: tracks UsesPrepareDispose flag to emit correct CFA offset (CalleeSavedSize for PREPARE, 0 for fallback) |
