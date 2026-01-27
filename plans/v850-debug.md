@@ -23,13 +23,13 @@ This document outlines the plan for implementing comprehensive debugging support
 
 | Feature | Priority | Complexity |
 |---------|----------|------------|
-| LLDB instruction emulation | Low | High |
 | GDB remote stub support | Low | Medium |
 
 ### Recently Implemented
 
 | Feature | Status | Location |
 |---------|--------|----------|
+| LLDB instruction emulation | Done | `lldb/source/Plugins/Instruction/V850/EmulateInstructionV850.cpp` |
 | LLDB architecture plugin | Done | `lldb/source/Plugins/Architecture/V850/ArchitectureV850.cpp` |
 | LLDB ABI plugin | Done | `lldb/source/Plugins/ABI/V850/ABISysV_v850.cpp` |
 | LLDB unwind plans | Done | `CreateFunctionEntryUnwindPlan`, `CreateDefaultUnwindPlan` |
@@ -925,3 +925,4 @@ llvm-readelf -r test.o
 | 2026-01-27 | 2.3 | Line number information: Added V850 support to LLVM Object library (ELF.cpp, RelocationResolver.cpp, ELFObjectFile.h) for proper debug section parsing |
 | 2026-01-26 | 2.3 | Fixed epilogue CFI for fallback path: tracks UsesPrepareDispose flag to emit correct CFA offset (CalleeSavedSize for PREPARE, 0 for fallback) |
 | 2026-01-27 | 2.4 | LLDB architecture plugin implemented (ArchitectureV850.cpp) |
+| 2026-01-27 | 2.5 | LLDB instruction emulation implemented (PREPARE/DISPOSE/ADD/ADDI/ST.W/LD.W/MOV) |
