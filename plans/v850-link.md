@@ -614,41 +614,27 @@ Used for thread-local storage (if applicable).
 
 ## 7. Implementation Phases
 
-### Phase 1: Complete MC Layer Relocations [HIGH PRIORITY]
+### Phase 1: Complete MC Layer Relocations [COMPLETE]
 
-1. Implement `getRelocType()` in V850ELFObjectWriter.cpp
-2. Verify all fixup kinds map to correct ELF relocations
-3. Add missing relocations to V850.def
-4. Add tests for relocation emission
+1. ~~Implement `getRelocType()` in V850ELFObjectWriter.cpp~~
+2. ~~Verify all fixup kinds map to correct ELF relocations~~
+3. ~~Add missing relocations to V850.def~~
+4. ~~Add tests for relocation emission~~
 
-**Deliverables:**
-- Correct `.rela.*` sections in ELF output
-- Relocatable object files usable with GNU ld
+**Status:** Fully implemented. All basic relocations work correctly.
 
-**Test:**
-```bash
-llvm-mc -triple=v850-unknown-elf -filetype=obj test.s -o test.o
-llvm-readelf -r test.o  # Verify relocations
-```
+### Phase 2: LLD Target Implementation [COMPLETE]
 
-### Phase 2: LLD Target Implementation [HIGH PRIORITY]
+1. ~~Create `lld/ELF/Arch/V850.cpp`~~
+2. ~~Add to LLD build system~~
+3. ~~Implement `getRelExpr()` for all relocations~~
+4. ~~Implement `relocate()` for all relocations~~
+5. ~~Add basic linker script support~~
+6. ~~Add elf32-v850 output format~~
+7. ~~Add v850elf emulation~~
+8. ~~Add LLD tests (lld/test/ELF/v850/)~~
 
-1. Create `lld/ELF/Arch/V850.cpp`
-2. Add to LLD build system
-3. Implement `getRelExpr()` for all relocations
-4. Implement `relocate()` for all relocations
-5. Add basic linker script support
-
-**Deliverables:**
-- `ld.lld` can link V850 object files
-- Basic executable generation
-
-**Test:**
-```bash
-clang -target v850-unknown-elf -c test.c -o test.o
-ld.lld test.o -o test.elf
-llvm-readelf -h test.elf  # Verify ELF header
-```
+**Status:** Fully implemented. LLD can link V850 object files to executables.
 
 ### Phase 3: Linker Script and Startup [MEDIUM PRIORITY]
 
@@ -664,15 +650,15 @@ llvm-readelf -h test.elf  # Verify ELF header
 - Interrupt vector layout
 - Any device-specific initialization
 
-### Phase 4: Small Data Area Support [MEDIUM PRIORITY]
+### Phase 4: Small Data Area Support [PARTIAL]
 
-1. Implement SDA_* relocation handling
-2. Implement TDA_* relocation handling
-3. Implement ZDA_* relocation handling
-4. Add GP/EP initialization in crt0
+1. ~~Implement SDA_* relocation handling~~ (in LLD V850.cpp)
+2. ~~Implement TDA_* relocation handling~~ (in LLD V850.cpp)
+3. ~~Implement ZDA_* relocation handling~~ (in LLD V850.cpp)
+4. Add GP/EP initialization in crt0 (requires Phase 3)
 
-**Deliverables:**
-- Optimized memory access via GP/EP
+**Status:** Relocation handlers implemented in LLD. GP/EP initialization
+requires crt0 startup code (blocked on Phase 3 user input).
 
 ### Phase 5: Advanced Features [LOW PRIORITY]
 
@@ -771,3 +757,4 @@ Please provide them for reference.
 |------|---------|---------|
 | 2026-01-17 | 1.0 | Initial plan |
 | 2026-01-31 | 1.1 | LLD V850 target implemented (V850.cpp with all basic relocations) |
+| 2026-01-31 | 1.2 | Added elf32-v850 output format and v850elf emulation; added LLD tests; Phase 1-2 complete, Phase 4 partial |
