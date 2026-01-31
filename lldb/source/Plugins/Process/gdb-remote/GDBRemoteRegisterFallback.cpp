@@ -48,6 +48,23 @@ static std::vector<DynamicRegisterInfo::Register> GetRegisters_msp430() {
   return registers;
 }
 
+static std::vector<DynamicRegisterInfo::Register> GetRegisters_v850() {
+  ConstString empty_alt_name;
+  ConstString reg_set{"general purpose registers"};
+
+  // V850 has 32 general-purpose registers (r0-r31), PC, and PSW
+  // r0 is always zero, r3=sp, r4=gp, r5=tp, r29=fp, r30=ep, r31=lp
+  std::vector<DynamicRegisterInfo::Register> registers{
+      R32(r0),  R32(r1),  R32(r2),  R32(r3),  R32(r4),  R32(r5),  R32(r6),
+      R32(r7),  R32(r8),  R32(r9),  R32(r10), R32(r11), R32(r12), R32(r13),
+      R32(r14), R32(r15), R32(r16), R32(r17), R32(r18), R32(r19), R32(r20),
+      R32(r21), R32(r22), R32(r23), R32(r24), R32(r25), R32(r26), R32(r27),
+      R32(r28), R32(r29), R32(r30), R32(r31), R32(pc),  R32(psw),
+  };
+
+  return registers;
+}
+
 static std::vector<DynamicRegisterInfo::Register> GetRegisters_x86() {
   ConstString empty_alt_name;
   ConstString reg_set{"general purpose registers"};
@@ -86,6 +103,8 @@ GetFallbackRegisters(const ArchSpec &arch_to_use) {
     return GetRegisters_aarch64();
   case llvm::Triple::msp430:
     return GetRegisters_msp430();
+  case llvm::Triple::v850:
+    return GetRegisters_v850();
   case llvm::Triple::x86:
     return GetRegisters_x86();
   case llvm::Triple::x86_64:

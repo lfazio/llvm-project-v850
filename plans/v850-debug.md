@@ -23,12 +23,13 @@ This document outlines the plan for implementing comprehensive debugging support
 
 | Feature | Priority | Complexity |
 |---------|----------|------------|
-| GDB remote stub support | Low | Medium |
+| (all planned features implemented) | - | - |
 
 ### Recently Implemented
 
 | Feature | Status | Location |
 |---------|--------|----------|
+| GDB remote stub support | Done | `lldb/source/Plugins/Process/gdb-remote/GDBRemoteRegisterFallback.cpp` |
 | LLDB instruction emulation | Done | `lldb/source/Plugins/Instruction/V850/EmulateInstructionV850.cpp` |
 | LLDB architecture plugin | Done | `lldb/source/Plugins/Architecture/V850/ArchitectureV850.cpp` |
 | LLDB ABI plugin | Done | `lldb/source/Plugins/ABI/V850/ABISysV_v850.cpp` |
@@ -926,3 +927,4 @@ llvm-readelf -r test.o
 | 2026-01-26 | 2.3 | Fixed epilogue CFI for fallback path: tracks UsesPrepareDispose flag to emit correct CFA offset (CalleeSavedSize for PREPARE, 0 for fallback) |
 | 2026-01-27 | 2.4 | LLDB architecture plugin implemented (ArchitectureV850.cpp) |
 | 2026-01-27 | 2.5 | LLDB instruction emulation implemented (PREPARE/DISPOSE/ADD/ADDI/ST.W/LD.W/MOV) |
+| 2026-01-31 | 2.6 | GDB remote stub support implemented (GDBRemoteRegisterFallback.cpp) |
