@@ -180,7 +180,10 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
       int64_t Imm = CN->getSExtValue();
       if (isInt<5>(Imm)) {
         // Use CMPi for small immediates
-        SDValue ImmOp = CurDAG->getTargetConstant(Imm, DL, MVT::i32);
+        // Cast to uint32_t to ensure the value fits in 32 bits (handles
+        // negative values like -1 which are sign-extended to 64 bits)
+        SDValue ImmOp =
+            CurDAG->getTargetConstant(static_cast<uint32_t>(Imm), DL, MVT::i32);
         SDNode *CmpNode =
             CurDAG->getMachineNode(V850::CMPi, DL, MVT::Glue, LHS, ImmOp);
         ReplaceNode(Node, CmpNode);
