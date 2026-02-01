@@ -636,11 +636,17 @@ Used for thread-local storage (if applicable).
 
 **Status:** Fully implemented. LLD can link V850 object files to executables.
 
-### Phase 3: Linker Script and Startup [MEDIUM PRIORITY]
+### Phase 3: Linker Script and Startup [PARTIAL]
 
-1. Create default linker script template
-2. Create minimal crt0.S
-3. Test with actual hardware/simulator
+1. ~~Create default linker script template~~ (lld/test/ELF/v850/Inputs/v850.ld)
+2. ~~Create minimal crt0.S~~ (lld/test/ELF/v850/Inputs/crt0.S)
+3. Test with actual hardware/simulator (requires user's device-specific values)
+
+**Status:** Template files created. Users need to customize MEMORY regions for their specific V850 device.
+
+**Template Files:**
+- `lld/test/ELF/v850/Inputs/v850.ld` - Linker script with customizable memory regions
+- `lld/test/ELF/v850/Inputs/crt0.S` - Startup code with BSS clearing, data copying, GP/EP init
 
 **Deliverables:**
 - Working bare-metal "hello world"
@@ -758,3 +764,4 @@ Please provide them for reference.
 | 2026-01-17 | 1.0 | Initial plan |
 | 2026-01-31 | 1.1 | LLD V850 target implemented (V850.cpp with all basic relocations) |
 | 2026-01-31 | 1.2 | Added elf32-v850 output format and v850elf emulation; added LLD tests; Phase 1-2 complete, Phase 4 partial |
+| 2026-01-31 | 1.3 | Added template linker script (v850.ld) and crt0.S startup code; added V850 to LLD lit.cfg.py feature config; fixed tests to use correct V850 assembler syntax; Phase 3 partial |

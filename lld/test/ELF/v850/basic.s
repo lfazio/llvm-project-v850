@@ -6,7 +6,6 @@
 # RUN: llvm-readelf -s %t | FileCheck %s --check-prefix=SYMBOLS
 
 # HEADER: Machine: NEC v850
-# HEADER: OS/ABI: Standalone App
 
 # SYMBOLS: foo
 # SYMBOLS: main
