@@ -395,6 +395,10 @@ def SUBR : FormatI<0b001100, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
                    "subr\t$reg1, $reg2",
                    []>;
 
+// Pattern for negation: (0 - X) -> SUBR r0, X
+// This is more efficient than MOV 0, rd; SUB rs, rd (2 instructions -> 1)
+def : Pat<(sub 0, GPR:$src), (SUBR GPR:$src, R0)>;
+
 // CMP reg1, reg2 - Compare reg2 with reg1 (sets flags only)
 // Opcode: 001111 (0x0F)
 let Defs = [PSW], hasSideEffects = 0 in
