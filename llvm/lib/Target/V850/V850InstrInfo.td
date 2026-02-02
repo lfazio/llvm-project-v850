@@ -1234,12 +1234,18 @@ def SWITCH_JT : V850Pseudo<(outs), (ins GPR:$index, i32imm:$jti),
 
 //===----------------------------------------------------------------------===//
 // Short Load/Store Instructions - Format IV (16-bit)
+// These are V850E1+ instructions with encoding that overlaps JMP when reg2=0
 //===----------------------------------------------------------------------===//
+
+let Predicates = [HasV850E1], DecoderNamespace = "V850E1" in {
 
 // SLD.BU disp4[ep], reg2 - Short load byte unsigned (zero-extended)
 // Uses EP as base, 4-bit displacement (0-15 bytes)
 // Opcode: 0000110
-let mayLoad = 1, Uses = [EP] in
+// Note: Custom decoder to avoid conflict with JMP [reg1] when reg2=0.
+// JMP has opcode 000011 with reg2=0, which overlaps SLDBU encoding.
+// The decoder method returns Fail when reg2=0, allowing fallthrough to JMP.
+let mayLoad = 1, Uses = [EP], DecoderMethod = "DecodeSLDBUInstruction" in
 def SLDBU : FormatIV_E1<0b0000110, (outs GPR:$reg2), (ins disp4ep:$disp4),
                         "sld.bu\t$disp4, $reg2",
                         []>;
@@ -1248,13 +1254,18 @@ def SLDBU : FormatIV_E1<0b0000110, (outs GPR:$reg2), (ins disp4ep:$disp4),
 // Uses EP as base, 5-bit displacement (0-30 bytes, halfword aligned)
 // The 4-bit field encodes disp/2 (halfword index), so byte offset = disp4 * 2
 // Opcode: 0000111
-let mayLoad = 1, Uses = [EP] in
+// Note: Custom decoder to avoid conflict with JMP [reg1] when reg2=0.
+// JMP has opcode 000011 with reg2=0, which overlaps SLDHU encoding.
+// The decoder method returns Fail when reg2=0, allowing fallthrough to JMP.
+let mayLoad = 1, Uses = [EP], DecoderMethod = "DecodeSLDHUInstruction" in
 def SLDHU : FormatIV_E1<0b0000111, (outs GPR:$reg2), (ins disp5ep:$disp5),
                         "sld.hu\t$disp5, $reg2",
                         []> {
   bits<5> disp5;
   let disp4 = disp5{4-1};  // Encode disp5[4:1], bit 0 is always 0
 }
+
+} // Predicates = [HasV850E1], DecoderNamespace = "V850E1"
 
 //===----------------------------------------------------------------------===//
 // SASF Instruction

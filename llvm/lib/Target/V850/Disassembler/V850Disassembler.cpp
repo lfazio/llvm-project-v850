@@ -98,17 +98,6 @@ static DecodeStatus DecodeFPRRegisterClass(MCInst &Inst, uint32_t RegNo,
   return MCDisassembler::Success;
 }
 
-static DecodeStatus DecodeGPRnoR0RegisterClass(MCInst &Inst, uint32_t RegNo,
-                                               uint64_t Address,
-                                               const MCDisassembler *Decoder) {
-  if (RegNo == 0 || RegNo >= 32)
-    return MCDisassembler::Fail;
-
-  MCRegister Reg = GPRDecoderTable[RegNo];
-  Inst.addOperand(MCOperand::createReg(Reg));
-  return MCDisassembler::Success;
-}
-
 static DecodeStatus DecodeSysRegRegisterClass(MCInst &Inst, uint32_t RegNo,
                                               uint64_t Address,
                                               const MCDisassembler *Decoder) {
@@ -142,6 +131,63 @@ static DecodeStatus decodeSImm(MCInst &Inst, uint32_t Imm, int64_t Address,
   assert(isUInt<N>(Imm) && "Invalid immediate");
   // Sign-extend the number in the bottom N bits of Imm
   Inst.addOperand(MCOperand::createImm(SignExtend64<N>(Imm)));
+  return MCDisassembler::Success;
+}
+
+//===----------------------------------------------------------------------===//
+// Custom Instruction Decoders
+// These handle encoding conflicts between instructions
+//===----------------------------------------------------------------------===//
+
+// Custom decoder for SLDBU to avoid conflict with JMP [reg1].
+// When reg2=0 (bits[15:11]=0), this could be JMP, so we return Fail to
+// allow the decoder to try JMP next.
+static DecodeStatus DecodeSLDBUInstruction(MCInst &Inst, uint32_t Insn,
+                                           uint64_t Address,
+                                           const MCDisassembler *Decoder) {
+  // Extract reg2 from bits [15:11]
+  unsigned Reg2 = (Insn >> 11) & 0x1F;
+
+  // If reg2 is 0, this encoding conflicts with JMP - return Fail to allow
+  // the decoder to try JMP instead
+  if (Reg2 == 0)
+    return MCDisassembler::Fail;
+
+  // Extract disp4 from bits [3:0]
+  unsigned Disp4 = Insn & 0xF;
+
+  // Add the register operand
+  Inst.addOperand(MCOperand::createReg(GPRDecoderTable[Reg2]));
+
+  // Add the displacement operand (already in byte units for SLDBU)
+  Inst.addOperand(MCOperand::createImm(Disp4));
+
+  return MCDisassembler::Success;
+}
+
+// Custom decoder for SLDHU to avoid conflict with JMP [reg1].
+// When reg2=0 (bits[15:11]=0), this could be JMP, so we return Fail to
+// allow the decoder to try JMP next.
+static DecodeStatus DecodeSLDHUInstruction(MCInst &Inst, uint32_t Insn,
+                                           uint64_t Address,
+                                           const MCDisassembler *Decoder) {
+  // Extract reg2 from bits [15:11]
+  unsigned Reg2 = (Insn >> 11) & 0x1F;
+
+  // If reg2 is 0, this encoding conflicts with JMP - return Fail to allow
+  // the decoder to try JMP instead
+  if (Reg2 == 0)
+    return MCDisassembler::Fail;
+
+  // Extract disp4 from bits [3:0] - this is disp5[4:1]
+  unsigned Disp4 = Insn & 0xF;
+
+  // Add the register operand
+  Inst.addOperand(MCOperand::createReg(GPRDecoderTable[Reg2]));
+
+  // Add the displacement operand (multiply by 2 to get byte offset)
+  Inst.addOperand(MCOperand::createImm(Disp4 * 2));
+
   return MCDisassembler::Success;
 }
 
@@ -201,7 +247,9 @@ DecodeStatus V850Disassembler::getInstruction16(MCInst &MI, uint64_t &Size,
   uint16_t Insn16 = support::endian::read16le(Bytes.data());
 
   bool HasV850E2M = STI.hasFeature(V850::FeatureV850E2M);
+  bool HasV850E1 = STI.hasFeature(V850::FeatureV850E1);
 
+  // Try V850E2M-specific instructions first (superset of V850E1)
   if (HasV850E2M) {
     MI.clear();
     DecodeStatus Result = decodeInstruction(DecoderTableV850E2M16, MI, Insn16,
@@ -212,6 +260,19 @@ DecodeStatus V850Disassembler::getInstruction16(MCInst &MI, uint64_t &Size,
     }
   }
 
+  // Try V850E1-specific instructions (includes SLDBU, SLDHU with custom
+  // decoders that return Fail for reg2=0 to allow fallthrough to JMP)
+  if (HasV850E1) {
+    MI.clear();
+    DecodeStatus Result = decodeInstruction(DecoderTableV850E116, MI, Insn16,
+                                            Address, this, STI);
+    if (Result != MCDisassembler::Fail) {
+      Size = 2;
+      return Result;
+    }
+  }
+
+  // Try base V850 instructions
   MI.clear();
   DecodeStatus Result =
       decodeInstruction(DecoderTable16, MI, Insn16, Address, this, STI);
@@ -294,9 +355,6 @@ DecodeStatus V850Disassembler::getInstruction(MCInst &MI, uint64_t &Size,
 
   // Read the first 16-bit halfword
   uint16_t Insn16 = support::endian::read16le(Bytes.data());
-
-  // Check if we have V850E1 features for extended instructions
-  bool HasV850E1 = STI.hasFeature(V850::FeatureV850E1);
 
   // Decide whether to try 16-bit or 32-bit first using a small heuristic.
   // Many 32-bit V850 formats use the extended opcode value 0b111111 in
