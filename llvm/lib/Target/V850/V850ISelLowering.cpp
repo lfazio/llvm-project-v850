@@ -95,8 +95,10 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::SMUL_LOHI, MVT::i32, Expand);
     setOperationAction(ISD::UMUL_LOHI, MVT::i32, Expand);
   } else {
-    // Base V850 uses library calls
-    setOperationAction(ISD::MUL, MVT::i32, Expand);
+    // Base V850 has MULH (16x16 multiply) but no 32x32 MUL.
+    // Use Custom to let LowerMUL detect 16-bit patterns and use MULH,
+    // otherwise fall back to library call.
+    setOperationAction(ISD::MUL, MVT::i32, Custom);
     setOperationAction(ISD::MULHS, MVT::i32, Expand);
     setOperationAction(ISD::MULHU, MVT::i32, Expand);
     setOperationAction(ISD::SMUL_LOHI, MVT::i32, Expand);
@@ -331,6 +333,8 @@ const char *V850TargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "V850ISD::SMUL";
   case V850ISD::UMUL:
     return "V850ISD::UMUL";
+  case V850ISD::MULH16:
+    return "V850ISD::MULH16";
   case V850ISD::SDIVREM:
     return "V850ISD::SDIVREM";
   case V850ISD::UDIVREM:
@@ -446,6 +450,28 @@ SDValue V850TargetLowering::LowerSELECT_CC(SDValue Op,
                      DAG.getConstant(CC, DL, MVT::i32), Cmp);
 }
 
+// Helper to check if a value is sign-extended from i16
+// Returns true if the value effectively contains a sign-extended i16
+static bool isSExtFromI16(SDValue V) {
+  // Case 1: sign_extend_inreg (explicit sign extension of bits)
+  if (V.getOpcode() == ISD::SIGN_EXTEND_INREG) {
+    VTSDNode *VTN = cast<VTSDNode>(V.getOperand(1));
+    return VTN->getVT() == MVT::i16;
+  }
+  // Case 2: sign_extend from i16 (before type legalization)
+  if (V.getOpcode() == ISD::SIGN_EXTEND && V.getOperand(0).getValueType() == MVT::i16) {
+    return true;
+  }
+  // Case 3: sign-extending load from i16 (after type legalization)
+  if (auto *Load = dyn_cast<LoadSDNode>(V)) {
+    if (Load->getExtensionType() == ISD::SEXTLOAD &&
+        Load->getMemoryVT() == MVT::i16) {
+      return true;
+    }
+  }
+  return false;
+}
+
 SDValue V850TargetLowering::LowerMUL(SDValue Op, SelectionDAG &DAG) const {
   // V850's MUL instruction produces a 64-bit result in two registers.
   // For simple 32-bit multiply, we use V850ISD::SMUL and take only the low
@@ -453,6 +479,22 @@ SDValue V850TargetLowering::LowerMUL(SDValue Op, SelectionDAG &DAG) const {
   SDLoc DL(Op);
   SDValue LHS = Op.getOperand(0);
   SDValue RHS = Op.getOperand(1);
+
+  // Check if both operands are sign-extended from i16.
+  // In this case, use V850ISD::MULH16 which maps to the MULH instruction
+  // (16x16 -> 32 bit multiply, more efficient than full 32x32 MUL)
+  // MULH uses only the lower 16 bits of each operand, so we can pass
+  // the i32 values directly.
+  // MULH is available on all V850 variants.
+  if (isSExtFromI16(LHS) && isSExtFromI16(RHS)) {
+    return DAG.getNode(V850ISD::MULH16, DL, MVT::i32, LHS, RHS);
+  }
+
+  // V850E1+ has hardware MUL instruction. For base V850, return empty SDValue
+  // to trigger expansion to library call.
+  if (!Subtarget.hasV850E1()) {
+    return SDValue();
+  }
 
   // V850ISD::SMUL returns (low, high)
   SDValue MulLoHi = DAG.getNode(V850ISD::SMUL, DL,

@@ -231,6 +231,13 @@ def SDT_V850Mul : SDTypeProfile<2, 2, [SDTCisSameAs<0, 1>,
 def V850smul : SDNode<"V850ISD::SMUL", SDT_V850Mul>;
 def V850umul : SDNode<"V850ISD::UMUL", SDT_V850Mul>;
 
+// MULH16: Signed 16x16->32 multiply for MULH instruction
+// Takes two i32 inputs (containing i16 values), returns one i32
+def SDT_V850Mulh16 : SDTypeProfile<1, 2, [SDTCisSameAs<0, 1>,
+                                          SDTCisSameAs<0, 2>,
+                                          SDTCisVT<0, i32>]>;
+def V850mulh16 : SDNode<"V850ISD::MULH16", SDT_V850Mulh16>;
+
 // Multiply-accumulate node - takes 4 i32s (a, b, acc_lo, acc_hi), returns 2 i32s (res_lo, res_hi)
 def SDT_V850Mac : SDTypeProfile<2, 4, [SDTCisSameAs<0, 1>,
                                         SDTCisSameAs<0, 2>,
@@ -465,10 +472,16 @@ def SATADD : FormatI<0b000110, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
 
 // MULH reg1, reg2 - Multiply halfword (16x16 -> 32)
 // Opcode: 000111 (0x07)
+// Computes: reg2 = sign_ext(reg1[15:0]) * sign_ext(reg2[15:0])
 let Constraints = "$rs = $reg2" in
 def MULH : FormatI<0b000111, (outs GPR:$reg2), (ins GPR:$rs, GPR:$reg1),
                    "mulh\t$reg1, $reg2",
                    []>;
+
+// Pattern for 16x16 signed multiply using V850ISD::MULH16 custom node
+// This is matched when LowerMUL detects both operands are sext_inreg from i16
+// More efficient than full 32x32 multiply (2 bytes vs 4 bytes, fewer cycles)
+def : Pat<(V850mulh16 GPR:$rs, GPR:$reg1), (MULH GPR:$rs, GPR:$reg1)>;
 
 // OR reg1, reg2 - Bitwise OR
 // Opcode: 001000 (0x08)

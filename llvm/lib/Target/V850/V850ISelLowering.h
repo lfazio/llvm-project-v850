@@ -40,6 +40,9 @@ enum NodeType : unsigned {
   SMUL,
   // UMUL: Unsigned 32x32->64 multiply, returns (low, high)
   UMUL,
+  // MULH16: Signed 16x16->32 multiply (MULH instruction)
+  // More efficient than SMUL when both operands are sign-extended i16
+  MULH16,
 
   // Division operations (V850E1+)
   // SDIVREM: Signed divide, returns (quotient, remainder)
