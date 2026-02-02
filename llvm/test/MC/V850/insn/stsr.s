@@ -1,8 +1,9 @@
-// RUN: llvm-mc -triple=v850 -show-encoding %s | FileCheck %s
+// RUN: llvm-mc -triple=v850 -mcpu=v850e2m -show-encoding %s | FileCheck %s
 
 // STSR - Store from system register (Format IX)
 // Syntax: stsr regID, reg2
 // Operation: reg2 <- sysreg[regID]
+// Note: Tests use v850e2m to include all system register variants
 
 //===----------------------------------------------------------------------===//
 // Base V850 System Registers (All variants)

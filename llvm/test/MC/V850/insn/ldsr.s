@@ -1,8 +1,9 @@
-// RUN: llvm-mc -triple=v850 -show-encoding %s | FileCheck %s
+// RUN: llvm-mc -triple=v850 -mcpu=v850e2m -show-encoding %s | FileCheck %s
 
 // LDSR - Load to system register (Format IX)
 // Syntax: ldsr reg2, regID
 // Operation: sysreg[regID] <- reg2
+// Note: Tests use v850e2m to include all system register variants
 
 //===----------------------------------------------------------------------===//
 // Base V850 System Registers (All variants)
