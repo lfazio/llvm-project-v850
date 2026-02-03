@@ -67,17 +67,18 @@ def RetCC_V850 : CallingConv<[
   // Promote i8/i16 return values to i32
   CCIfType<[i8, i16], CCPromoteToType<i32>>,
 
-  // i32 values are returned in r10
-  CCIfType<[i32], CCAssignToReg<[R10]>>,
+  // i32 and i64 values are returned in r10:r11
+  // Single i32 uses r10, i64 (split into two i32) uses r10 for low, r11 for high
+  // Note: i64 is split into two i32 values before this CC is applied on 32-bit targets
+  CCIfType<[i32], CCAssignToReg<[R10, R11]>>,
 
-  // f32 values are returned in r10 (using GPR)
-  CCIfType<[f32], CCAssignToReg<[R10]>>,
+  // f32 and f64 values are returned in r10:r11 (using GPRs)
+  // Single f32 uses r10, f64 (split into two f32/i32) uses r10:r11
+  CCIfType<[f32], CCAssignToReg<[R10, R11]>>,
 
-  // i64 values are returned in r10:r11 (low:high)
-  CCIfType<[i64], CCAssignToRegWithShadow<[R10], [R11]>>,
-
-  // f64 values are returned in r10:r11 (low:high pair)
-  CCIfType<[f64], CCAssignToRegWithShadow<[R10], [R11]>>
+  // Keep these for completeness in case i64/f64 are not split
+  CCIfType<[i64], CCAssignToReg<[R10, R11]>>,
+  CCIfType<[f64], CCAssignToReg<[R10, R11]>>
 ]>;
 
 //===----------------------------------------------------------------------===//
