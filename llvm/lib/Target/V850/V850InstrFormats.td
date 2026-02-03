@@ -386,6 +386,26 @@ class FormatXIII<bits<5> opcode, dag outs, dag ins, string asmstr, list<dag> pat
 // "let reg1 = 0" constraint instead of a separate class.
 
 //===----------------------------------------------------------------------===//
+// Format VI-E1: 48-bit MOV with 32-bit immediate (V850E1+)
+// Used for: MOV imm32, reg1
+// First halfword:  15-11 = 0, 10-5 = opcode (110001), 4-0 = reg1
+// Second halfword: 31-16 = imm32[15:0]
+// Third halfword:  47-32 = imm32[31:16]
+//===----------------------------------------------------------------------===//
+
+class FormatVI_E1<bits<6> opcode, dag outs, dag ins, string asmstr, list<dag> pattern>
+    : V850Inst48<outs, ins, asmstr, pattern> {
+  bits<5> reg1;
+  bits<32> imm32;
+
+  let Inst{15-11} = 0;                // reg2 field (must be 0)
+  let Inst{10-5}  = opcode;
+  let Inst{4-0}   = reg1;
+  let Inst{31-16} = imm32{15-0};      // imm32[15:0]
+  let Inst{47-32} = imm32{31-16};     // imm32[31:16]
+}
+
+//===----------------------------------------------------------------------===//
 // Format VI-E2: 48-bit Jump with 32-bit displacement (V850E2+)
 // Used for: JARL disp32, JMP disp32, JR disp32
 // First halfword:  15-11 = reg2 (unused, set to 0), 10-5 = opcode, 4-0 = reg1

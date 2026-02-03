@@ -524,6 +524,15 @@ def MOVi : FormatII<0b010000, (outs GPR:$reg2), (ins simm5:$imm5),
                     "mov\t$imm5, $reg2",
                     [(set GPR:$reg2, simm5:$imm5)]>;
 
+// MOV imm32, reg1 - Move 32-bit immediate to reg1 (V850E1+)
+// 48-bit instruction: Format VI with reg2=0, opcode=110001 (0x31)
+// This is the same opcode as MOVEA but with a 48-bit format when reg2=0
+// 6 bytes vs 8 bytes for MOVHI+MOVEA sequence
+let Predicates = [HasV850E1] in
+def MOVi32 : FormatVI_E1<0b110001, (outs GPR:$reg1), (ins i32imm:$imm32),
+                         "mov\t$imm32, $reg1",
+                         []>;  // Pattern added separately with imm32_pred
+
 // SATADD imm5, reg2 - Saturated add immediate
 // Opcode: 010001 (0x11)
 // Flags: CY, OV, S, Z, SAT modified
@@ -1106,7 +1115,13 @@ def TST1_PSEUDO : V850Pseudo<(outs GPR:$result), (ins GPR:$bit, GPR:$addr),
 def : Pat<(i32 imm_hi16_only:$imm),
           (MOVHI R0, (HI16_ONLY $imm))>;
 
-// Full 32-bit constant requires MOVHI + MOVEA sequence (2 instructions)
+// Full 32-bit constant: Use MOVi32 on V850E1+ (6 bytes, 1 instruction)
+// This is preferred over MOVHI+MOVEA (8 bytes, 2 instructions)
+let Predicates = [HasV850E1], AddedComplexity = 1 in
+def : Pat<(i32 imm32_pred:$imm), (MOVi32 imm:$imm)>;
+
+// Full 32-bit constant: Fallback for base V850 (no MOVi32)
+// Requires MOVHI + MOVEA sequence (2 instructions, 8 bytes)
 // For a 32-bit value V = (Hi << 16) + Lo (signed)
 // We need to account for sign extension of Lo in HI16
 def : Pat<(i32 imm32_pred:$imm),

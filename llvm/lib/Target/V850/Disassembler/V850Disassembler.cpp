@@ -356,13 +356,39 @@ DecodeStatus V850Disassembler::getInstruction(MCInst &MI, uint64_t &Size,
   // Read the first 16-bit halfword
   uint16_t Insn16 = support::endian::read16le(Bytes.data());
 
+  unsigned Opcode6 = (Insn16 >> 5) & 0x3F;
+  unsigned Reg2 = (Insn16 >> 11) & 0x1F;
+
+  // Check for 48-bit MOVi32 instruction (V850E1+)
+  // MOVi32 uses opcode=0x31 (same as MOVEA) but with reg2=0
+  // This distinguishes MOVi32 from MOVEA (which has reg2 != 0)
+  if (Opcode6 == 0x31 && Reg2 == 0 && Bytes.size() >= 6) {
+    if (STI.hasFeature(V850::FeatureV850E1)) {
+      // Format VI-E1: 48-bit MOV imm32, reg1
+      // Bits 4-0: reg1
+      // Bits 10-5: opcode (0x31)
+      // Bits 15-11: reg2 (must be 0)
+      // Bits 31-16: imm32[15:0]
+      // Bits 47-32: imm32[31:16]
+      unsigned Reg1 = Insn16 & 0x1F;
+      uint16_t ImmLo = support::endian::read16le(Bytes.data() + 2);
+      uint16_t ImmHi = support::endian::read16le(Bytes.data() + 4);
+      uint32_t Imm32 = (static_cast<uint32_t>(ImmHi) << 16) | ImmLo;
+
+      MI.setOpcode(V850::MOVi32);
+      MI.addOperand(MCOperand::createReg(GPRDecoderTable[Reg1]));
+      MI.addOperand(MCOperand::createImm(static_cast<int32_t>(Imm32)));
+      Size = 6;
+      return MCDisassembler::Success;
+    }
+  }
+
   // Decide whether to try 16-bit or 32-bit first using a small heuristic.
   // Many 32-bit V850 formats use the extended opcode value 0b111111 in
   // bits [10:5] of the first halfword (FormatIX/XI/XII/etc.). If those
   // bits are 0b111111, prefer the 32-bit decoder first; otherwise try the
   // 16-bit decoder first and fall back to 32-bit when available.
 
-  unsigned Opcode6 = (Insn16 >> 5) & 0x3F;
   bool Prefer32 = (Opcode6 == 0x3F);
 
   if (Prefer32 && Bytes.size() >= 4) {
