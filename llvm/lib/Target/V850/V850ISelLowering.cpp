@@ -1168,11 +1168,14 @@ static SDValue performADDECombine(SDNode *N, SelectionDAG &DAG,
   SDValue Mac = DAG.getNode(MacOpc, DL, VTs, MacOps);
 
   // Replace ADDC uses (sum_lo) with MAC low result
-  SDValue SumLo = SDValue(GluedNode, 0);
-  DAG.ReplaceAllUsesOfValueWith(SumLo, Mac.getValue(0));
+  // Replace ADDE uses (sum_hi) with MAC high result
+  // Following ARM's pattern for SMLAL/UMLAL combining
+  DAG.ReplaceAllUsesOfValueWith(SDValue(GluedNode, 0),
+                                SDValue(Mac.getNode(), 0));
+  DAG.ReplaceAllUsesOfValueWith(SDValue(N, 0), SDValue(Mac.getNode(), 1));
 
-  // Return high part for this ADDE node
-  return Mac.getValue(1);
+  // Return original node to notify the driver to stop replacing
+  return SDValue(N, 0);
 }
 
 /// Try to combine multiply-add patterns into MAC/MACU instructions.
