@@ -186,6 +186,17 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
     setMaxAtomicSizeInBitsSupported(0);
   }
 
+  // Multi-precision arithmetic - V850E2+ has ADF/SBF for efficient 64-bit ops
+  // ADF: add with flag (reg3 = reg2 + reg1 + (cond ? 1 : 0))
+  // SBF: subtract with flag (reg3 = reg2 - reg1 - (cond ? 1 : 0))
+  // Using condition C (carry), this implements add/sub with carry
+  if (STI.hasV850E2()) {
+    setOperationAction(ISD::ADDC, MVT::i32, Legal);
+    setOperationAction(ISD::ADDE, MVT::i32, Legal);
+    setOperationAction(ISD::SUBC, MVT::i32, Legal);
+    setOperationAction(ISD::SUBE, MVT::i32, Legal);
+  }
+
   // Intrinsics - V850E1+ has register-based bit manipulation instructions
   if (STI.hasV850E1()) {
     setOperationAction(ISD::INTRINSIC_W_CHAIN, MVT::Other, Custom);
@@ -251,8 +262,10 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
   setPrefFunctionAlignment(Align(4));
 
   // Enable DAG combining for MAC pattern recognition (V850E2M+)
+  // We check both ADD (for legacy pattern) and ADDE (when ADDC/ADDE are Legal)
   if (STI.hasV850E2M()) {
     setTargetDAGCombine(ISD::ADD);
+    setTargetDAGCombine(ISD::ADDE);
   }
 
   // Enable DAG combining for bit manipulation (SET1/CLR1/NOT1)
@@ -407,7 +420,7 @@ SDValue V850TargetLowering::LowerBlockAddress(SDValue Op,
 }
 
 SDValue V850TargetLowering::LowerConstantPool(SDValue Op,
-                                               SelectionDAG &DAG) const {
+                                              SelectionDAG &DAG) const {
   SDLoc DL(Op);
   EVT VT = Op.getValueType();
   ConstantPoolSDNode *CP = cast<ConstantPoolSDNode>(Op);
@@ -459,7 +472,8 @@ static bool isSExtFromI16(SDValue V) {
     return VTN->getVT() == MVT::i16;
   }
   // Case 2: sign_extend from i16 (before type legalization)
-  if (V.getOpcode() == ISD::SIGN_EXTEND && V.getOperand(0).getValueType() == MVT::i16) {
+  if (V.getOpcode() == ISD::SIGN_EXTEND &&
+      V.getOperand(0).getValueType() == MVT::i16) {
     return true;
   }
   // Case 3: sign-extending load from i16 (after type legalization)
@@ -1066,7 +1080,103 @@ static SDValue performSTORECombine(SDNode *N, SelectionDAG &DAG,
 }
 
 /// Try to combine multiply-add patterns into MAC/MACU instructions.
-/// Pattern after type legalization:
+/// Pattern with ADDC/ADDE (when Legal):
+///   mul_lo, mul_hi = SMUL/UMUL(a, b)
+///   sum_lo, carry = ADDC(acc_lo, mul_lo)
+///   sum_hi = ADDE(acc_hi, mul_hi, carry_in)
+///
+/// We look for the ADDE node and trace back to find the multiply-accumulate.
+static SDValue performADDECombine(SDNode *N, SelectionDAG &DAG,
+                                  const V850Subtarget &Subtarget) {
+  // Only V850E2M and later have MAC/MACU
+  if (!Subtarget.hasV850E2M())
+    return SDValue();
+
+  SDLoc DL(N);
+
+  // ADDE has (LHS, RHS, CarryIn) - find which is mul_hi
+  SDValue LHS = N->getOperand(0);
+  SDValue RHS = N->getOperand(1);
+
+  SDValue MulHi, AccHi;
+  bool IsSigned = false;
+
+  // Check if one operand is SMUL/UMUL result 1 (high part of multiply)
+  auto checkMulHi = [&](SDValue V) -> bool {
+    if (V.getResNo() != 1)
+      return false;
+    if (V.getOpcode() == V850ISD::SMUL) {
+      IsSigned = true;
+      return true;
+    }
+    if (V.getOpcode() == V850ISD::UMUL) {
+      IsSigned = false;
+      return true;
+    }
+    return false;
+  };
+
+  if (checkMulHi(LHS)) {
+    MulHi = LHS;
+    AccHi = RHS;
+  } else if (checkMulHi(RHS)) {
+    MulHi = RHS;
+    AccHi = LHS;
+  } else {
+    return SDValue();
+  }
+
+  SDNode *MulNode = MulHi.getNode();
+
+  // Now find the ADDC that produces the carry input to this ADDE
+  // ADDC should have glue output that feeds into ADDE
+  // We need to find the glue producer for this ADDE
+  SDNode *GluedNode = N->getGluedNode();
+  if (!GluedNode || GluedNode->getOpcode() != ISD::ADDC)
+    return SDValue();
+
+  // ADDC has (LHS, RHS) - find which is mul_lo
+  SDValue ADDCOp0 = GluedNode->getOperand(0);
+  SDValue ADDCOp1 = GluedNode->getOperand(1);
+
+  auto isMulLow = [&](SDValue V) -> bool {
+    if (V.getResNo() != 0)
+      return false;
+    if (V.getOpcode() != V850ISD::SMUL && V.getOpcode() != V850ISD::UMUL)
+      return false;
+    // Verify same multiply operands as MulHi
+    return V.getOperand(0) == MulNode->getOperand(0) &&
+           V.getOperand(1) == MulNode->getOperand(1);
+  };
+
+  SDValue AccLo;
+  if (isMulLow(ADDCOp0)) {
+    AccLo = ADDCOp1;
+  } else if (isMulLow(ADDCOp1)) {
+    AccLo = ADDCOp0;
+  } else {
+    return SDValue();
+  }
+
+  // We have a match! Create the MAC node.
+  SDValue MulA = MulNode->getOperand(0);
+  SDValue MulB = MulNode->getOperand(1);
+
+  unsigned MacOpc = IsSigned ? V850ISD::SMAC : V850ISD::UMAC;
+  SDValue MacOps[] = {MulA, MulB, AccLo, AccHi};
+  SDVTList VTs = DAG.getVTList(MVT::i32, MVT::i32);
+  SDValue Mac = DAG.getNode(MacOpc, DL, VTs, MacOps);
+
+  // Replace ADDC uses (sum_lo) with MAC low result
+  SDValue SumLo = SDValue(GluedNode, 0);
+  DAG.ReplaceAllUsesOfValueWith(SumLo, Mac.getValue(0));
+
+  // Return high part for this ADDE node
+  return Mac.getValue(1);
+}
+
+/// Try to combine multiply-add patterns into MAC/MACU instructions.
+/// Pattern after type legalization (legacy with setcc):
 ///   sum_lo = add acc_lo, mul_lo   (where mul_lo = SMUL/UMUL result 0)
 ///   carry = setcc sum_lo, acc_lo, setult
 ///   partial_hi = add acc_hi, mul_hi (where mul_hi = SMUL/UMUL result 1)
@@ -1342,6 +1452,8 @@ SDValue V850TargetLowering::PerformDAGCombine(SDNode *N,
     break;
   case ISD::ADD:
     return performADDCombine(N, DAG, Subtarget);
+  case ISD::ADDE:
+    return performADDECombine(N, DAG, Subtarget);
   case ISD::STORE:
     return performSTORECombine(N, DAG, Subtarget);
   case ISD::OR:

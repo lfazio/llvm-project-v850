@@ -1633,9 +1633,10 @@ def DBRET : FormatX<0b111111, 0b010001, (outs), (ins),
 let Predicates = [HasV850E2] in {
 
 // ADF cccc, reg1, reg2, reg3 - Add on condition flag
-// If condition true: reg3 = reg2 + reg1 + CY, else reg3 = reg2 + CY
+// If condition true: reg3 = reg2 + reg1 + 1, else reg3 = reg2 + reg1
 // Opcode: 111111, sub-op: 011101, subid: {cond, 0}
-let Uses = [PSW] in
+// When cond=C (1), this implements add-with-carry for 64-bit arithmetic
+let Uses = [PSW], Defs = [PSW] in
 def ADF : FormatXI<0b111111, 0b011101, 0b00000, (outs GPR:$reg3),
                    (ins cmov_cond:$cond, GPR:$reg1, GPR:$reg2),
                    "adf\t$cond, $reg1, $reg2, $reg3",
@@ -1646,9 +1647,10 @@ def ADF : FormatXI<0b111111, 0b011101, 0b00000, (outs GPR:$reg3),
 }
 
 // SBF cccc, reg1, reg2, reg3 - Subtract on condition flag
-// If condition true: reg3 = reg2 - reg1 - CY, else reg3 = reg2 - CY
+// If condition true: reg3 = reg2 - reg1 - 1, else reg3 = reg2 - reg1
 // Opcode: 111111, sub-op: 011100, subid: {cond, 0}
-let Uses = [PSW] in
+// When cond=C (1), this implements sub-with-borrow for 64-bit arithmetic
+let Uses = [PSW], Defs = [PSW] in
 def SBF : FormatXI<0b111111, 0b011100, 0b00000, (outs GPR:$reg3),
                    (ins cmov_cond:$cond, GPR:$reg1, GPR:$reg2),
                    "sbf\t$cond, $reg1, $reg2, $reg3",
@@ -1657,6 +1659,18 @@ def SBF : FormatXI<0b111111, 0b011100, 0b00000, (outs GPR:$reg3),
   let Inst{20-17} = cond;
   let Inst{16} = 0;
 }
+
+// Patterns for multi-precision arithmetic (64-bit add/sub on 32-bit target)
+// addc: add with carry output (low part of 64-bit add)
+// adde: add with carry in/out (high part of 64-bit add)
+// Condition code 1 = C (carry flag set)
+def : Pat<(addc GPR:$rs, GPR:$reg1), (ADD GPR:$rs, GPR:$reg1)>;
+def : Pat<(adde GPR:$reg1, GPR:$reg2), (ADF 1, GPR:$reg1, GPR:$reg2)>;
+
+// subc: subtract with borrow output (low part of 64-bit sub)
+// sube: subtract with borrow in/out (high part of 64-bit sub)
+def : Pat<(subc GPR:$rs, GPR:$reg1), (SUB GPR:$rs, GPR:$reg1)>;
+def : Pat<(sube GPR:$reg1, GPR:$reg2), (SBF 1, GPR:$reg1, GPR:$reg2)>;
 
 // MAC reg1, reg2, reg3, reg4 - Multiply-accumulate signed
 // (reg3:reg4) = (reg3:reg4) + sext(reg1) * sext(reg2)
