@@ -186,7 +186,43 @@ mul → add  →  MAC reg1, reg2, reg3, reg4 (adds to reg3:reg4)
 
 ---
 
-### 2.3 DIVQ/DIVQU Quick Division [IMPLEMENTED]
+### 2.3 ADF/SBF 64-bit Arithmetic [IMPLEMENTED]
+
+**File:** `llvm/lib/Target/V850/V850ISelLowering.cpp`, `llvm/lib/Target/V850/V850InstrInfo.td`
+
+**Functions:** `performADDECombine()`, ISel patterns for addc/adde/subc/sube
+
+**Description:** Uses ADF/SBF instructions for efficient 64-bit add/subtract with carry propagation.
+
+**Instructions:**
+- ADF cond, reg1, reg2, reg3: reg3 = reg2 + reg1 + (cond ? 1 : 0)
+- SBF cond, reg1, reg2, reg3: reg3 = reg2 - reg1 - (cond ? 1 : 0)
+
+**Pattern:**
+```
+i64 add:  ADD (low) + ADF C (high with carry)
+i64 sub:  SUB (low) + SBF C (high with borrow)
+```
+
+**Implementation Details:**
+- ADDC/ADDE/SUBC/SUBE set to Legal on V850E2+
+- ISel patterns: addc→ADD, adde→ADF, subc→SUB, sube→SBF
+- ADF/SBF define PSW for chained operations (e.g., i128 add)
+- performADDECombine recognizes MAC patterns with ADDC/ADDE
+
+**Code Generation Improvement:**
+| Operation | V850E2M (ADF/SBF) | V850E1 (setf) |
+|-----------|-------------------|---------------|
+| i64 add   | add + adf c (4)   | add + setf c + add + add (7) |
+| i64 sub   | sub + sbf c (4)   | setf c + sub + sub + sub (7) |
+
+**Requirements:** V850E2 or later
+
+**Status:** Fully implemented
+
+---
+
+### 2.5 DIVQ/DIVQU Quick Division [IMPLEMENTED]
 
 **Description:** Use DIVQ/DIVQU for divisions when quotient is known to fit.
 
@@ -208,7 +244,7 @@ Unsigned division where dividend >> divisor → DIVQU
 
 ---
 
-### 2.4 SWITCH Instruction for Jump Tables [IMPLEMENTED]
+### 2.6 SWITCH Instruction for Jump Tables [IMPLEMENTED]
 
 **File:** `llvm/lib/Target/V850/V850ISelLowering.cpp`
 
@@ -223,7 +259,7 @@ Index bounds check → table lookup → indirect jump  →  SWITCH reg
 
 ---
 
-### 2.5 SXB/SXH/ZXB/ZXH Extension [IMPLEMENTED]
+### 2.7 SXB/SXH/ZXB/ZXH Extension [IMPLEMENTED]
 
 **Description:** Sign/zero extension using dedicated instructions.
 
@@ -231,7 +267,7 @@ Index bounds check → table lookup → indirect jump  →  SWITCH reg
 
 ---
 
-### 2.6 BSH/BSW Byte Swap [IMPLEMENTED]
+### 2.8 BSH/BSW Byte Swap [IMPLEMENTED]
 
 **Description:** Byte swap operations using BSH (halfword) and BSW (word).
 
@@ -239,7 +275,7 @@ Index bounds check → table lookup → indirect jump  →  SWITCH reg
 
 ---
 
-### 2.7 SASF Shift-and-Add with Sign Flag [IMPLEMENTED]
+### 2.9 SASF Shift-and-Add with Sign Flag [IMPLEMENTED]
 
 **Description:** Use SASF for shift-add sequences that depend on condition codes.
 
@@ -272,7 +308,7 @@ sasf gt, x    // x = (x << 1) | (condition ? 1 : 0)
 
 ---
 
-### 2.8 HSH/HSW Half-word Swap [IMPLEMENTED]
+### 2.10 HSH/HSW Half-word Swap [IMPLEMENTED]
 
 **Description:** Use HSH/HSW for specific rotation/swap patterns.
 
@@ -289,7 +325,7 @@ sasf gt, x    // x = (x << 1) | (condition ? 1 : 0)
 
 ---
 
-### 2.9 SCH Search Operations [IMPLEMENTED]
+### 2.11 SCH Search Operations [IMPLEMENTED]
 
 **Description:** Use SCH0L/SCH0R/SCH1L/SCH1R for leading/trailing zero/one counting.
 
@@ -313,7 +349,7 @@ cttz(not x) → SCH0R (count trailing ones)
 
 ---
 
-### 2.10 Saturating Arithmetic [IMPLEMENTED]
+### 2.12 Saturating Arithmetic [IMPLEMENTED]
 
 **Description:** Use SATADD/SATSUB/SATSUBI for saturating arithmetic.
 
@@ -973,17 +1009,17 @@ varargs_receiver:
 ## Implementation Priority Summary
 
 ### Completed
-1. ~~DIVQ/DIVQU Quick Division (2.3)~~ - DONE
+1. ~~DIVQ/DIVQU Quick Division (2.5)~~ - DONE
 2. ~~Bit Search Intrinsics (10.6)~~ - DONE
-3. ~~SCH Search Operations (2.9)~~ - DONE
-4. ~~HSH/HSW Half-word Swap (2.8)~~ - DONE
-5. ~~Saturating Arithmetic (2.10)~~ - DONE
+3. ~~SCH Search Operations (2.11)~~ - DONE
+4. ~~HSH/HSW Half-word Swap (2.10)~~ - DONE
+5. ~~Saturating Arithmetic (2.12)~~ - DONE
 6. ~~Saturating Arithmetic Intrinsics (10.5)~~ - DONE
 7. ~~If Conversion (1.6)~~ - DONE (EarlyIfConversion with CMOV)
 8. ~~GP-Relative Addressing (8.2)~~ - DONE (V850TargetObjectFile, .sdata/.sbss)
 9. ~~Peephole Optimizer (1.5)~~ - DONE (MOV+ADD folding, redundant ANDI removal, copy propagation)
 10. ~~Post-RA Scheduler (1.7)~~ - DONE (anti-dependency breaking, dual-issue optimization)
-11. ~~SASF Shift-and-Add (2.7)~~ - DONE (DAG combine for (shl x, 1) | setcc pattern)
+11. ~~SASF Shift-and-Add (2.9)~~ - DONE (DAG combine for (shl x, 1) | setcc pattern)
 12. ~~Callee-Saved Register Shrink Wrapping (3.3)~~ - DONE (enableShrinkWrapping, RET fix)
 13. ~~Constant Materialization (5.4)~~ - DONE (MOVHI-only for zero low bits)
 14. ~~Literal Pool / Constant Pool Support (5.2)~~ - DONE (FP constant handling, LDW_F/STW_F)
@@ -991,6 +1027,7 @@ varargs_receiver:
 16. ~~SIMD-like Operations (7.2)~~ - DONE (BSH for bswap16, FMA patterns fixed)
 17. ~~FP Constant Folding (7.3)~~ - DONE (LLVM infrastructure, IEEE 754 compliant)
 18. ~~Varargs Support (9.3)~~ - DONE (V850MachineFunctionInfo, LowerVASTART, fixed CALL ISel)
+19. ~~ADF/SBF 64-bit Arithmetic (2.3)~~ - DONE (ADDC/ADDE→ADF, SUBC/SUBE→SBF for V850E2+)
 
 ### High Priority (Next Phase)
 - None currently queued
@@ -1089,6 +1126,7 @@ Metrics to track:
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-02-07 | 1.5 | Added ADF/SBF 64-bit arithmetic (efficient ADDC/ADDE/SUBC/SUBE for V850E2+) |
 | 2026-01-21 | 1.4 | Added Post-RA Scheduler implementation (anti-dependency breaking, dual-issue optimization) |
 | 2026-01-21 | 1.3 | Added Peephole Optimizer implementation (MOV+ADD folding, ANDI removal, copy propagation) |
 | 2026-01-21 | 1.2 | Added If Conversion (CMOV) and GP-Relative Addressing implementations |
