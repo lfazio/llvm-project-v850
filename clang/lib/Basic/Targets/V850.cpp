@@ -82,6 +82,21 @@ void V850TargetInfo::getTargetDefines(const LangOptions &Opts,
     Builder.defineMacro("__v850e2__");
     Builder.defineMacro("__v850e3__");
     break;
+  case CK_RH850G3M:
+    Builder.defineMacro("__v850e__");
+    Builder.defineMacro("__v850e2__");
+    Builder.defineMacro("__v850e2m__");
+    Builder.defineMacro("__rh850__");
+    Builder.defineMacro("__rh850g3m__");
+    break;
+  case CK_RH850G3MH:
+    Builder.defineMacro("__v850e__");
+    Builder.defineMacro("__v850e2__");
+    Builder.defineMacro("__v850e2m__");
+    Builder.defineMacro("__rh850__");
+    Builder.defineMacro("__rh850g3m__");
+    Builder.defineMacro("__rh850g3mh__");
+    break;
   default:
     break;
   }
@@ -120,6 +135,8 @@ bool V850TargetInfo::isValidCPUName(StringRef Name) const {
       .Case("v850e2m", true)
       .Case("v850e2v3", true)
       .Case("v850e3", true)
+      .Case("g3m", true)
+      .Case("g3mh", true)
       .Default(false);
 }
 
@@ -132,6 +149,8 @@ void V850TargetInfo::fillValidCPUList(
   Values.emplace_back("v850e2m");
   Values.emplace_back("v850e2v3");
   Values.emplace_back("v850e3");
+  Values.emplace_back("g3m");
+  Values.emplace_back("g3mh");
 }
 
 bool V850TargetInfo::setCPU(const std::string &Name) {
@@ -143,9 +162,11 @@ bool V850TargetInfo::setCPU(const std::string &Name) {
             .Case("v850e2m", CK_V850E2M)
             .Case("v850e2v3", CK_V850E2V3)
             .Case("v850e3", CK_V850E3)
+            .Case("g3m", CK_RH850G3M)
+            .Case("g3mh", CK_RH850G3MH)
             .Default(CK_NONE);
 
-  // V850E2M and later have FPU by default
+  // V850E2M and later have FPU by default (includes RH850 variants)
   HasFPU = (CPU >= CK_V850E2M);
 
   return CPU != CK_NONE;
@@ -155,7 +176,7 @@ bool V850TargetInfo::initFeatureMap(
     llvm::StringMap<bool> &Features, DiagnosticsEngine &Diags, StringRef CPU,
     const std::vector<std::string> &FeaturesVec) const {
   // Enable features based on CPU variant
-  // Features are cumulative: v850e3 includes v850e2m includes v850e2 includes v850e1
+  // Features are cumulative: g3mh includes g3m includes v850e2m includes v850e2 includes v850e1
   CPUKind CpuKind = llvm::StringSwitch<CPUKind>(CPU)
                         .Case("v850", CK_V850)
                         .Case("v850e1", CK_V850E1)
@@ -164,6 +185,8 @@ bool V850TargetInfo::initFeatureMap(
                         .Case("v850e2m", CK_V850E2M)
                         .Case("v850e2v3", CK_V850E2V3)
                         .Case("v850e3", CK_V850E3)
+                        .Case("g3m", CK_RH850G3M)
+                        .Case("g3mh", CK_RH850G3MH)
                         .Default(CK_V850);
 
   // V850E1 and later (including V850ES)
@@ -183,6 +206,14 @@ bool V850TargetInfo::initFeatureMap(
   // V850E3 and later
   if (CpuKind >= CK_V850E3)
     Features["v850e3"] = true;
+
+  // RH850G3M and later
+  if (CpuKind >= CK_RH850G3M)
+    Features["rh850g3m"] = true;
+
+  // RH850G3MH and later
+  if (CpuKind >= CK_RH850G3MH)
+    Features["rh850g3mh"] = true;
 
   return TargetInfo::initFeatureMap(Features, Diags, CPU, FeaturesVec);
 }

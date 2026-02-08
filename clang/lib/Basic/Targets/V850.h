@@ -33,6 +33,8 @@ class LLVM_LIBRARY_VISIBILITY V850TargetInfo : public TargetInfo {
     CK_V850E2M,
     CK_V850E2V3,  // V850E2V3 is an alias for V850E3 with some enhancements
     CK_V850E3,
+    CK_RH850G3M,   // RH850G3M - adds atomics, cache control, new instructions
+    CK_RH850G3MH,  // RH850G3MH - G3M with performance enhancements
   } CPU = CK_V850;
 
   // FPU feature tracking - V850E2M and later have FPU
@@ -91,6 +93,8 @@ public:
         .Case("v850e2", true)
         .Case("v850e2m", true)
         .Case("v850e3", true)
+        .Case("rh850g3m", true)
+        .Case("rh850g3mh", true)
         .Case("v850fpu", true)
         .Case("soft-float", true)
         .Default(false);
@@ -118,6 +122,8 @@ public:
         .Case("v850e2m", CPU >= CK_V850E2M)
         .Case("v850e2v3", CPU >= CK_V850E2V3)
         .Case("v850e3", CPU >= CK_V850E3)
+        .Case("rh850g3m", CPU >= CK_RH850G3M)
+        .Case("rh850g3mh", CPU >= CK_RH850G3MH)
         .Case("v850fpu", HasFPU && !SoftFloat)
         .Case("soft-float", SoftFloat)
         .Default(false);

@@ -56,6 +56,19 @@ def FeatureV850E3 : SubtargetFeature<"v850e3", "HasV850E3", "true",
                                       "Enable V850E3 extensions",
                                       [FeatureV850E2M]>;
 
+// RH850G3M feature - adds user/supervisor modes, atomics, cache control
+// New instructions: LDL.W, STC.W, CLL, BINS, ROTL, LD.DW, ST.DW, LOOP,
+// PUSHSP, POPSP, Bcond disp17, JARL [reg1] reg3, CACHE, PREF, SNOOZE, SYNCI
+def FeatureRH850G3M : SubtargetFeature<"rh850g3m", "HasRH850G3M", "true",
+                                        "Enable RH850G3M extensions",
+                                        [FeatureV850E2M]>;
+
+// RH850G3MH feature - G3M with performance enhancements
+// Simplified FPU exceptions (FPINT replaces FPP/FPI), FPIPR register removed
+def FeatureRH850G3MH : SubtargetFeature<"rh850g3mh", "HasRH850G3MH", "true",
+                                         "Enable RH850G3MH extensions",
+                                         [FeatureRH850G3M]>;
+
 //===----------------------------------------------------------------------===//
 // Register File, Calling Conv, Instruction Descriptions
 //===----------------------------------------------------------------------===//
@@ -93,6 +106,10 @@ def : ProcessorModel<"v850e2m", V850E2MModel, [FeatureV850E2M]>;
 def : ProcessorModel<"v850e2v3", V850E2MModel, [FeatureV850E2M]>;
 def : ProcessorModel<"v850e3", V850E2MModel, [FeatureV850E3]>;
 def : ProcessorModel<"v850e3v5", V850E2MModel, [FeatureV850E3]>;
+
+// RH850 processors (use V850E2MModel - similar dual-issue pipeline)
+def : ProcessorModel<"g3m", V850E2MModel, [FeatureRH850G3M]>;
+def : ProcessorModel<"g3mh", V850E2MModel, [FeatureRH850G3MH]>;
 
 //===----------------------------------------------------------------------===//
 // V850 assembly writer
