@@ -251,7 +251,8 @@ bool V850InstrInfo::analyzeBranch(MachineBasicBlock &MBB,
 
 unsigned V850InstrInfo::removeBranch(MachineBasicBlock &MBB,
                                      int *BytesRemoved) const {
-  assert(!BytesRemoved && "code size not handled");
+  if (BytesRemoved)
+    *BytesRemoved = 0;
 
   MachineBasicBlock::iterator I = MBB.end();
   unsigned Count = 0;
@@ -264,6 +265,10 @@ unsigned V850InstrInfo::removeBranch(MachineBasicBlock &MBB,
     // Only remove conditional and unconditional branches
     if (I->getOpcode() != V850::JR && !isCondBranchOpcode(I->getOpcode()))
       break;
+
+    // Track bytes removed
+    if (BytesRemoved)
+      *BytesRemoved += getInstSizeInBytes(*I);
 
     // Remove the branch
     I->eraseFromParent();
@@ -281,19 +286,25 @@ unsigned V850InstrInfo::insertBranch(MachineBasicBlock &MBB,
                                      const DebugLoc &DL,
                                      int *BytesAdded) const {
   assert(TBB && "insertBranch must not be told to insert a fallthrough");
-  assert(!BytesAdded && "code size not handled");
+
+  if (BytesAdded)
+    *BytesAdded = 0;
 
   if (Cond.empty()) {
     // Unconditional branch
     assert(!FBB && "Unconditional branch with multiple successors!");
-    BuildMI(&MBB, DL, get(V850::JR)).addMBB(TBB);
+    MachineInstr &MI = *BuildMI(&MBB, DL, get(V850::JR)).addMBB(TBB);
+    if (BytesAdded)
+      *BytesAdded += getInstSizeInBytes(MI);
     return 1;
   }
 
   // Conditional branch
   assert(Cond.size() == 1 && "V850 branch conditions have one component");
   unsigned Opc = Cond[0].getImm();
-  BuildMI(&MBB, DL, get(Opc)).addMBB(TBB);
+  MachineInstr &CondMI = *BuildMI(&MBB, DL, get(Opc)).addMBB(TBB);
+  if (BytesAdded)
+    *BytesAdded += getInstSizeInBytes(CondMI);
 
   if (!FBB) {
     // One-way conditional branch
@@ -301,7 +312,9 @@ unsigned V850InstrInfo::insertBranch(MachineBasicBlock &MBB,
   }
 
   // Two-way conditional branch: conditional + unconditional fallback
-  BuildMI(&MBB, DL, get(V850::JR)).addMBB(FBB);
+  MachineInstr &UncondMI = *BuildMI(&MBB, DL, get(V850::JR)).addMBB(FBB);
+  if (BytesAdded)
+    *BytesAdded += getInstSizeInBytes(UncondMI);
   return 2;
 }
 
