@@ -438,5 +438,39 @@ TARGET_BUILTIN(__builtin_v850_write_fpcfg, "vUi", "n", "v850fpu")
 // void __builtin_v850_write_fpec(unsigned int value)
 TARGET_BUILTIN(__builtin_v850_write_fpec, "vUi", "n", "v850fpu")
 
+//===----------------------------------------------------------------------===//
+// RH850G3M Instructions
+//
+// These instructions require RH850G3M or later architecture.
+// Includes load-linked/store-conditional atomics and instruction sync.
+//===----------------------------------------------------------------------===//
+
+// SYNCI - Synchronize instruction pipeline
+// void __builtin_v850_synci(void)
+// Ensures all preceding instructions complete before fetching new instructions.
+// Required after self-modifying code or cache operations.
+TARGET_BUILTIN(__builtin_v850_synci, "v", "n", "rh850g3m")
+
+// SNOOZE - Enter low-power snooze state
+// void __builtin_v850_snooze(void)
+// Enters a low-power state until an interrupt or event occurs.
+TARGET_BUILTIN(__builtin_v850_snooze, "v", "n", "rh850g3m")
+
+// CLL - Clear load link state
+// void __builtin_v850_cll(void)
+// Clears the load-linked state (invalidates pending store-conditional).
+TARGET_BUILTIN(__builtin_v850_cll, "v", "n", "rh850g3m")
+
+// LDL.W - Load linked word
+// unsigned int __builtin_v850_ldl_w(volatile unsigned int *ptr)
+// Loads a word and establishes an exclusive monitor for store-conditional.
+TARGET_BUILTIN(__builtin_v850_ldl_w, "UiUiC*", "n", "rh850g3m")
+
+// STC.W - Store conditional word
+// int __builtin_v850_stc_w(volatile unsigned int *ptr, unsigned int value)
+// Stores a word if exclusive monitor is still valid. Returns 1 on success, 0 on
+// failure.
+TARGET_BUILTIN(__builtin_v850_stc_w, "iUi*Ui", "n", "rh850g3m")
+
 #undef BUILTIN
 #undef TARGET_BUILTIN

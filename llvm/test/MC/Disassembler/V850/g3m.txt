@@ -1,0 +1,56 @@
+# RUN: llvm-mc -triple=v850-unknown-elf -mcpu=g3m --disassemble %s | FileCheck %s
+# RUN: llvm-mc -triple=v850-unknown-elf -mcpu=g3mh --disassemble %s | FileCheck %s
+
+# Test RH850G3M specific instructions disassembly
+
+# SYNCI - Synchronize instruction pipeline
+# CHECK: synci
+0x1c 0x00
+
+# SNOOZE - Enter low-power snooze state
+# CHECK: snooze
+0xe0 0x0f 0x20 0x01
+
+# CLL - Clear load link state
+# CHECK: cll
+0xff 0xff 0x60 0xf1
+
+# LDL.W - Load linked word
+# CHECK: ldl.w [r10], r11
+0xea 0x07 0x78 0x5b
+
+# CHECK: ldl.w [r0], r1
+0xe0 0x07 0x78 0x0b
+
+# CHECK: ldl.w [r31], r31
+0xff 0x07 0x78 0xfb
+
+# STC.W - Store conditional word
+# CHECK: stc.w r11, [r10]
+0xea 0x07 0x7a 0x5b
+
+# CHECK: stc.w r1, [r0]
+0xe0 0x07 0x7a 0x0b
+
+# CHECK: stc.w r31, [r31]
+0xff 0x07 0x7a 0xfb
+
+# ROTL - Rotate left with immediate
+# CHECK: rotl 5, r6, r10
+0xe5 0x37 0xc4 0x50
+
+# CHECK: rotl 0, r0, r0
+0xe0 0x07 0xc4 0x00
+
+# CHECK: rotl 31, r31, r31
+0xff 0xff 0xc4 0xf8
+
+# ROTL - Rotate left with register
+# CHECK: rotl r7, r6, r10
+0xe7 0x37 0xc6 0x50
+
+# CHECK: rotl r0, r0, r0
+0xe0 0x07 0xc6 0x00
+
+# CHECK: rotl r31, r31, r31
+0xff 0xff 0xc6 0xf8

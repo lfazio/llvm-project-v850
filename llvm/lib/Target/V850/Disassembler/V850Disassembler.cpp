@@ -246,10 +246,22 @@ DecodeStatus V850Disassembler::getInstruction16(MCInst &MI, uint64_t &Size,
   }
   uint16_t Insn16 = support::endian::read16le(Bytes.data());
 
+  bool HasRH850G3M = STI.hasFeature(V850::FeatureRH850G3M);
   bool HasV850E2M = STI.hasFeature(V850::FeatureV850E2M);
   bool HasV850E1 = STI.hasFeature(V850::FeatureV850E1);
 
-  // Try V850E2M-specific instructions first (superset of V850E1)
+  // Try RH850G3M-specific instructions first (superset of V850E2M)
+  if (HasRH850G3M) {
+    MI.clear();
+    DecodeStatus Result = decodeInstruction(DecoderTableRH850G3M16, MI, Insn16,
+                                            Address, this, STI);
+    if (Result != MCDisassembler::Fail) {
+      Size = 2;
+      return Result;
+    }
+  }
+
+  // Try V850E2M-specific instructions (superset of V850E1)
   if (HasV850E2M) {
     MI.clear();
     DecodeStatus Result = decodeInstruction(DecoderTableV850E2M16, MI, Insn16,
@@ -264,8 +276,8 @@ DecodeStatus V850Disassembler::getInstruction16(MCInst &MI, uint64_t &Size,
   // decoders that return Fail for reg2=0 to allow fallthrough to JMP)
   if (HasV850E1) {
     MI.clear();
-    DecodeStatus Result = decodeInstruction(DecoderTableV850E116, MI, Insn16,
-                                            Address, this, STI);
+    DecodeStatus Result =
+        decodeInstruction(DecoderTableV850E116, MI, Insn16, Address, this, STI);
     if (Result != MCDisassembler::Fail) {
       Size = 2;
       return Result;
@@ -294,9 +306,21 @@ DecodeStatus V850Disassembler::getInstruction32(MCInst &MI, uint64_t &Size,
   }
   uint32_t Insn32 = support::endian::read32le(Bytes.data());
 
+  bool HasRH850G3M = STI.hasFeature(V850::FeatureRH850G3M);
   bool HasV850E2M = STI.hasFeature(V850::FeatureV850E2M);
 
-  // Try base 32-bit decoder first; this favors integer instructions that
+  // Try RH850G3M-specific instructions first (superset of V850E2M)
+  if (HasRH850G3M) {
+    MI.clear();
+    DecodeStatus Result = decodeInstruction(DecoderTableRH850G3M32, MI, Insn32,
+                                            Address, this, STI);
+    if (Result != MCDisassembler::Fail) {
+      Size = 4;
+      return Result;
+    }
+  }
+
+  // Try base 32-bit decoder; this favors integer instructions that
   // otherwise can be mis-decoded by the E2M table (which contains FPU
   // encodings that overlap extended opcode patterns).
   MI.clear();
@@ -386,10 +410,14 @@ DecodeStatus V850Disassembler::getInstruction(MCInst &MI, uint64_t &Size,
   // Decide whether to try 16-bit or 32-bit first using a small heuristic.
   // Many 32-bit V850 formats use the extended opcode value 0b111111 in
   // bits [10:5] of the first halfword (FormatIX/XI/XII/etc.). If those
-  // bits are 0b111111, prefer the 32-bit decoder first; otherwise try the
-  // 16-bit decoder first and fall back to 32-bit when available.
+  // bits are 0b111111, prefer the 32-bit decoder first.
+  //
+  // Also, Format V (JR/JARL) has opcode 0b101111 in bits [10:5]. The first
+  // halfword happens to match Format III (Bcond) pattern because bits[10:7]
+  // equals 0b1011 (branch opcode), so we need to prefer 32-bit for Format V.
 
-  bool Prefer32 = (Opcode6 == 0x3F);
+  bool Prefer32 = (Opcode6 == 0x3F) || // Extended opcode
+                  (Opcode6 == 0x2F);   // JR/JARL (Format V)
 
   if (Prefer32 && Bytes.size() >= 4) {
     DecodeStatus R = getInstruction32(MI, Size, Bytes, Address, CS);

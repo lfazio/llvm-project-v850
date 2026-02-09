@@ -628,5 +628,33 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
     Function *F = CGM.getIntrinsic(Intrinsic::v850_write_fpec);
     return Builder.CreateCall(F, Val);
   }
+
+    //===--------------------------------------------------------------------===//
+    // RH850G3M Instructions
+    //===--------------------------------------------------------------------===//
+
+  case V850::BI__builtin_v850_synci: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_synci);
+    return Builder.CreateCall(F);
+  }
+  case V850::BI__builtin_v850_snooze: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_snooze);
+    return Builder.CreateCall(F);
+  }
+  case V850::BI__builtin_v850_cll: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_cll);
+    return Builder.CreateCall(F);
+  }
+  case V850::BI__builtin_v850_ldl_w: {
+    Value *Addr = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldl_w);
+    return Builder.CreateCall(F, Addr);
+  }
+  case V850::BI__builtin_v850_stc_w: {
+    Value *Addr = EmitScalarExpr(E->getArg(0));
+    Value *Val = EmitScalarExpr(E->getArg(1));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stc_w);
+    return Builder.CreateCall(F, {Addr, Val});
+  }
   }
 }

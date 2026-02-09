@@ -56,41 +56,45 @@ let TargetPrefix = "v850" in { // All intrinsics start with "llvm.v850.".
 
   // HSH - Halfword swap halfword (V850E2+)
   // i32 @llvm.v850.hsh(i32 %x)
-  // Sign-extends lower halfword to 32 bits, then swaps bytes within each halfword
-  // Result: sign_extend(x[15:0]) with bytes swapped in each halfword
+  // Sign-extends lower halfword to 32 bits, then swaps bytes within each
+  // halfword Result: sign_extend(x[15:0]) with bytes swapped in each halfword
   def int_v850_hsh : Intrinsic<[llvm_i32_ty], [llvm_i32_ty],
                                [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
 
   //===----------------------------------------------------------------------===//
   // Saturating Arithmetic Operations
   //
-  // V850 provides signed saturating arithmetic that saturates to INT_MIN/INT_MAX.
-  // Note: SATADD and SATSUB use the standard LLVM saddsat/ssubsat ISD nodes.
-  // SATSUBR (reverse subtraction) requires a dedicated intrinsic.
+  // V850 provides signed saturating arithmetic that saturates to
+  // INT_MIN/INT_MAX. Note: SATADD and SATSUB use the standard LLVM
+  // saddsat/ssubsat ISD nodes. SATSUBR (reverse subtraction) requires a
+  // dedicated intrinsic.
   //===----------------------------------------------------------------------===//
 
   // SATSUBR - Saturating subtract reverse
   // i32 @llvm.v850.satsubr(i32 %a, i32 %b)
   // Returns: saturate(a - b), where saturation is to INT_MIN/INT_MAX
-  // Note: This computes (a - b) with saturation, while ssubsat computes (b - a).
-  // The "reverse" refers to operand order relative to the 2-operand instruction
-  // encoding where reg2 is both source and destination.
-  def int_v850_satsubr : Intrinsic<[llvm_i32_ty], [llvm_i32_ty, llvm_i32_ty],
-                                   [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
+  // Note: This computes (a - b) with saturation, while ssubsat computes (b -
+  // a). The "reverse" refers to operand order relative to the 2-operand
+  // instruction encoding where reg2 is both source and destination.
+  def int_v850_satsubr
+      : Intrinsic<[llvm_i32_ty], [llvm_i32_ty, llvm_i32_ty],
+                  [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
 
   // SATADD3 - 3-operand saturating add (V850E2+)
   // i32 @llvm.v850.satadd3(i32 %a, i32 %b)
   // Returns: saturate(a + b), result in separate register
   // This is the 3-operand form: reg3 = saturate(reg1 + reg2)
-  def int_v850_satadd3 : Intrinsic<[llvm_i32_ty], [llvm_i32_ty, llvm_i32_ty],
-                                   [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
+  def int_v850_satadd3
+      : Intrinsic<[llvm_i32_ty], [llvm_i32_ty, llvm_i32_ty],
+                  [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
 
   // SATSUB3 - 3-operand saturating subtract (V850E2+)
   // i32 @llvm.v850.satsub3(i32 %a, i32 %b)
   // Returns: saturate(a - b), result in separate register
   // This is the 3-operand form: reg3 = saturate(reg2 - reg1)
-  def int_v850_satsub3 : Intrinsic<[llvm_i32_ty], [llvm_i32_ty, llvm_i32_ty],
-                                   [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
+  def int_v850_satsub3
+      : Intrinsic<[llvm_i32_ty], [llvm_i32_ty, llvm_i32_ty],
+                  [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
 
   //===----------------------------------------------------------------------===//
   // Bit Search Operations (V850E2+)
@@ -111,9 +115,9 @@ let TargetPrefix = "v850" in { // All intrinsics start with "llvm.v850.".
   def int_v850_sch1r : Intrinsic<[llvm_i32_ty], [llvm_i32_ty],
                                  [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
 
-  // SCH0L - Search for leftmost 0 (like 31 - CLO, but returns 32 if input is -1)
-  // i32 @llvm.v850.sch0l(i32 %x)
-  // Returns: Position of leftmost 0 bit, or 32 if x == 0xFFFFFFFF
+  // SCH0L - Search for leftmost 0 (like 31 - CLO, but returns 32 if input is
+  // -1) i32 @llvm.v850.sch0l(i32 %x) Returns: Position of leftmost 0 bit, or 32
+  // if x == 0xFFFFFFFF
   def int_v850_sch0l : Intrinsic<[llvm_i32_ty], [llvm_i32_ty],
                                  [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
 
@@ -130,9 +134,9 @@ let TargetPrefix = "v850" in { // All intrinsics start with "llvm.v850.".
   // CAXI - Compare and Exchange for Interlock
   // i32 @llvm.v850.caxi(ptr %addr, i32 %expected, i32 %desired)
   // Atomically: if (*addr == expected) *addr = desired; return old *addr
-  def int_v850_caxi : Intrinsic<[llvm_i32_ty],
-                                [llvm_ptr_ty, llvm_i32_ty, llvm_i32_ty],
-                                [IntrArgMemOnly, NoCapture<ArgIndex<0>>]>;
+  def int_v850_caxi
+      : Intrinsic<[llvm_i32_ty], [llvm_ptr_ty, llvm_i32_ty, llvm_i32_ty],
+                  [IntrArgMemOnly, NoCapture<ArgIndex<0>>]>;
 
   //===----------------------------------------------------------------------===//
   // FPU System Register Access (V850E2M+)
@@ -249,14 +253,16 @@ let TargetPrefix = "v850" in { // All intrinsics start with "llvm.v850.".
   // LDSR - Load to system register
   // void @llvm.v850.ldsr(i32 %value, i32 %regID)
   // Writes %value to system register specified by %regID
-  def int_v850_ldsr : Intrinsic<[], [llvm_i32_ty, llvm_i32_ty],
-                                [IntrNoMem, IntrHasSideEffects, ImmArg<ArgIndex<1>>]>;
+  def int_v850_ldsr
+      : Intrinsic<[], [llvm_i32_ty, llvm_i32_ty],
+                  [IntrNoMem, IntrHasSideEffects, ImmArg<ArgIndex<1>>]>;
 
   // STSR - Store from system register
   // i32 @llvm.v850.stsr(i32 %regID)
   // Reads the system register specified by %regID
-  def int_v850_stsr : Intrinsic<[llvm_i32_ty], [llvm_i32_ty],
-                                [IntrNoMem, IntrHasSideEffects, ImmArg<ArgIndex<0>>]>;
+  def int_v850_stsr
+      : Intrinsic<[llvm_i32_ty], [llvm_i32_ty],
+                  [IntrNoMem, IntrHasSideEffects, ImmArg<ArgIndex<0>>]>;
 
   //===----------------------------------------------------------------------===//
   // Multiply-Accumulate Operations (V850E2M+)
@@ -269,22 +275,25 @@ let TargetPrefix = "v850" in { // All intrinsics start with "llvm.v850.".
   // MAC - Signed multiply-accumulate
   // (i32, i32) @llvm.v850.mac(i32 %a, i32 %b, i32 %acc_hi, i32 %acc_lo)
   // Returns: (result_hi, result_lo) = (acc_hi:acc_lo) + sext(a) * sext(b)
-  def int_v850_mac : Intrinsic<[llvm_i32_ty, llvm_i32_ty],
-                               [llvm_i32_ty, llvm_i32_ty, llvm_i32_ty, llvm_i32_ty],
-                               [IntrNoMem]>;
+  def int_v850_mac
+      : Intrinsic<[llvm_i32_ty, llvm_i32_ty],
+                  [llvm_i32_ty, llvm_i32_ty, llvm_i32_ty, llvm_i32_ty],
+                  [IntrNoMem]>;
 
   // MACU - Unsigned multiply-accumulate
   // (i32, i32) @llvm.v850.macu(i32 %a, i32 %b, i32 %acc_hi, i32 %acc_lo)
   // Returns: (result_hi, result_lo) = (acc_hi:acc_lo) + zext(a) * zext(b)
-  def int_v850_macu : Intrinsic<[llvm_i32_ty, llvm_i32_ty],
-                                [llvm_i32_ty, llvm_i32_ty, llvm_i32_ty, llvm_i32_ty],
-                                [IntrNoMem]>;
+  def int_v850_macu
+      : Intrinsic<[llvm_i32_ty, llvm_i32_ty],
+                  [llvm_i32_ty, llvm_i32_ty, llvm_i32_ty, llvm_i32_ty],
+                  [IntrNoMem]>;
 
   //===----------------------------------------------------------------------===//
   // Table-Driven Branch (V850E1+)
   //
-  // SWITCH provides efficient table-driven branching for switch/case statements.
-  // The instruction reads a halfword offset from a table and branches to it.
+  // SWITCH provides efficient table-driven branching for switch/case
+  // statements. The instruction reads a halfword offset from a table and
+  // branches to it.
   //
   // Operation:
   //   adr = (PC + 2) + (index << 1)           ; Table entry address
@@ -299,14 +308,13 @@ let TargetPrefix = "v850" in { // All intrinsics start with "llvm.v850.".
   // Branches to the target specified by table[index], where the table
   // immediately follows this instruction in memory.
   // Note: This is an indirect branch - control does not fall through.
-  def int_v850_switch : Intrinsic<[], [llvm_i32_ty],
-                                  [IntrHasSideEffects]>;
+  def int_v850_switch : Intrinsic<[], [llvm_i32_ty], [IntrHasSideEffects]>;
 
   //===----------------------------------------------------------------------===//
   // Special Instructions
   //
-  // These instructions provide system-level functionality for exception handling,
-  // power management, and OS interaction.
+  // These instructions provide system-level functionality for exception
+  // handling, power management, and OS interaction.
   //===----------------------------------------------------------------------===//
 
   // HALT - Halt CPU until interrupt
@@ -317,25 +325,66 @@ let TargetPrefix = "v850" in { // All intrinsics start with "llvm.v850.".
   // TRAP - Software trap
   // void @llvm.v850.trap(i32 %vector)
   // Triggers a software exception with the specified vector (0-31).
-  def int_v850_trap : Intrinsic<[], [llvm_i32_ty],
-                                [IntrNoMem, IntrHasSideEffects, ImmArg<ArgIndex<0>>]>;
+  def int_v850_trap
+      : Intrinsic<[], [llvm_i32_ty],
+                  [IntrNoMem, IntrHasSideEffects, ImmArg<ArgIndex<0>>]>;
 
   // SYSCALL - System call (V850E2M+)
   // void @llvm.v850.syscall(i32 %vector)
   // Triggers a system call with the specified vector (0-255).
-  def int_v850_syscall : Intrinsic<[], [llvm_i32_ty],
-                                   [IntrNoMem, IntrHasSideEffects, ImmArg<ArgIndex<0>>]>;
+  def int_v850_syscall
+      : Intrinsic<[], [llvm_i32_ty],
+                  [IntrNoMem, IntrHasSideEffects, ImmArg<ArgIndex<0>>]>;
 
   // FETRAP - FE-level software trap (V850E2M+)
   // void @llvm.v850.fetrap(i32 %vector)
   // Triggers an FE-level exception with the specified vector (1-15).
-  def int_v850_fetrap : Intrinsic<[], [llvm_i32_ty],
-                                  [IntrNoMem, IntrHasSideEffects, ImmArg<ArgIndex<0>>]>;
+  def int_v850_fetrap
+      : Intrinsic<[], [llvm_i32_ty],
+                  [IntrNoMem, IntrHasSideEffects, ImmArg<ArgIndex<0>>]>;
 
   // DBTRAP - Debug trap (V850E1+)
   // void @llvm.v850.dbtrap()
   // Triggers a debug exception, saving PC to DBPC and PSW to DBPSW.
   // Used for software breakpoints. Return from handler with DBRET.
   def int_v850_dbtrap : Intrinsic<[], [], [IntrNoMem, IntrHasSideEffects]>;
+
+  //===----------------------------------------------------------------------===//
+  // RH850G3M Instructions
+  //
+  // These intrinsics are for RH850G3M-specific instructions including
+  // load-linked/store-conditional atomics and instruction synchronization.
+  //===----------------------------------------------------------------------===//
+
+  // SYNCI - Synchronize instruction pipeline
+  // void @llvm.v850.synci()
+  // Ensures all preceding instructions complete before fetching new
+  // instructions. Required after self-modifying code or cache operations.
+  def int_v850_synci : Intrinsic<[], [], [IntrNoMem, IntrHasSideEffects]>;
+
+  // SNOOZE - Enter low-power snooze state
+  // void @llvm.v850.snooze()
+  // Enters a low-power state until an interrupt or event occurs.
+  def int_v850_snooze : Intrinsic<[], [], [IntrNoMem, IntrHasSideEffects]>;
+
+  // CLL - Clear load link state
+  // void @llvm.v850.cll()
+  // Clears the load-linked state (invalidates pending store-conditional).
+  def int_v850_cll : Intrinsic<[], [], [IntrNoMem, IntrHasSideEffects]>;
+
+  // LDL.W - Load linked word
+  // i32 @llvm.v850.ldl.w(ptr %addr)
+  // Loads a word and establishes an exclusive monitor for store-conditional.
+  def int_v850_ldl_w
+      : Intrinsic<[llvm_i32_ty], [llvm_ptr_ty],
+                  [IntrReadMem, IntrArgMemOnly, NoCapture<ArgIndex<0>>]>;
+
+  // STC.W - Store conditional word
+  // i32 @llvm.v850.stc.w(ptr %addr, i32 %value)
+  // Stores a word if exclusive monitor is still valid.
+  // Returns 1 on success, 0 on failure.
+  def int_v850_stc_w
+      : Intrinsic<[llvm_i32_ty], [llvm_ptr_ty, llvm_i32_ty],
+                  [IntrWriteMem, IntrArgMemOnly, NoCapture<ArgIndex<0>>]>;
 
 } // TargetPrefix = "v850"
