@@ -105,9 +105,15 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::UMUL_LOHI, MVT::i32, Expand);
   }
 
-  // Rotates - expand
-  setOperationAction(ISD::ROTL, MVT::i32, Expand);
-  setOperationAction(ISD::ROTR, MVT::i32, Expand);
+  // Rotates - RH850G3M+ has native ROTL instruction
+  if (Subtarget.hasRH850G3M()) {
+    setOperationAction(ISD::ROTL, MVT::i32, Legal);
+    // ROTR is implemented as ROTL with (32 - amount)
+    setOperationAction(ISD::ROTR, MVT::i32, Expand);
+  } else {
+    setOperationAction(ISD::ROTL, MVT::i32, Expand);
+    setOperationAction(ISD::ROTR, MVT::i32, Expand);
+  }
 
   // Bit counting
   // V850E2+ has SCH1L/SCH1R for ctlz/cttz, SCH0L/SCH0R for ctlz(not)/cttz(not)

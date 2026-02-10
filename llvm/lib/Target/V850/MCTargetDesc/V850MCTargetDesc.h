@@ -25,6 +25,8 @@ namespace V850 {
 enum Fixups {
   /// 9-bit PC-relative branch (Format III conditional branches)
   fixup_v850_9_pcrel = FirstTargetFixupKind,
+  /// 16-bit PC-relative branch (LOOP instruction, RH850G3M+)
+  fixup_v850_16_pcrel,
   /// 22-bit PC-relative branch (Format V: JR, JARL)
   fixup_v850_22_pcrel,
   /// 16-bit signed immediate (Format VI/VII)

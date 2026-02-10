@@ -31,6 +31,11 @@ def simm16 : Operand<i32>, ImmLeaf<i32, [{return isInt<16>(Imm);}]> {
   let DecoderMethod = "decodeSImm<16>";
 }
 
+// Signed 23-bit immediate (for LD.DW/ST.DW 23-bit displacement)
+def simm23 : Operand<i32>, ImmLeaf<i32, [{return isInt<23>(Imm);}]> {
+  let DecoderMethod = "decodeSImm<23>";
+}
+
 // Unsigned 16-bit immediate
 def uimm16 : Operand<i32>, ImmLeaf<i32, [{return isUInt<16>(Imm);}]> {
   let DecoderMethod = "decodeUImmOperand<16>";
@@ -114,6 +119,12 @@ def disp5ep : Operand<i32>,
 def brtarget9 : Operand<OtherVT> {
   let EncoderMethod = "getBranchTarget9OpValue";
   let DecoderMethod = "decodeBranchTarget9";
+}
+
+// 16-bit PC-relative branch target for LOOP (bit 0 implicitly 0)
+def brtarget16 : Operand<OtherVT> {
+  let EncoderMethod = "getBranchTarget16OpValue";
+  let DecoderMethod = "decodeBranchTarget16";
 }
 
 // 22-bit PC-relative branch target (bit 0 implicitly 0)
@@ -3037,6 +3048,227 @@ let Predicates = [HasRH850G3M], DecoderNamespace = "RH850G3M" in {
       let Inst{26 -16} = 0b00011000110; // subop for reg
     }
   } // isCommutable = 0
+
+//===----------------------------------------------------------------------===//
+// PUSHSP - Push registers to Stack (RH850G3M+)
+//
+// Format XI: 01000111111RRRRR wwwww00101100000
+// Pushes registers from rh to rt onto stack, updating SP.
+//===----------------------------------------------------------------------===//
+
+let hasSideEffects = 1, mayLoad = 0, mayStore = 1, Uses = [SP], Defs = [SP] in
+def PUSHSP : V850Inst32<(outs), (ins GPR:$reg1, GPR:$reg2),
+                        "pushsp $reg1, $reg2", []> {
+  bits<5> reg1;
+  bits<5> reg2;
+
+  let Inst{15-11} = 0b01000;
+  let Inst{10-5}  = 0b111111;    // Extended opcode
+  let Inst{4-0}   = reg1;
+  let Inst{31-27} = reg2;
+  let Inst{26-16} = 0b00101100000;
+}
+
+//===----------------------------------------------------------------------===//
+// POPSP - Pop registers from Stack (RH850G3M+)
+//
+// Format XI: 01100111111RRRRR wwwww00101100000
+// Pops registers from rt to rh from stack, updating SP.
+//===----------------------------------------------------------------------===//
+
+let hasSideEffects = 1, mayLoad = 1, mayStore = 0, Uses = [SP], Defs = [SP] in
+def POPSP : V850Inst32<(outs), (ins GPR:$reg1, GPR:$reg2),
+                       "popsp $reg1, $reg2", []> {
+  bits<5> reg1;
+  bits<5> reg2;
+
+  let Inst{15-11} = 0b01100;
+  let Inst{10-5}  = 0b111111;    // Extended opcode
+  let Inst{4-0}   = reg1;
+  let Inst{31-27} = reg2;
+  let Inst{26-16} = 0b00101100000;
+}
+
+//===----------------------------------------------------------------------===//
+// LOOP - Hardware Loop (RH850G3M+)
+//
+// Format VII: 00000110111RRRRR ddddddddddddddd1
+// Decrements reg1, branches backward if not zero.
+//===----------------------------------------------------------------------===//
+
+let isBranch = 1, isTerminator = 1, Uses = [PSW] in
+def LOOP : V850Inst32<(outs GPR:$reg1_out), (ins GPR:$reg1, brtarget16:$disp16),
+                      "loop $reg1, $disp16", []> {
+  bits<5> reg1;
+  bits<16> disp16;
+  let Constraints = "$reg1_out = $reg1";
+
+  let Inst{15-11} = 0b00000;
+  let Inst{10-5}  = 0b110111;
+  let Inst{4-0}   = reg1;
+  let Inst{31-17} = disp16{15-1};
+  let Inst{16}    = 0b1;
+}
+
+//===----------------------------------------------------------------------===//
+// CACHE - Cache Operation (RH850G3M+)
+//
+// Format X: 111pp111111RRRRR PPPPP00101100000
+// Performs cache operations specified by cacheop.
+//===----------------------------------------------------------------------===//
+
+let hasSideEffects = 1, mayLoad = 0, mayStore = 0 in
+def CACHE : V850Inst32<(outs), (ins uimm7:$cacheop, GPR:$reg1),
+                       "cache $cacheop, [$reg1]", []> {
+  bits<7> cacheop;
+  bits<5> reg1;
+
+  let Inst{15-13} = 0b111;
+  let Inst{12-11} = cacheop{6-5};
+  let Inst{10-5}  = 0b111111;
+  let Inst{4-0}   = reg1;
+  let Inst{31-27} = cacheop{4-0};
+  let Inst{26-16} = 0b00101100000;
+}
+
+//===----------------------------------------------------------------------===//
+// PREF - Prefetch (RH850G3M+)
+//
+// Format X: 11011111111RRRRR PPPPP00101100000
+// Prefetches data at address in reg1.
+//===----------------------------------------------------------------------===//
+
+let hasSideEffects = 0, mayLoad = 1, mayStore = 0 in
+def PREF : V850Inst32<(outs), (ins uimm5:$prefop, GPR:$reg1),
+                      "pref $prefop, [$reg1]", []> {
+  bits<5> prefop;
+  bits<5> reg1;
+
+  let Inst{15-11} = 0b11011;
+  let Inst{10-5}  = 0b111111;
+  let Inst{4-0}   = reg1;
+  let Inst{31-27} = prefop;
+  let Inst{26-16} = 0b00101100000;
+}
+
+//===----------------------------------------------------------------------===//
+// BINS - Bitfield Insert (RH850G3M+)
+// Three variants based on msb/lsb positions
+// Assembly syntax: bins reg1, pos, width, reg2
+// But encoding uses msb = pos+width-1, lsb = pos
+//===----------------------------------------------------------------------===//
+
+// BINS variant 1: msb >= 16, lsb >= 16
+// Opcode: rrrrr111111RRRRR MMMMK0001001LLL0
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
+def BINS0 : V850Inst32<(outs GPR:$reg2), (ins GPR:$reg1, uimm5:$msb, uimm5:$lsb),
+                       "bins $reg1, $lsb, $msb, $reg2", []> {
+  bits<5> reg2;
+  bits<5> reg1;
+  bits<5> msb;  // msb = pos + width - 1
+  bits<5> lsb;  // lsb = pos
+
+  let Inst{15-11} = reg2;
+  let Inst{10-5}  = 0b111111;
+  let Inst{4-0}   = reg1;
+  let Inst{31-28} = msb{3-0};   // MMMM
+  let Inst{27}    = lsb{3};     // K
+  let Inst{26-24} = 0b000;
+  let Inst{23-21} = 0b100;      // sub-opcode variant 0
+  let Inst{20}    = 1;
+  let Inst{19-17} = lsb{2-0};   // LLL
+  let Inst{16}    = 0;
+}
+
+// BINS variant 2: msb >= 16, lsb < 16
+// Opcode: rrrrr111111RRRRR MMMMK0001011LLL0
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
+def BINS1 : V850Inst32<(outs GPR:$reg2), (ins GPR:$reg1, uimm5:$msb, uimm5:$lsb),
+                       "bins $reg1, $lsb, $msb, $reg2", []> {
+  bits<5> reg2;
+  bits<5> reg1;
+  bits<5> msb;
+  bits<5> lsb;
+
+  let Inst{15-11} = reg2;
+  let Inst{10-5}  = 0b111111;
+  let Inst{4-0}   = reg1;
+  let Inst{31-28} = msb{3-0};   // MMMM
+  let Inst{27}    = lsb{3};     // K
+  let Inst{26-24} = 0b000;
+  let Inst{23-21} = 0b101;      // sub-opcode variant 1
+  let Inst{20}    = 1;
+  let Inst{19-17} = lsb{2-0};   // LLL
+  let Inst{16}    = 0;
+}
+
+// BINS variant 3: msb < 16, lsb < 16
+// Opcode: rrrrr111111RRRRR MMMMK0001101LLL0
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
+def BINS2 : V850Inst32<(outs GPR:$reg2), (ins GPR:$reg1, uimm5:$msb, uimm5:$lsb),
+                       "bins $reg1, $lsb, $msb, $reg2", []> {
+  bits<5> reg2;
+  bits<5> reg1;
+  bits<5> msb;
+  bits<5> lsb;
+
+  let Inst{15-11} = reg2;
+  let Inst{10-5}  = 0b111111;
+  let Inst{4-0}   = reg1;
+  let Inst{31-28} = msb{3-0};   // MMMM
+  let Inst{27}    = lsb{3};     // K
+  let Inst{26-24} = 0b000;
+  let Inst{23-21} = 0b110;      // sub-opcode variant 2
+  let Inst{20}    = 1;
+  let Inst{19-17} = lsb{2-0};   // LLL
+  let Inst{16}    = 0;
+}
+
+//===----------------------------------------------------------------------===//
+// LD.DW - Load Double Word (RH850G3M+)
+// Format XIV (48-bit)
+// Opcode: 00000111101RRRRR wwwwwdddddd01001 DDDDDDDDDDDDDDDD
+// disp23 = {bits[47:32], bits[26:21], 0} (bit 0 always 0 for alignment)
+//===----------------------------------------------------------------------===//
+
+let hasSideEffects = 0, mayLoad = 1, mayStore = 0 in
+def LD_DW : V850Inst48<(outs GPR:$reg3), (ins GPR:$reg1, simm23:$disp23),
+                       "ld.dw $disp23[$reg1], $reg3", []> {
+  bits<5> reg3;     // Destination register pair (even register)
+  bits<5> reg1;     // Base register
+  bits<23> disp23;  // 23-bit signed displacement
+
+  let Inst{15-11} = 0b00000;
+  let Inst{10-5}  = 0b111101;
+  let Inst{4-0}   = reg1;
+  let Inst{31-27} = reg3;
+  let Inst{26-21} = disp23{6-1};   // disp23[6:1]
+  let Inst{20-16} = 0b01001;
+  let Inst{47-32} = disp23{22-7};  // disp23[22:7]
+}
+
+//===----------------------------------------------------------------------===//
+// ST.DW - Store Double Word (RH850G3M+)
+// Format XIV (48-bit)
+// Opcode: 00000111101RRRRR wwwwwdddddd01111 DDDDDDDDDDDDDDDD
+// disp23 = {bits[47:32], bits[26:21], 0} (bit 0 always 0 for alignment)
+//===----------------------------------------------------------------------===//
+
+let hasSideEffects = 0, mayLoad = 0, mayStore = 1 in
+def ST_DW : V850Inst48<(outs), (ins GPR:$reg3, GPR:$reg1, simm23:$disp23),
+                       "st.dw $reg3, $disp23[$reg1]", []> {
+  bits<5> reg3;     // Source register pair (even register)
+  bits<5> reg1;     // Base register
+  bits<23> disp23;  // 23-bit signed displacement
+
+  let Inst{15-11} = 0b00000;
+  let Inst{10-5}  = 0b111101;
+  let Inst{4-0}   = reg1;
+  let Inst{31-27} = reg3;
+  let Inst{26-21} = disp23{6-1};   // disp23[6:1]
+  let Inst{20-16} = 0b01111;
+  let Inst{47-32} = disp23{22-7};  // disp23[22:7]
+}
 
 } // Predicates = [HasRH850G3M], DecoderNamespace = "RH850G3M"
 

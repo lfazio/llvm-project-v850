@@ -60,6 +60,11 @@ public:
                                    SmallVectorImpl<MCFixup> &Fixups,
                                    const MCSubtargetInfo &STI) const;
 
+  // Get encoding for 16-bit branch target (LOOP instruction)
+  unsigned getBranchTarget16OpValue(const MCInst &MI, unsigned OpNo,
+                                    SmallVectorImpl<MCFixup> &Fixups,
+                                    const MCSubtargetInfo &STI) const;
+
   // Get encoding for 22-bit branch target
   unsigned getBranchTarget22OpValue(const MCInst &MI, unsigned OpNo,
                                     SmallVectorImpl<MCFixup> &Fixups,
@@ -87,20 +92,25 @@ void V850MCCodeEmitter::encodeInstruction(const MCInst &MI,
     support::endian::write<uint16_t>(CB, Binary, llvm::endianness::little);
   } else if (Size == 4) {
     // 32-bit instructions: emit first halfword, then second halfword
-    support::endian::write<uint16_t>(CB, Binary & 0xFFFF, llvm::endianness::little);
-    support::endian::write<uint16_t>(CB, (Binary >> 16) & 0xFFFF, llvm::endianness::little);
+    support::endian::write<uint16_t>(CB, Binary & 0xFFFF,
+                                     llvm::endianness::little);
+    support::endian::write<uint16_t>(CB, (Binary >> 16) & 0xFFFF,
+                                     llvm::endianness::little);
   } else if (Size == 6) {
     // 48-bit instructions: emit three halfwords
-    support::endian::write<uint16_t>(CB, Binary & 0xFFFF, llvm::endianness::little);
-    support::endian::write<uint16_t>(CB, (Binary >> 16) & 0xFFFF, llvm::endianness::little);
-    support::endian::write<uint16_t>(CB, (Binary >> 32) & 0xFFFF, llvm::endianness::little);
+    support::endian::write<uint16_t>(CB, Binary & 0xFFFF,
+                                     llvm::endianness::little);
+    support::endian::write<uint16_t>(CB, (Binary >> 16) & 0xFFFF,
+                                     llvm::endianness::little);
+    support::endian::write<uint16_t>(CB, (Binary >> 32) & 0xFFFF,
+                                     llvm::endianness::little);
   }
 }
 
-unsigned V850MCCodeEmitter::getMachineOpValue(const MCInst &MI,
-                                              const MCOperand &MO,
-                                              SmallVectorImpl<MCFixup> &Fixups,
-                                              const MCSubtargetInfo &STI) const {
+unsigned
+V850MCCodeEmitter::getMachineOpValue(const MCInst &MI, const MCOperand &MO,
+                                     SmallVectorImpl<MCFixup> &Fixups,
+                                     const MCSubtargetInfo &STI) const {
   if (MO.isReg())
     return Ctx.getRegisterInfo()->getEncodingValue(MO.getReg());
 
@@ -109,54 +119,73 @@ unsigned V850MCCodeEmitter::getMachineOpValue(const MCInst &MI,
 
   // Handle expression operand - add fixup and return 0 as placeholder
   assert(MO.isExpr() && "Expected expression operand");
-  Fixups.push_back(MCFixup::create(0, MO.getExpr(),
-                                   static_cast<MCFixupKind>(V850::fixup_v850_32),
-                                   /*PCRel=*/false));
+  Fixups.push_back(MCFixup::create(
+      0, MO.getExpr(), static_cast<MCFixupKind>(V850::fixup_v850_32),
+      /*PCRel=*/false));
   return 0;
 }
 
-unsigned V850MCCodeEmitter::getBranchTarget9OpValue(
-    const MCInst &MI, unsigned OpNo, SmallVectorImpl<MCFixup> &Fixups,
-    const MCSubtargetInfo &STI) const {
+unsigned
+V850MCCodeEmitter::getBranchTarget9OpValue(const MCInst &MI, unsigned OpNo,
+                                           SmallVectorImpl<MCFixup> &Fixups,
+                                           const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpNo);
   if (MO.isImm())
     return MO.getImm() >> 1; // Shift right by 1 (bit 0 is implicit 0)
 
   // Handle expression operand - add PC-relative fixup
   assert(MO.isExpr() && "Expected expression operand");
-  Fixups.push_back(MCFixup::create(0, MO.getExpr(),
-                                   static_cast<MCFixupKind>(V850::fixup_v850_9_pcrel),
-                                   /*PCRel=*/true));
+  Fixups.push_back(MCFixup::create(
+      0, MO.getExpr(), static_cast<MCFixupKind>(V850::fixup_v850_9_pcrel),
+      /*PCRel=*/true));
   return 0;
 }
 
-unsigned V850MCCodeEmitter::getBranchTarget22OpValue(
-    const MCInst &MI, unsigned OpNo, SmallVectorImpl<MCFixup> &Fixups,
-    const MCSubtargetInfo &STI) const {
+unsigned
+V850MCCodeEmitter::getBranchTarget16OpValue(const MCInst &MI, unsigned OpNo,
+                                            SmallVectorImpl<MCFixup> &Fixups,
+                                            const MCSubtargetInfo &STI) const {
+  const MCOperand &MO = MI.getOperand(OpNo);
+  if (MO.isImm())
+    return MO.getImm() >> 1; // Shift right by 1 (bit 0 is implicit 0)
+
+  // Handle expression operand - add PC-relative fixup for LOOP
+  assert(MO.isExpr() && "Expected expression operand");
+  Fixups.push_back(MCFixup::create(
+      0, MO.getExpr(), static_cast<MCFixupKind>(V850::fixup_v850_16_pcrel),
+      /*PCRel=*/true));
+  return 0;
+}
+
+unsigned
+V850MCCodeEmitter::getBranchTarget22OpValue(const MCInst &MI, unsigned OpNo,
+                                            SmallVectorImpl<MCFixup> &Fixups,
+                                            const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpNo);
   if (MO.isImm())
     return MO.getImm() >> 1; // Shift right by 1 (bit 0 is implicit 0)
 
   // Handle expression operand - add PC-relative fixup for JARL/JR
   assert(MO.isExpr() && "Expected expression operand");
-  Fixups.push_back(MCFixup::create(0, MO.getExpr(),
-                                   static_cast<MCFixupKind>(V850::fixup_v850_22_pcrel),
-                                   /*PCRel=*/true));
+  Fixups.push_back(MCFixup::create(
+      0, MO.getExpr(), static_cast<MCFixupKind>(V850::fixup_v850_22_pcrel),
+      /*PCRel=*/true));
   return 0;
 }
 
-unsigned V850MCCodeEmitter::getBranchTarget32OpValue(
-    const MCInst &MI, unsigned OpNo, SmallVectorImpl<MCFixup> &Fixups,
-    const MCSubtargetInfo &STI) const {
+unsigned
+V850MCCodeEmitter::getBranchTarget32OpValue(const MCInst &MI, unsigned OpNo,
+                                            SmallVectorImpl<MCFixup> &Fixups,
+                                            const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpNo);
   if (MO.isImm())
     return MO.getImm() >> 1; // Shift right by 1 (bit 0 is implicit 0)
 
   // Handle expression operand - add PC-relative fixup for 32-bit branch
   assert(MO.isExpr() && "Expected expression operand");
-  Fixups.push_back(MCFixup::create(0, MO.getExpr(),
-                                   static_cast<MCFixupKind>(V850::fixup_v850_32),
-                                   /*PCRel=*/true));
+  Fixups.push_back(MCFixup::create(
+      0, MO.getExpr(), static_cast<MCFixupKind>(V850::fixup_v850_32),
+      /*PCRel=*/true));
   return 0;
 }
 

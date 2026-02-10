@@ -54,3 +54,60 @@
 
 // CHECK: rotl r31, r31, r31 ; encoding: [0xff,0xff,0xc6,0xf8]
 	rotl r31, r31, r31
+
+// PUSHSP - Push registers to stack
+// CHECK: pushsp r20, r31 ; encoding: [0xf4,0x47,0x60,0xf9]
+	pushsp r20, r31
+
+// CHECK: pushsp r0, r0 ; encoding: [0xe0,0x47,0x60,0x01]
+	pushsp r0, r0
+
+// POPSP - Pop registers from stack
+// CHECK: popsp r20, r31 ; encoding: [0xf4,0x67,0x60,0xf9]
+	popsp r20, r31
+
+// CHECK: popsp r0, r0 ; encoding: [0xe0,0x67,0x60,0x01]
+	popsp r0, r0
+
+// LOOP - Hardware loop
+// CHECK: loop r5, -100 ; encoding: [0xe5,0x06,0xcf,0xff]
+	loop r5, -100
+
+// CHECK: loop r10, -2 ; encoding: [0xea,0x06,0xff,0xff]
+	loop r10, -2
+
+// CACHE - Cache operation (7-bit cacheop: bits 6-5 in inst[12-11], bits 4-0 in inst[31-27])
+// CHECK: cache 0, [r10] ; encoding: [0xea,0xe7,0x60,0x01]
+	cache 0, [r10]
+
+// CHECK: cache 31, [r5] ; encoding: [0xe5,0xe7,0x60,0xf9]
+	cache 31, [r5]
+
+// CHECK: cache 127, [r5] ; encoding: [0xe5,0xff,0x60,0xf9]
+	cache 127, [r5]
+
+// PREF - Prefetch
+// CHECK: pref 0, [r10] ; encoding: [0xea,0xdf,0x60,0x01]
+	pref 0, [r10]
+
+// BINS - Bitfield insert
+// Note: BINS encodes 4 bits of lsb and msb. The assembler always uses variant 0.
+// CHECK: bins r6, 0, 15, r10 ; encoding: [0xe6,0x57,0x90,0xf0]
+	bins r6, 0, 15, r10
+
+// CHECK: bins r0, 0, 0, r0 ; encoding: [0xe0,0x07,0x90,0x00]
+	bins r0, 0, 0, r0
+
+// LD.DW - Load doubleword (48-bit instruction)
+// CHECK: ld.dw 100[r10], r12 ; encoding: [0xaa,0x07,0x49,0x66,0x00,0x00]
+	ld.dw 100[r10], r12
+
+// CHECK: ld.dw 0[r0], r0 ; encoding: [0xa0,0x07,0x09,0x00,0x00,0x00]
+	ld.dw 0[r0], r0
+
+// ST.DW - Store doubleword (48-bit instruction)
+// CHECK: st.dw r14, 200[r10] ; encoding: [0xaa,0x07,0x8f,0x74,0x01,0x00]
+	st.dw r14, 200[r10]
+
+// CHECK: st.dw r0, 0[r0] ; encoding: [0xa0,0x07,0x0f,0x00,0x00,0x00]
+	st.dw r0, 0[r0]

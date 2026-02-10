@@ -44,13 +44,10 @@ public:
   MCFixupKindInfo getFixupKindInfo(MCFixupKind Kind) const override {
     const static MCFixupKindInfo Infos[V850::NumTargetFixupKinds] = {
         // name                    offset  bits  flags
-        {"fixup_v850_9_pcrel", 0, 9, 0},
-        {"fixup_v850_22_pcrel", 0, 22, 0},
-        {"fixup_v850_16", 16, 16, 0},
-        {"fixup_v850_32", 0, 32, 0},
-        {"fixup_v850_hi16", 16, 16, 0},
-        {"fixup_v850_lo16", 16, 16, 0},
-        {"fixup_v850_sda_16", 16, 16, 0},
+        {"fixup_v850_9_pcrel", 0, 9, 0},   {"fixup_v850_16_pcrel", 0, 16, 0},
+        {"fixup_v850_22_pcrel", 0, 22, 0}, {"fixup_v850_16", 16, 16, 0},
+        {"fixup_v850_32", 0, 32, 0},       {"fixup_v850_hi16", 16, 16, 0},
+        {"fixup_v850_lo16", 16, 16, 0},    {"fixup_v850_sda_16", 16, 16, 0},
     };
 
     if (Kind < FirstTargetFixupKind)
@@ -93,8 +90,14 @@ public:
       Value >>= 1;
       // Upper 5 bits go to [15:11], lower 3 bits to [6:4]
       Data[Offset] = (Data[Offset] & 0x0F) | ((Value & 0x07) << 4);
-      Data[Offset + 1] =
-          (Data[Offset + 1] & 0x07) | ((Value >> 3) & 0x1F) << 3;
+      Data[Offset + 1] = (Data[Offset + 1] & 0x07) | ((Value >> 3) & 0x1F) << 3;
+      return;
+    case V850::fixup_v850_16_pcrel:
+      // 16-bit PC-relative for LOOP instruction
+      // Value is shifted right by 1 (bit 0 always 0)
+      Value >>= 1;
+      // 16-bit displacement in second halfword (bits 31-16)
+      support::endian::write16le(&Data[Offset + 2], Value & 0xFFFF);
       return;
     case V850::fixup_v850_22_pcrel:
       // 22-bit PC-relative for JR/JARL
