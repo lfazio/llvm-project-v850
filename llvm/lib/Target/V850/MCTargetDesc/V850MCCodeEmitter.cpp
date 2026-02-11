@@ -65,6 +65,11 @@ public:
                                     SmallVectorImpl<MCFixup> &Fixups,
                                     const MCSubtargetInfo &STI) const;
 
+  // Get encoding for 17-bit branch target (Bcond disp17, RH850G3M+)
+  unsigned getBranchTarget17OpValue(const MCInst &MI, unsigned OpNo,
+                                    SmallVectorImpl<MCFixup> &Fixups,
+                                    const MCSubtargetInfo &STI) const;
+
   // Get encoding for 22-bit branch target
   unsigned getBranchTarget22OpValue(const MCInst &MI, unsigned OpNo,
                                     SmallVectorImpl<MCFixup> &Fixups,
@@ -153,6 +158,22 @@ V850MCCodeEmitter::getBranchTarget16OpValue(const MCInst &MI, unsigned OpNo,
   assert(MO.isExpr() && "Expected expression operand");
   Fixups.push_back(MCFixup::create(
       0, MO.getExpr(), static_cast<MCFixupKind>(V850::fixup_v850_16_pcrel),
+      /*PCRel=*/true));
+  return 0;
+}
+
+unsigned
+V850MCCodeEmitter::getBranchTarget17OpValue(const MCInst &MI, unsigned OpNo,
+                                            SmallVectorImpl<MCFixup> &Fixups,
+                                            const MCSubtargetInfo &STI) const {
+  const MCOperand &MO = MI.getOperand(OpNo);
+  if (MO.isImm())
+    return MO.getImm() >> 1; // Shift right by 1 (bit 0 is implicit 0)
+
+  // Handle expression operand - add PC-relative fixup for Bcond disp17
+  assert(MO.isExpr() && "Expected expression operand");
+  Fixups.push_back(MCFixup::create(
+      0, MO.getExpr(), static_cast<MCFixupKind>(V850::fixup_v850_17_pcrel),
       /*PCRel=*/true));
   return 0;
 }

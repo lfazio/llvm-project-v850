@@ -123,12 +123,12 @@ class FormatII_IMM6<bits<5> opcode, dag outs, dag ins, string asmstr,
 class FormatIII<bits<4> opcode, dag outs, dag ins, string asmstr,
                 list<dag> pattern>
     : V850Inst16<outs, ins, asmstr, pattern> {
-  bits<9> disp9;  // PC-relative displacement (bit 0 implicitly 0)
+  bits<8> disp9;  // Half-displacement (encoder shifts val >> 1)
   bits<4> cond;
 
-  let Inst{15-11} = disp9{8-4};
+  let Inst{15-11} = disp9{7-3};
   let Inst{10-7}  = opcode;
-  let Inst{6-4}   = disp9{3-1};
+  let Inst{6-4}   = disp9{2-0};
   let Inst{3-0}   = cond;
 }
 

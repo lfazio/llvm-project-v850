@@ -27,6 +27,8 @@ enum Fixups {
   fixup_v850_9_pcrel = FirstTargetFixupKind,
   /// 16-bit PC-relative branch (LOOP instruction, RH850G3M+)
   fixup_v850_16_pcrel,
+  /// 17-bit PC-relative branch (Bcond disp17, RH850G3M+)
+  fixup_v850_17_pcrel,
   /// 22-bit PC-relative branch (Format V: JR, JARL)
   fixup_v850_22_pcrel,
   /// 16-bit signed immediate (Format VI/VII)

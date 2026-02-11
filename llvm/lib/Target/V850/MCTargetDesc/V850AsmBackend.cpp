@@ -45,9 +45,10 @@ public:
     const static MCFixupKindInfo Infos[V850::NumTargetFixupKinds] = {
         // name                    offset  bits  flags
         {"fixup_v850_9_pcrel", 0, 9, 0},   {"fixup_v850_16_pcrel", 0, 16, 0},
-        {"fixup_v850_22_pcrel", 0, 22, 0}, {"fixup_v850_16", 16, 16, 0},
-        {"fixup_v850_32", 0, 32, 0},       {"fixup_v850_hi16", 16, 16, 0},
-        {"fixup_v850_lo16", 16, 16, 0},    {"fixup_v850_sda_16", 16, 16, 0},
+        {"fixup_v850_17_pcrel", 0, 17, 0}, {"fixup_v850_22_pcrel", 0, 22, 0},
+        {"fixup_v850_16", 16, 16, 0},      {"fixup_v850_32", 0, 32, 0},
+        {"fixup_v850_hi16", 16, 16, 0},    {"fixup_v850_lo16", 16, 16, 0},
+        {"fixup_v850_sda_16", 16, 16, 0},
     };
 
     if (Kind < FirstTargetFixupKind)
@@ -98,6 +99,18 @@ public:
       Value >>= 1;
       // 16-bit displacement in second halfword (bits 31-16)
       support::endian::write16le(&Data[Offset + 2], Value & 0xFFFF);
+      return;
+    case V850::fixup_v850_17_pcrel:
+      // 17-bit PC-relative for Bcond disp17 (RH850G3M+)
+      // Format: 00000111111DCCCC ddddddddddddddd1
+      // D = sign bit of half-displacement, d = lower 15 bits, bit 0 fixed at 1
+      // Value is shifted right by 1 to get half-displacement
+      Value >>= 1;
+      // Sign bit (bit 15) goes to first halfword bit 4
+      Data[Offset] = (Data[Offset] & 0xEF) | ((Value >> 11) & 0x10);
+      // Lower 15 bits go to second halfword bits 15-1, bit 0 is fixed at 1
+      support::endian::write16le(&Data[Offset + 2],
+                                 ((Value & 0x7FFF) << 1) | 1);
       return;
     case V850::fixup_v850_22_pcrel:
       // 22-bit PC-relative for JR/JARL

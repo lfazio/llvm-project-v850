@@ -70,7 +70,7 @@
 	popsp r0, r0
 
 // LOOP - Hardware loop
-// CHECK: loop r5, -100 ; encoding: [0xe5,0x06,0xcf,0xff]
+// CHECK: loop r5, -100 ; encoding: [0xe5,0x06,0x9d,0xff]
 	loop r5, -100
 
 // CHECK: loop r10, -2 ; encoding: [0xea,0x06,0xff,0xff]

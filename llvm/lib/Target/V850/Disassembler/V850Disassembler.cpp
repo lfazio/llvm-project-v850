@@ -198,9 +198,9 @@ static DecodeStatus DecodeSLDHUInstruction(MCInst &Inst, uint32_t Insn,
 static DecodeStatus decodeBranchTarget9(MCInst &Inst, uint32_t Imm,
                                         int64_t Address,
                                         const MCDisassembler *Decoder) {
-  // 9-bit signed offset, bit 0 is implicitly 0
-  // The encoding stores bits [8:1], so we need to shift left by 1
-  int32_t Offset = SignExtend32<9>(Imm << 1);
+  // Imm is the 8-bit half-displacement (displacement >> 1)
+  // Sign-extend from 8 bits and shift left by 1 to recover the byte offset
+  int32_t Offset = SignExtend32<8>(Imm) << 1;
   Inst.addOperand(MCOperand::createImm(Offset));
   return MCDisassembler::Success;
 }
@@ -208,9 +208,19 @@ static DecodeStatus decodeBranchTarget9(MCInst &Inst, uint32_t Imm,
 static DecodeStatus decodeBranchTarget16(MCInst &Inst, uint32_t Imm,
                                          int64_t Address,
                                          const MCDisassembler *Decoder) {
-  // 16-bit signed offset, bit 0 is implicitly 0
-  // The encoding stores bits [15:1], so we need to shift left by 1
-  int32_t Offset = SignExtend32<16>(Imm << 1);
+  // Imm is the 15-bit half-displacement (displacement >> 1)
+  // Sign-extend from 15 bits and shift left by 1 to recover the byte offset
+  int32_t Offset = SignExtend32<15>(Imm) << 1;
+  Inst.addOperand(MCOperand::createImm(Offset));
+  return MCDisassembler::Success;
+}
+
+static DecodeStatus decodeBranchTarget17(MCInst &Inst, uint32_t Imm,
+                                         int64_t Address,
+                                         const MCDisassembler *Decoder) {
+  // Imm is the 16-bit half-displacement (displacement >> 1)
+  // Sign-extend from 16 bits and shift left by 1 to recover the byte offset
+  int32_t Offset = SignExtend32<16>(Imm) << 1;
   Inst.addOperand(MCOperand::createImm(Offset));
   return MCDisassembler::Success;
 }

@@ -2,8 +2,8 @@
 
 #------------------------------------------------------------------------------
 # Format III: Conditional Branch (16-bit)
-# Encoding: bits[15-11]=disp[8:4], bits[10-7]=opcode(1011),
-#           bits[6-4]=disp[3:1], bits[3-0]=condition
+# Encoding: bits[15-11]=half_disp[7:3], bits[10-7]=opcode(1011),
+#           bits[6-4]=half_disp[2:0], bits[3-0]=condition
 #
 # Note: Each 16-bit instruction is paired with NOP to form 4 bytes.
 # Branch target bit 0 is implicitly 0 (halfword aligned).
@@ -18,7 +18,7 @@
 
 # CHECK: bv	8
 # CHECK: nop
-0xa0,0x05,0x00,0x00
+0xc0,0x05,0x00,0x00
 
 #------------------------------------------------------------------------------
 # BNH - Branch if not higher (cond: 0011)
@@ -26,7 +26,7 @@
 
 # CHECK: bnh	32
 # CHECK: nop
-0x83,0x0d,0x00,0x00
+0x83,0x15,0x00,0x00
 
 #------------------------------------------------------------------------------
 # BN - Branch if negative (cond: 0100)
@@ -34,7 +34,7 @@
 
 # CHECK: bn	40
 # CHECK: nop
-0xa4,0x0d,0x00,0x00
+0xc4,0x15,0x00,0x00
 
 #------------------------------------------------------------------------------
 # BLE - Branch if less or equal (signed) (cond: 0111)
@@ -42,7 +42,7 @@
 
 # CHECK: ble	64
 # CHECK: nop
-0x87,0x15,0x00,0x00
+0x87,0x25,0x00,0x00
 
 #------------------------------------------------------------------------------
 # BNV - Branch if no overflow (cond: 1000)
@@ -50,7 +50,7 @@
 
 # CHECK: bnv	72
 # CHECK: nop
-0xa8,0x15,0x00,0x00
+0xc8,0x25,0x00,0x00
 
 #------------------------------------------------------------------------------
 # BH - Branch if higher (cond: 1011)
@@ -58,7 +58,7 @@
 
 # CHECK: bh	96
 # CHECK: nop
-0x8b,0x1d,0x00,0x00
+0x8b,0x35,0x00,0x00
 
 #------------------------------------------------------------------------------
 # BP - Branch if positive (cond: 1100)
@@ -66,7 +66,7 @@
 
 # CHECK: bp	104
 # CHECK: nop
-0xac,0x1d,0x00,0x00
+0xcc,0x35,0x00,0x00
 
 #------------------------------------------------------------------------------
 # BGT - Branch if greater than (signed) (cond: 1111)
@@ -74,4 +74,4 @@
 
 # CHECK: bgt	128
 # CHECK: nop
-0x8f,0x25,0x00,0x00
+0x8f,0x45,0x00,0x00

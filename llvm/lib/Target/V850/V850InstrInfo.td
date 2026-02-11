@@ -115,34 +115,83 @@ def disp5ep : Operand<i32>,
   let ParserMatchClass = Imm5AsmOperand;
 }
 
+// AsmOperandClass hierarchy for branch targets.
+// Narrower classes are subclasses of wider ones so the asm matcher
+// prefers the shortest encoding when multiple forms match.
+def Brtarget32AsmOperand : AsmOperandClass {
+  let Name = "Brtarget32";
+  let RenderMethod = "addBrtarget32Operands";
+  let PredicateMethod = "isBrtarget32";
+}
+
+def Brtarget22AsmOperand : AsmOperandClass {
+  let Name = "Brtarget22";
+  let RenderMethod = "addBrtarget22Operands";
+  let PredicateMethod = "isBrtarget22";
+  let SuperClasses = [Brtarget32AsmOperand];
+}
+
+def Brtarget17AsmOperand : AsmOperandClass {
+  let Name = "Brtarget17";
+  let RenderMethod = "addBrtarget17Operands";
+  let PredicateMethod = "isBrtarget17";
+  let SuperClasses = [Brtarget22AsmOperand];
+}
+
+def Brtarget16AsmOperand : AsmOperandClass {
+  let Name = "Brtarget16";
+  let RenderMethod = "addBrtarget16Operands";
+  let PredicateMethod = "isBrtarget16";
+  let SuperClasses = [Brtarget17AsmOperand];
+}
+
+def Brtarget9AsmOperand : AsmOperandClass {
+  let Name = "Brtarget9";
+  let RenderMethod = "addBrtarget9Operands";
+  let PredicateMethod = "isBrtarget9";
+  let SuperClasses = [Brtarget16AsmOperand];
+}
+
 // 9-bit PC-relative branch target (bit 0 implicitly 0)
 def brtarget9 : Operand<OtherVT> {
   let EncoderMethod = "getBranchTarget9OpValue";
   let DecoderMethod = "decodeBranchTarget9";
+  let ParserMatchClass = Brtarget9AsmOperand;
 }
 
 // 16-bit PC-relative branch target for LOOP (bit 0 implicitly 0)
 def brtarget16 : Operand<OtherVT> {
   let EncoderMethod = "getBranchTarget16OpValue";
   let DecoderMethod = "decodeBranchTarget16";
+  let ParserMatchClass = Brtarget16AsmOperand;
+}
+
+// 17-bit PC-relative branch target for Bcond disp17 (bit 0 implicitly 0, RH850G3M+)
+def brtarget17 : Operand<OtherVT> {
+  let EncoderMethod = "getBranchTarget17OpValue";
+  let DecoderMethod = "decodeBranchTarget17";
+  let ParserMatchClass = Brtarget17AsmOperand;
 }
 
 // 22-bit PC-relative branch target (bit 0 implicitly 0)
 def brtarget22 : Operand<OtherVT> {
   let EncoderMethod = "getBranchTarget22OpValue";
   let DecoderMethod = "decodeBranchTarget22";
+  let ParserMatchClass = Brtarget22AsmOperand;
 }
 
 // Call target operand for CALL/TAIL instructions
 def calltarget : Operand<i32> {
   let EncoderMethod = "getBranchTarget22OpValue";
   let DecoderMethod = "decodeBranchTarget22";
+  let ParserMatchClass = Brtarget22AsmOperand;
 }
 
 // 32-bit PC-relative branch target (bit 0 implicitly 0, V850E2+)
 def brtarget32 : Operand<OtherVT> {
   let EncoderMethod = "getBranchTarget32OpValue";
   let DecoderMethod = "decodeBranchTarget32";
+  let ParserMatchClass = Brtarget32AsmOperand;
 }
 
 // AsmOperandClass for condition codes
@@ -693,6 +742,51 @@ def BGT : Bcond<0b1111, "bgt">; // Greater than (signed)
 // def : InstAlias<"be $disp9", (BZ brtarget9:$disp9)>;
 // def : InstAlias<"bne $disp9", (BNZ brtarget9:$disp9)>;
 // def : InstAlias<"bnl $disp9", (BNC brtarget9:$disp9)>;
+
+//===----------------------------------------------------------------------===//
+// Extended Conditional Branch Instructions - RH850G3M+ (32-bit)
+// Bcond disp17 - 17-bit PC-relative conditional branch
+// Format: 00000111111DCCCC ddddddddddddddd1
+//   D = bit 16 of displacement
+//   CCCC = condition code
+//   ddddddddddddddd = bits 15-1 of displacement
+//   bit 0 of second halfword is fixed at 1
+//===----------------------------------------------------------------------===//
+
+class Bcond17<bits<4> cc, string mnemonic>
+    : V850Inst32<(outs), (ins brtarget17:$disp17),
+                 mnemonic#"\t$disp17", []>,
+      Requires<[HasRH850G3M]> {
+  bits<16> disp17;  // Half-displacement (encoder shifts val >> 1)
+
+  let Inst{15-5} = 0b00000111111;  // Fixed opcode
+  let Inst{4} = disp17{15};        // Sign bit of half-displacement (D)
+  let Inst{3-0} = cc;              // Condition code
+  let Inst{31-17} = disp17{14-0};  // Lower 15 bits of half-displacement
+  let Inst{16} = 1;                // Fixed format marker
+
+  let isBranch = 1;
+  let isTerminator = 1;
+}
+
+// Extended conditional branch instructions (RH850G3M+)
+// Note: BR (0101) is NOT allowed for Bcond disp17
+def BV_17  : Bcond17<0b0000, "bv">;   // Overflow
+def BC_17  : Bcond17<0b0001, "bc">;   // Carry (also BL)
+def BZ_17  : Bcond17<0b0010, "bz">;   // Zero (also BE)
+def BNH_17 : Bcond17<0b0011, "bnh">;  // Not higher
+def BN_17  : Bcond17<0b0100, "bn">;   // Negative
+// BR (0b0101) is NOT valid for disp17 - use JR disp22 instead
+def BLT_17 : Bcond17<0b0110, "blt">;  // Less than (signed)
+def BLE_17 : Bcond17<0b0111, "ble">;  // Less or equal (signed)
+def BNV_17 : Bcond17<0b1000, "bnv">;  // No overflow
+def BNC_17 : Bcond17<0b1001, "bnc">;  // No carry (also BNL)
+def BNZ_17 : Bcond17<0b1010, "bnz">;  // Not zero (also BNE)
+def BH_17  : Bcond17<0b1011, "bh">;   // Higher
+def BP_17  : Bcond17<0b1100, "bp">;   // Positive
+def BSA_17 : Bcond17<0b1101, "bsa">;  // Saturated
+def BGE_17 : Bcond17<0b1110, "bge">;  // Greater or equal (signed)
+def BGT_17 : Bcond17<0b1111, "bgt">;  // Greater than (signed)
 
 //===----------------------------------------------------------------------===//
 // Jump Instructions - Format V (32-bit)
@@ -3100,13 +3194,13 @@ let isBranch = 1, isTerminator = 1, Uses = [PSW] in
 def LOOP : V850Inst32<(outs GPR:$reg1_out), (ins GPR:$reg1, brtarget16:$disp16),
                       "loop $reg1, $disp16", []> {
   bits<5> reg1;
-  bits<16> disp16;
+  bits<15> disp16;  // Half-displacement (encoder shifts val >> 1)
   let Constraints = "$reg1_out = $reg1";
 
   let Inst{15-11} = 0b00000;
   let Inst{10-5}  = 0b110111;
   let Inst{4-0}   = reg1;
-  let Inst{31-17} = disp16{15-1};
+  let Inst{31-17} = disp16{14-0};
   let Inst{16}    = 0b1;
 }
 

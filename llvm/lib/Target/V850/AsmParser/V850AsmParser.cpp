@@ -79,8 +79,8 @@ class V850AsmParser : public MCTargetAsmParser {
 
   /// Validate register pair constraints for double-precision FPU instructions.
   /// Returns true if validation fails (odd register used where even required).
-  bool validateFPURegisterPair(StringRef Mnemonic, const OperandVector &Operands,
-                               SMLoc IDLoc);
+  bool validateFPURegisterPair(StringRef Mnemonic,
+                               const OperandVector &Operands, SMLoc IDLoc);
 
   /// Validate system register access based on CPU features.
   /// Returns true if validation fails (system register not available for CPU).
@@ -100,12 +100,7 @@ public:
 /// instruction operand.
 class V850Operand : public MCParsedAsmOperand {
 public:
-  enum KindTy {
-    K_Token,
-    K_Register,
-    K_Immediate,
-    K_Memory
-  } Kind;
+  enum KindTy { K_Token, K_Register, K_Immediate, K_Memory } Kind;
 
 private:
   struct TokOp {
@@ -216,9 +211,45 @@ public:
     return true;
   }
 
-  bool isBrtarget9() const { return isImm(); }
-  bool isBrtarget22() const { return isImm(); }
-  bool isBrtarget32() const { return isImm(); }
+  bool isBrtarget9() const {
+    if (!isImm())
+      return false;
+    if (const MCConstantExpr *CE = dyn_cast<MCConstantExpr>(getImm()))
+      return isInt<9>(CE->getValue()) && (CE->getValue() & 1) == 0;
+    return true; // Symbolic: assume shortest form, relaxation handles overflow
+  }
+
+  bool isBrtarget16() const {
+    if (!isImm())
+      return false;
+    if (const MCConstantExpr *CE = dyn_cast<MCConstantExpr>(getImm()))
+      return isInt<16>(CE->getValue()) && (CE->getValue() & 1) == 0;
+    return true;
+  }
+
+  bool isBrtarget17() const {
+    if (!isImm())
+      return false;
+    if (const MCConstantExpr *CE = dyn_cast<MCConstantExpr>(getImm()))
+      return isInt<17>(CE->getValue()) && (CE->getValue() & 1) == 0;
+    return true;
+  }
+
+  bool isBrtarget22() const {
+    if (!isImm())
+      return false;
+    if (const MCConstantExpr *CE = dyn_cast<MCConstantExpr>(getImm()))
+      return isInt<22>(CE->getValue()) && (CE->getValue() & 1) == 0;
+    return true;
+  }
+
+  bool isBrtarget32() const {
+    if (!isImm())
+      return false;
+    if (const MCConstantExpr *CE = dyn_cast<MCConstantExpr>(getImm()))
+      return isInt<32>(CE->getValue()) && (CE->getValue() & 1) == 0;
+    return true;
+  }
   bool isCondcode() const { return isImm(); }
   bool isCmov_cond() const { return isImm(); }
   bool isUimm6() const {
@@ -289,7 +320,7 @@ public:
   }
 
   static std::unique_ptr<V850Operand> createReg(MCRegister Reg, SMLoc S,
-                                                 SMLoc E) {
+                                                SMLoc E) {
     auto Op = std::make_unique<V850Operand>(K_Register);
     Op->Reg.RegNum = Reg;
     Op->StartLoc = S;
@@ -298,7 +329,7 @@ public:
   }
 
   static std::unique_ptr<V850Operand> createImm(const MCExpr *Val, SMLoc S,
-                                                 SMLoc E) {
+                                                SMLoc E) {
     auto Op = std::make_unique<V850Operand>(K_Immediate);
     Op->Imm.Val = Val;
     Op->StartLoc = S;
@@ -306,9 +337,8 @@ public:
     return Op;
   }
 
-  static std::unique_ptr<V850Operand> createMem(MCRegister Base,
-                                                 const MCExpr *Disp, SMLoc S,
-                                                 SMLoc E) {
+  static std::unique_ptr<V850Operand>
+  createMem(MCRegister Base, const MCExpr *Disp, SMLoc S, SMLoc E) {
     auto Op = std::make_unique<V850Operand>(K_Memory);
     Op->Mem.BaseReg = Base;
     Op->Mem.Disp = Disp;
@@ -352,6 +382,14 @@ public:
   }
 
   void addBrtarget9Operands(MCInst &Inst, unsigned N) const {
+    addImmOperands(Inst, N);
+  }
+
+  void addBrtarget16Operands(MCInst &Inst, unsigned N) const {
+    addImmOperands(Inst, N);
+  }
+
+  void addBrtarget17Operands(MCInst &Inst, unsigned N) const {
     addImmOperands(Inst, N);
   }
 
@@ -419,12 +457,12 @@ MCRegister V850AsmParser::matchRegisterAltName(StringRef Name) {
 }
 
 bool V850AsmParser::parseRegister(MCRegister &Reg, SMLoc &StartLoc,
-                                   SMLoc &EndLoc) {
+                                  SMLoc &EndLoc) {
   return !tryParseRegister(Reg, StartLoc, EndLoc).isSuccess();
 }
 
 ParseStatus V850AsmParser::tryParseRegister(MCRegister &Reg, SMLoc &StartLoc,
-                                             SMLoc &EndLoc) {
+                                            SMLoc &EndLoc) {
   const AsmToken &Tok = Parser.getTok();
   StartLoc = Tok.getLoc();
   EndLoc = Tok.getEndLoc();
@@ -533,29 +571,30 @@ ParseStatus V850AsmParser::parseCondCode(OperandVector &Operands) {
 
   // Map condition code names to their numeric values
   // V850 condition codes (4-bit encoding)
-  int CondVal = StringSwitch<int>(Name.lower())
-      .Case("v", 0)      // Overflow
-      .Case("c", 1)      // Carry / Lower
-      .Case("l", 1)      // Lower (alias for c)
-      .Case("z", 2)      // Zero / Equal
-      .Case("e", 2)      // Equal (alias for z)
-      .Case("nh", 3)     // Not higher
-      .Case("n", 4)      // Negative
-      .Case("t", 5)      // Always true (unconditional)
-      .Case("lt", 6)     // Less than (signed)
-      .Case("le", 7)     // Less or equal (signed)
-      .Case("nv", 8)     // No overflow
-      .Case("nc", 9)     // No carry / Not lower
-      .Case("nl", 9)     // Not lower (alias for nc)
-      .Case("nz", 10)    // Not zero / Not equal
-      .Case("ne", 10)    // Not equal (alias for nz)
-      .Case("h", 11)     // Higher
-      .Case("p", 12)     // Positive
-      .Case("sa", 13)    // Saturated
-      .Case("ge", 14)    // Greater or equal (signed)
-      .Case("gt", 15)    // Greater than (signed)
-      .Case("f", 5)      // Always false mapped to always true (same encoding)
-      .Default(-1);
+  int CondVal =
+      StringSwitch<int>(Name.lower())
+          .Case("v", 0)   // Overflow
+          .Case("c", 1)   // Carry / Lower
+          .Case("l", 1)   // Lower (alias for c)
+          .Case("z", 2)   // Zero / Equal
+          .Case("e", 2)   // Equal (alias for z)
+          .Case("nh", 3)  // Not higher
+          .Case("n", 4)   // Negative
+          .Case("t", 5)   // Always true (unconditional)
+          .Case("lt", 6)  // Less than (signed)
+          .Case("le", 7)  // Less or equal (signed)
+          .Case("nv", 8)  // No overflow
+          .Case("nc", 9)  // No carry / Not lower
+          .Case("nl", 9)  // Not lower (alias for nc)
+          .Case("nz", 10) // Not zero / Not equal
+          .Case("ne", 10) // Not equal (alias for nz)
+          .Case("h", 11)  // Higher
+          .Case("p", 12)  // Positive
+          .Case("sa", 13) // Saturated
+          .Case("ge", 14) // Greater or equal (signed)
+          .Case("gt", 15) // Greater than (signed)
+          .Case("f", 5)   // Always false mapped to always true (same encoding)
+          .Default(-1);
 
   if (CondVal < 0)
     return ParseStatus::NoMatch;
@@ -579,23 +618,23 @@ ParseStatus V850AsmParser::parseFPCondCode(OperandVector &Operands) {
   // Map FPU condition code names to their numeric values (4-bit encoding)
   // These are used by CMPF.S and CMPF.D instructions
   int FCondVal = StringSwitch<int>(Name.lower())
-      .Case("f", 0)       // False
-      .Case("un", 1)      // Unordered
-      .Case("eq", 2)      // Equal
-      .Case("ueq", 3)     // Unordered or Equal
-      .Case("olt", 4)     // Ordered Less Than
-      .Case("ult", 5)     // Unordered or Less Than
-      .Case("ole", 6)     // Ordered Less or Equal
-      .Case("ule", 7)     // Unordered or Less or Equal
-      .Case("sf", 8)      // Signaling False
-      .Case("ngle", 9)    // Not Greater, Less, or Equal
-      .Case("seq", 10)    // Signaling Equal
-      .Case("ngl", 11)    // Not Greater or Less
-      .Case("lt", 12)     // Less Than
-      .Case("nge", 13)    // Not Greater or Equal
-      .Case("le", 14)     // Less or Equal
-      .Case("ngt", 15)    // Not Greater Than
-      .Default(-1);
+                     .Case("f", 0)    // False
+                     .Case("un", 1)   // Unordered
+                     .Case("eq", 2)   // Equal
+                     .Case("ueq", 3)  // Unordered or Equal
+                     .Case("olt", 4)  // Ordered Less Than
+                     .Case("ult", 5)  // Unordered or Less Than
+                     .Case("ole", 6)  // Ordered Less or Equal
+                     .Case("ule", 7)  // Unordered or Less or Equal
+                     .Case("sf", 8)   // Signaling False
+                     .Case("ngle", 9) // Not Greater, Less, or Equal
+                     .Case("seq", 10) // Signaling Equal
+                     .Case("ngl", 11) // Not Greater or Less
+                     .Case("lt", 12)  // Less Than
+                     .Case("nge", 13) // Not Greater or Equal
+                     .Case("le", 14)  // Less or Equal
+                     .Case("ngt", 15) // Not Greater Than
+                     .Default(-1);
 
   if (FCondVal < 0)
     return ParseStatus::NoMatch;
@@ -609,7 +648,7 @@ ParseStatus V850AsmParser::parseFPCondCode(OperandVector &Operands) {
 }
 
 bool V850AsmParser::parseInstruction(ParseInstructionInfo &Info, StringRef Name,
-                                      SMLoc NameLoc, OperandVector &Operands) {
+                                     SMLoc NameLoc, OperandVector &Operands) {
   // Add the mnemonic as first operand
   Operands.push_back(V850Operand::createToken(Name, NameLoc));
 
@@ -638,8 +677,8 @@ bool V850AsmParser::parseInstruction(ParseInstructionInfo &Info, StringRef Name,
 }
 
 bool V850AsmParser::validateFPURegisterPair(StringRef Mnemonic,
-                                             const OperandVector &Operands,
-                                             SMLoc IDLoc) {
+                                            const OperandVector &Operands,
+                                            SMLoc IDLoc) {
   // Double-precision FPU instructions require even-numbered registers for
   // register pairs. Validate the appropriate operands based on instruction.
 
@@ -669,8 +708,9 @@ bool V850AsmParser::validateFPURegisterPair(StringRef Mnemonic,
     // Operands: [mnemonic, reg1, reg2, reg3]
     for (unsigned i = 1; i <= 3 && i < Operands.size(); ++i) {
       if (!isEvenRegister(*Operands[i])) {
-        Error(getOperandLoc(i),
-              "double-precision FPU instruction requires even-numbered register");
+        Error(
+            getOperandLoc(i),
+            "double-precision FPU instruction requires even-numbered register");
         return true;
       }
     }
@@ -683,8 +723,9 @@ bool V850AsmParser::validateFPURegisterPair(StringRef Mnemonic,
       Mnemonic == "recipf.d" || Mnemonic == "rsqrtf.d") {
     for (unsigned i = 1; i <= 2 && i < Operands.size(); ++i) {
       if (!isEvenRegister(*Operands[i])) {
-        Error(getOperandLoc(i),
-              "double-precision FPU instruction requires even-numbered register");
+        Error(
+            getOperandLoc(i),
+            "double-precision FPU instruction requires even-numbered register");
         return true;
       }
     }
@@ -696,8 +737,9 @@ bool V850AsmParser::validateFPURegisterPair(StringRef Mnemonic,
   if (Mnemonic == "cmpf.d") {
     for (unsigned i = 2; i <= 3 && i < Operands.size(); ++i) {
       if (!isEvenRegister(*Operands[i])) {
-        Error(getOperandLoc(i),
-              "double-precision FPU instruction requires even-numbered register");
+        Error(
+            getOperandLoc(i),
+            "double-precision FPU instruction requires even-numbered register");
         return true;
       }
     }
@@ -765,10 +807,11 @@ bool V850AsmParser::validateFPURegisterPair(StringRef Mnemonic,
 }
 
 bool V850AsmParser::validateSystemRegister(StringRef Mnemonic,
-                                            const OperandVector &Operands,
-                                            SMLoc IDLoc) {
+                                           const OperandVector &Operands,
+                                           SMLoc IDLoc) {
   // Only validate LDSR and STSR instructions
-  if (!Mnemonic.equals_insensitive("ldsr") && !Mnemonic.equals_insensitive("stsr"))
+  if (!Mnemonic.equals_insensitive("ldsr") &&
+      !Mnemonic.equals_insensitive("stsr"))
     return false;
 
   // Get the system register operand
@@ -818,8 +861,8 @@ bool V850AsmParser::validateSystemRegister(StringRef Mnemonic,
   }
 
   // V850E2M+ CPU bank registers (SCCFG, SCBP, exception cause registers)
-  if (Reg == V850::SCCFG || Reg == V850::SCBP ||
-      Reg == V850::EIIC || Reg == V850::FEIC || Reg == V850::DBIC) {
+  if (Reg == V850::SCCFG || Reg == V850::SCBP || Reg == V850::EIIC ||
+      Reg == V850::FEIC || Reg == V850::DBIC) {
     if (!HasV850E2M) {
       Error(SysRegOp.getStartLoc(),
             "system register requires V850E2M or later CPU");
@@ -844,16 +887,15 @@ bool V850AsmParser::validateSystemRegister(StringRef Mnemonic,
 }
 
 bool V850AsmParser::matchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
-                                             OperandVector &Operands,
-                                             MCStreamer &Out,
-                                             uint64_t &ErrorInfo,
-                                             bool MatchingInlineAsm) {
+                                            OperandVector &Operands,
+                                            MCStreamer &Out,
+                                            uint64_t &ErrorInfo,
+                                            bool MatchingInlineAsm) {
   MCInst Inst;
   FeatureBitset MissingFeatures;
 
-  auto Result =
-      MatchInstructionImpl(Operands, Inst, ErrorInfo, MissingFeatures,
-                           MatchingInlineAsm);
+  auto Result = MatchInstructionImpl(Operands, Inst, ErrorInfo, MissingFeatures,
+                                     MatchingInlineAsm);
 
   switch (Result) {
   default:
@@ -903,6 +945,7 @@ ParseStatus V850AsmParser::parseDirective(AsmToken DirectiveID) {
   return ParseStatus::NoMatch;
 }
 
-extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void LLVMInitializeV850AsmParser() {
+extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void
+LLVMInitializeV850AsmParser() {
   RegisterMCAsmParser<V850AsmParser> X(getTheV850Target());
 }
