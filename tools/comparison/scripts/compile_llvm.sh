@@ -6,7 +6,7 @@
 #
 # Options:
 #   -O<level>    Optimization level (0, 1, 2, 3, s, z)
-#   -mcpu=<cpu>  Target CPU (v850, v850e1, v850e2, v850e2m)
+#   -mcpu=<cpu>  Target CPU (v850, v850e1, v850e2, v850e2m, g3m, g3mh)
 #   -S           Output assembly only
 #   -c           Output object file only
 #   -o <file>    Output file name
@@ -115,6 +115,6 @@ echo "Done."
 # Optionally generate disassembly for object files
 if [ "$OUTPUT_TYPE" = "obj" ] && [ -x "$LLVM_OBJDUMP" ]; then
     DISASM_FILE="${OUTPUT_FILE%.o}.dis"
-    $LLVM_OBJDUMP -d "$OUTPUT_FILE" > "$DISASM_FILE" 2>/dev/null || true
+    $LLVM_OBJDUMP -mcpu=$CPU -d "$OUTPUT_FILE" > "$DISASM_FILE" 2>/dev/null || true
     echo "Disassembly: $DISASM_FILE"
 fi

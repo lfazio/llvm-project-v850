@@ -209,7 +209,12 @@ int swap_endian_32(int val) {
 }
 
 /* Packed access */
-typedef struct __attribute__((packed)) {
+#ifdef __GNUC__
+__attribute__((packed))
+#else
+#pragma pack 1
+#endif
+typedef struct {
     char a;
     int b;
     short c;

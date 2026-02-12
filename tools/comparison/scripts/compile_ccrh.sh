@@ -54,28 +54,29 @@ find_ccrh() {
     return 1
 }
 
-# CCRH=$(find_ccrh) || {
-#     echo "Error: CC-RH compiler not found."
-#     echo "Please set CCRH_PATH environment variable to CC-RH installation directory."
-#     echo "Example: export CCRH_PATH=/opt/renesas/ccrh/V2.02.00"
-#     exit 1
-# }
-CCRH="docker dev:latest --rm -v $(pwd):/llvm ccrh"
+CCRH=$(find_ccrh) || {
+    echo "Error: CC-RH compiler not found."
+    echo "Please set CCRH_PATH environment variable to CC-RH installation directory."
+    echo "Example: export CCRH_PATH=/usr/local/Renesas/CC-RH/V2.07.00/bin"
+    exit 1
+}
 echo "Using CC-RH: $CCRH"
 
 # Map CPU names between LLVM and CCRH conventions
 map_cpu() {
     case $1 in
-        v850)     echo "-Xcpu=v850" ;;
-        v850e1)   echo "-Xcpu=v850e" ;;
-        v850e2)   echo "-Xcpu=v850e2" ;;
-        v850e2m)  echo "-Xcpu=v850e2m" ;;
-        rh850g3m) echo "-Xcpu=g3m" ;;
-        rh850g3k) echo "-Xcpu=g3k" ;;
-        rh850g3kh) echo "-Xcpu=g3kh" ;;
+        v850)     echo "-Xcpu=g3mh" ;;
+        v850e1)   echo "-Xcpu=g3mh" ;;
+        v850e2)   echo "-Xcpu=g3mh" ;;
+        v850e2m)  echo "-Xcpu=g3mh" ;;
+        g3m)      echo "-Xcpu=g3mh" ;;
+        g3mh)     echo "-Xcpu=g3mh" ;;
+        rh850g3m) echo "-Xcpu=g3mh" ;;
+        rh850g3k) echo "-Xcpu=g3mh" ;;
+        rh850g3kh) echo "-Xcpu=g3mh" ;;
         rh850g3mh) echo "-Xcpu=g3mh" ;;
-        rh850g4m) echo "-Xcpu=g3kh" ;;
-        rh850g4mh) echo "-Xcpu=g3mh" ;;
+        rh850g4m) echo "-Xcpu=g4kh" ;;
+        rh850g4mh) echo "-Xcpu=g4mh" ;;
         *)        echo "-Xcpu=$1" ;;
     esac
 }
@@ -100,8 +101,8 @@ while [[ $# -gt 0 ]]; do
             OPT_LEVEL="${1#-O}"
             shift
             ;;
-        -mcpu=*)
-            CPU="${1#-mcpu=}"
+        -Xcpu=*)
+            CPU="${1#-Xcpu=}"
             shift
             ;;
         -S)
@@ -156,8 +157,9 @@ OPT_FLAG=$(map_opt "$OPT_LEVEL")
 # -g : Debug info (useful for analysis)
 # -Xasm : Output assembly listing
 COMMON_FLAGS="$CPU_FLAG $OPT_FLAG"
-COMMON_FLAGS="$COMMON_FLAGS -Xcommon=rh850"
+COMMON_FLAGS="$COMMON_FLAGS -Xcommon=rh850  -lang=c99 "
 COMMON_FLAGS="$COMMON_FLAGS $EXTRA_FLAGS"
+COMMON_FLAGS="$COMMON_FLAGS -I$CCRH_PATH/../inc"
 
 echo "Compiling: $SOURCE_FILE"
 echo "  Target: $CPU"
@@ -166,13 +168,13 @@ echo "  Output: $OUTPUT_FILE"
 
 if [ "$OUTPUT_TYPE" = "asm" ]; then
     # Generate assembly listing
-    $CCRH $COMMON_FLAGS -Xasm -c "$SOURCE_FILE" -o "${OUTPUT_FILE%.s}.o"
+    $CCRH $COMMON_FLAGS -S "$SOURCE_FILE" -o"${OUTPUT_FILE%.asm}"
     # Move/rename the .asm file if generated differently
     if [ -f "${BASENAME}.asm" ]; then
         mv "${BASENAME}.asm" "$OUTPUT_FILE"
     fi
 else
-    $CCRH $COMMON_FLAGS -c "$SOURCE_FILE" -o "$OUTPUT_FILE"
+    $CCRH $COMMON_FLAGS -c "$SOURCE_FILE" -o"$OUTPUT_FILE"
 fi
 
 echo "Done."
@@ -182,7 +184,7 @@ if [ "$OUTPUT_TYPE" = "obj" ]; then
     DISASM_FILE="${OUTPUT_FILE%.o}.dis"
     # Try CC-RH's dumper or fall back to binutils
     if command -v v850-elf-objdump &> /dev/null; then
-        v850-elf-objdump -d "$OUTPUT_FILE" > "$DISASM_FILE" 2>/dev/null || true
+        v850-elf-objdump -mcpu=$CPU -d "$OUTPUT_FILE" > "$DISASM_FILE" 2>/dev/null || true
         echo "Disassembly: $DISASM_FILE"
     fi
 fi

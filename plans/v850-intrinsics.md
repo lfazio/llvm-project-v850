@@ -18,17 +18,37 @@ This document catalogs all V850 intrinsics, their implementation status, and pro
 | Interrupt Control | 2 | 0 | 2 |
 | System Register Access | 38 | 7+ | 45+ |
 | FPU System Registers | 12 | 0 | 12 |
-| Memory Barriers | 3 | 1 | 4 |
+| Memory Barriers | 4 | 0 | 4 |
 | Bit Manipulation | 4 | 0 | 4 |
 | Byte/Halfword Swap | 3 | 0 | 3 |
 | Saturating Arithmetic | 5 | 1 | 6 |
 | Multiply-Accumulate | 2 | 0 | 2 |
 | Bit Search | 4 | 0 | 4 |
-| Atomic Operations | 1 | 3 | 4 |
-| Special Instructions | 4 | 1 | 5 |
+| Atomic Operations | 4 | 0 | 4 |
+| Special Instructions | 6 | 0 | 6 |
 | Cache Control | 0 | 2 | 2 |
 | FXU Vector (G4MH) | 0 | 59 | 59 |
-| **Total** | **78** | **72+** | **150+** |
+| **Total** | **84** | **69+** | **153+** |
+
+### G3M-Specific Instructions (All Implemented)
+
+The following RH850G3M-specific instructions and builtins are now implemented:
+
+| Instruction | Builtin | Description |
+|-------------|---------|-------------|
+| SYNCI | `__builtin_v850_synci()` | Synchronize instruction pipeline |
+| SNOOZE | `__builtin_v850_snooze()` | Enter low-power snooze state |
+| CLL | `__builtin_v850_cll()` | Clear load link state |
+| LDL.W | `__builtin_v850_ldl_w(ptr)` | Load linked word |
+| STC.W | `__builtin_v850_stc_w(ptr, val)` | Store conditional word |
+
+Additional G3M instructions (without builtins):
+- ROTL (immediate and register forms)
+- PUSHSP / POPSP (stack register push/pop)
+- LOOP (hardware loop)
+- CACHE / PREF (cache operations)
+- BINS (bitfield insert)
+- LD.DW / ST.DW (64-bit load/store)
 
 ---
 
@@ -299,7 +319,7 @@ void __builtin_v850_synce(void);
 
 ---
 
-### 5.4 SYNCI - Instruction Synchronization [TODO]
+### 5.4 SYNCI - Instruction Synchronization [IMPLEMENTED]
 
 **Architecture:** RH850G3M+
 
@@ -309,12 +329,13 @@ void __builtin_v850_synci(void);
 
 **Description:** Synchronize memory for instruction fetches. Required after self-modifying code.
 
-**Priority:** Medium
+**LLVM Intrinsic:** `@llvm.v850.synci()`
 
-**Implementation:**
-1. Add to `BuiltinsV850.def` with `rh850g3m` feature
-2. Add to `IntrinsicsV850.td`
-3. Add CodeGen pattern in `V850InstrInfo.td`
+**Files:**
+- `clang/include/clang/Basic/BuiltinsV850.def:452`
+- `clang/lib/CodeGen/TargetBuiltins/V850.cpp`
+- `llvm/include/llvm/IR/IntrinsicsV850.td`
+- `llvm/lib/Target/V850/V850InstrInfo.td` (SYNCI instruction)
 
 ---
 
@@ -709,7 +730,7 @@ Atomically: if (*addr == expected) *addr = desired; return old *addr
 
 ---
 
-### 11.2 LDL.W - Load Linked Word [TODO]
+### 11.2 LDL.W - Load Linked Word [IMPLEMENTED]
 
 **Architecture:** RH850G3M+
 
@@ -717,13 +738,20 @@ Atomically: if (*addr == expected) *addr = desired; return old *addr
 unsigned int __builtin_v850_ldl_w(volatile unsigned int *ptr);
 ```
 
-**Description:** Load linked - establishes exclusive monitor.
+**Description:** Load linked - establishes exclusive monitor for lock-free synchronization.
+Similar to ARM's LDREX or RISC-V's LR instruction.
 
-**Priority:** High
+**LLVM Intrinsic:** `@llvm.v850.ldl.w(ptr %ptr)`
+
+**Files:**
+- `clang/include/clang/Basic/BuiltinsV850.def:467`
+- `clang/lib/CodeGen/TargetBuiltins/V850.cpp`
+- `llvm/include/llvm/IR/IntrinsicsV850.td`
+- `llvm/lib/Target/V850/V850InstrInfo.td` (LDL_W instruction)
 
 ---
 
-### 11.3 STC.W - Store Conditional Word [TODO]
+### 11.3 STC.W - Store Conditional Word [IMPLEMENTED]
 
 **Architecture:** RH850G3M+
 
@@ -731,13 +759,20 @@ unsigned int __builtin_v850_ldl_w(volatile unsigned int *ptr);
 int __builtin_v850_stc_w(volatile unsigned int *ptr, unsigned int value);
 ```
 
-**Description:** Store conditional - succeeds only if exclusive monitor intact. Returns 1 on success.
+**Description:** Store conditional - succeeds only if exclusive monitor intact. Returns 1 on success, 0 on failure.
+Similar to ARM's STREX or RISC-V's SC instruction.
 
-**Priority:** High
+**LLVM Intrinsic:** `@llvm.v850.stc.w(ptr %ptr, i32 %value)`
+
+**Files:**
+- `clang/include/clang/Basic/BuiltinsV850.def:473`
+- `clang/lib/CodeGen/TargetBuiltins/V850.cpp`
+- `llvm/include/llvm/IR/IntrinsicsV850.td`
+- `llvm/lib/Target/V850/V850InstrInfo.td` (STC_W instruction)
 
 ---
 
-### 11.4 CLL - Clear Load Link [TODO]
+### 11.4 CLL - Clear Load Link [IMPLEMENTED]
 
 **Architecture:** RH850G3M+
 
@@ -745,9 +780,15 @@ int __builtin_v850_stc_w(volatile unsigned int *ptr, unsigned int value);
 void __builtin_v850_cll(void);
 ```
 
-**Description:** Clears load-link state.
+**Description:** Clears load-link state. Used to release exclusive monitor without storing.
 
-**Priority:** Medium
+**LLVM Intrinsic:** `@llvm.v850.cll()`
+
+**Files:**
+- `clang/include/clang/Basic/BuiltinsV850.def:462`
+- `clang/lib/CodeGen/TargetBuiltins/V850.cpp`
+- `llvm/include/llvm/IR/IntrinsicsV850.td`
+- `llvm/lib/Target/V850/V850InstrInfo.td` (CLL instruction)
 
 ---
 
@@ -866,7 +907,7 @@ void __builtin_v850_fetrap(unsigned int vector);
 
 ---
 
-### 13.5 SNOOZE [TODO]
+### 13.5 SNOOZE [IMPLEMENTED]
 
 **Architecture:** RH850G3M+
 
@@ -874,15 +915,21 @@ void __builtin_v850_fetrap(unsigned int vector);
 void __builtin_v850_snooze(void);
 ```
 
-**Description:** Low-power spin-wait.
+**Description:** Low-power spin-wait. Enters a low-power state waiting for an interrupt.
 
-**Priority:** Low
+**LLVM Intrinsic:** `@llvm.v850.snooze()`
+
+**Files:**
+- `clang/include/clang/Basic/BuiltinsV850.def`
+- `clang/lib/CodeGen/TargetBuiltins/V850.cpp`
+- `llvm/include/llvm/IR/IntrinsicsV850.td`
+- `llvm/lib/Target/V850/V850InstrInfo.td` (SNOOZE instruction)
 
 ---
 
-## 14. Data Manipulation Intrinsics [TODO]
+## 14. Data Manipulation Intrinsics [PARTIAL]
 
-### 14.1 BINS - Bitfield Insert [TODO]
+### 14.1 BINS - Bitfield Insert [PARTIAL]
 
 **Architecture:** RH850G3M+
 
@@ -893,11 +940,17 @@ unsigned int __builtin_v850_bins(unsigned int src, unsigned int dst,
 
 **Description:** Insert bitfield: `dst[pos+width-1:pos] = src[width-1:0]`
 
+**Instruction Status:** IMPLEMENTED in `V850InstrInfo.td`
+- Three encoding variants (BINS0, BINS1, BINS2) based on msb/lsb range
+- Assembler always uses variant 0; disassembler handles all variants
+
+**Intrinsic Status:** TODO - Clang builtin not yet implemented
+
 **Priority:** Medium
 
 ---
 
-### 14.2 ROTL - Rotate Left [TODO]
+### 14.2 ROTL - Rotate Left [PARTIAL]
 
 **Architecture:** RH850G3M+
 
@@ -907,7 +960,14 @@ unsigned int __builtin_v850_rotl(unsigned int x, unsigned int count);
 
 **Description:** Rotate left by count bits.
 
-**Priority:** Medium (maps to `__builtin_rotateleft32`)
+**Instruction Status:** IMPLEMENTED in `V850InstrInfo.td`
+- ROTL_imm5: Rotate left by 5-bit immediate (0-31)
+- ROTL_reg: Rotate left by register value
+
+**Intrinsic Status:** TODO - Clang builtin not yet implemented
+(Can use `__builtin_rotateleft32` which maps to LLVM's `fshl` intrinsic)
+
+**Priority:** Medium
 
 ---
 
@@ -1007,21 +1067,21 @@ def : Pat<(int_v850_xxx args), (XXX args)>;
 
 ### Phase 1 (High Priority) - COMPLETE
 1. ~~Bit search: SCH1L, SCH1R, SCH0L, SCH0R~~ [DONE]
-2. ~~Atomics: CAXI~~ [DONE], LDL.W, STC.W (require RH850G3M+)
-3. SYNCI memory barrier (requires RH850G3M+)
+2. ~~Atomics: CAXI~~ [DONE], ~~LDL.W, STC.W~~ [DONE] (G3M builtins)
+3. ~~SYNCI memory barrier~~ [DONE] (G3M builtin)
 4. ~~HALT instruction~~ [DONE]
 
 ### Phase 2 (Medium Priority)
-1. Cache: CACHE, PREF
-2. Data manipulation: BINS, ROTL
-3. Additional system registers
+1. Cache: CACHE, PREF (instructions exist, builtins TODO)
+2. Data manipulation: BINS (instruction exists, builtin TODO)
+3. Additional system registers (G3M groups 1-7, see plan-v850-g3m-g3mh.md)
 4. ~~TRAP, SYSCALL~~ [DONE]
 
 ### Phase 3 (Low Priority)
 1. ~~HSH halfword swap~~ [DONE]
 2. ~~3-operand saturating arithmetic~~ [DONE]
-3. SNOOZE, ~~FETRAP~~ [DONE]
-4. CLL (clear load link)
+3. ~~SNOOZE~~ [DONE], ~~FETRAP~~ [DONE]
+4. ~~CLL (clear load link)~~ [DONE]
 
 ### Phase 4 (Future)
 1. FXU vector intrinsics (59 total)
@@ -1050,6 +1110,7 @@ def : Pat<(int_v850_xxx args), (XXX args)>;
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-02-11 | 1.6 | Updated G3M intrinsics status: SYNCI, SNOOZE, CLL, LDL.W, STC.W all DONE; created plan-v850-g3m-g3mh.md for remaining features |
 | 2026-01-18 | 1.5 | Added special instruction intrinsics (HALT, TRAP, SYSCALL, FETRAP) |
 | 2026-01-18 | 1.4 | Added HSH, SATADD3, SATSUB3 intrinsics |
 | 2026-01-18 | 1.3 | Added bit search intrinsics (SCH1L, SCH1R, SCH0L, SCH0R) and CAXI atomic CAS |

@@ -284,9 +284,9 @@ Track discovered issues in categories:
   - bitwise.c - Bitwise and bit manipulation
   - control_flow.c - Branching, loops, switch
   - memory.c - Load/store patterns
-- [ ] Compile with both compilers
-- [ ] Generate initial comparison data
-- [ ] Document first findings
+- [x] Compile with LLVM (CCRH requires commercial license)
+- [x] Generate initial comparison data
+- [x] Document first findings (comparison_analysis.md)
 
 ### Phase 3: Analysis Tools [PARTIAL]
 - [ ] Implement object file analyzer
@@ -299,9 +299,9 @@ Track discovered issues in categories:
   - dsp.c - DSP algorithms (FIR, IIR, convolution)
   - matrix.c - Matrix operations
   - crypto.c - Cryptographic primitives (CRC, AES, XTEA)
-- [ ] Run full comparison suite
-- [ ] Identify optimization opportunities
-- [ ] Document LLVM backend improvements needed
+- [x] Run full comparison suite (LLVM only)
+- [x] Identify optimization opportunities (ADF/SBF, MOVi32 - now fixed)
+- [x] Document LLVM backend improvements needed (comparison_analysis.md)
 
 ### Phase 4.5: Application Benchmarks [COMPLETE]
 - [x] Implement application benchmarks

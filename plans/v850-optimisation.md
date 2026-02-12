@@ -76,8 +76,36 @@ This document catalogs all optimizations for the V850 LLVM backend, indicating t
 **V850E2M Support:**
 - CAXI instruction for 32-bit compare-and-swap
 - Expansion for 8-bit and 16-bit atomics
+- Custom lowering of ATOMIC_FENCE to SYNCP instruction
+- Custom lowering of ATOMIC_LOAD/ATOMIC_STORE (i32) to regular load/store
+- `shouldInsertFencesForAtomic()` returns true for loads/stores, causing AtomicExpandPass
+  to insert SYNCP fences for ordered atomics and reduce ordering to monotonic
+- `MaxAtomicInlineWidth = 32` in Clang TargetInfo enables lock-free atomics
 
-**Status:** Integrated via `createAtomicExpandLegacyPass()`
+**RH850G3M Support:**
+- LDL.W (load linked) instruction for exclusive access
+- STC.W (store conditional) instruction for atomic store
+- CLL (clear link) instruction to clear link state
+- Intrinsics: `__builtin_v850_ldl_w()`, `__builtin_v850_stc_w()`, `__builtin_v850_cll()`
+- Note: stdatomic currently uses CAXI path (V850E2M), NOT LDL.W/STC.W
+
+**Fence Placement (single-core in-order):**
+| Operation | Fences |
+|-----------|--------|
+| Relaxed load | (none) |
+| Acquire load | trailing SYNCP |
+| Seq_cst load | trailing SYNCP |
+| Relaxed store | (none) |
+| Release store | leading SYNCP |
+| Seq_cst store | leading + trailing SYNCP |
+
+**Files:**
+- `llvm/lib/Target/V850/V850ISelLowering.cpp` - Custom lowering
+- `llvm/lib/Target/V850/V850ISelLowering.h` - Declarations
+- `clang/lib/Basic/Targets/V850.cpp` - MaxAtomicInlineWidth
+- `llvm/test/CodeGen/V850/atomic-load-store.ll` - Tests
+
+**Status:** Fully implemented via `createAtomicExpandLegacyPass()` + custom lowering
 
 ---
 
@@ -511,13 +539,32 @@ to properly unwind the stack during debugging or exception handling.
 
 ---
 
-### 4.4 RH850G3M Scheduling [TODO]
+### 4.4 RH850G3M Scheduling [IMPLEMENTED]
 
-**Description:** Scheduling model for G3M variants with improved timing.
+**File:** `llvm/lib/Target/V850/V850SchedRH850G3M.td`
 
-**Requirements:** Document G3M-specific timing differences
+**Description:** Scheduling model for G3M/G3MH variants with improved timing over V850E2M.
 
-**Priority:** Low
+**Key Differences from V850E2M:**
+- Division: 19 cycles (was 36)
+- DIVQ/DIVQU: N+3 cycles (was N+5)
+- DIVF.S: 14 cycles (was 35), DIVF.D: 30 cycles (was 64)
+- SQRTF.S: 14 cycles (was 30), SQRTF.D: 30 cycles (was 60)
+- RECIPF.S: 10, RECIPF.D: 26, RSQRTF.S: 14, RSQRTF.D: 36
+- LDSR: 3 cycles (was 4)
+- Branch prediction support (1 cycle predicted, 4 mispredict)
+- G3M-specific instructions: LD.DW, ST.DW, LDL.W, STC.W, CLL, ROTL, BINS,
+  PUSHSP, POPSP, LOOP, CACHE, PREF, SYNCI, SNOOZE, Bcond disp17
+
+**Implementation Details:**
+- `RH850G3MModel`: Dual-issue, in-order, same pipeline structure as V850E2M
+- InstRW overrides for all G3M-specific instructions
+- InstRW overrides for RECIPF/RSQRTF with separate latencies
+- New SchedWrite types: WriteLDDW, WriteSTDW, WriteLDLW, WriteSTCW, WriteCLL,
+  WriteROTL, WriteBINS, WritePUSHSP, WritePOPSP, WriteLOOP, WriteCACHE,
+  WriteG3MPREF, WriteSYNCI, WriteSNOOZE
+
+**Status:** Fully implemented
 
 ---
 
@@ -995,12 +1042,19 @@ varargs_receiver:
 
 ---
 
-### 10.7 Cache Control Intrinsics [TODO]
+### 10.7 Cache Control Intrinsics [PARTIAL]
 
 **Intrinsics:**
-- `__builtin_v850_cache()` - Cache operations
+- `__builtin_v850_cache()` - Cache operations (TODO)
+- `__builtin_v850_pref()` - Prefetch hint (TODO)
 
-**Requirements:** V850E2M or later
+**Instruction Status:** IMPLEMENTED in `V850InstrInfo.td`
+- CACHE instruction with 7-bit cacheop encoding (G3M+)
+- PREF instruction for prefetch hint (G3M+)
+
+**Intrinsic Status:** TODO - Clang builtins not yet implemented
+
+**Requirements:** RH850G3M or later
 
 **Priority:** Low
 
@@ -1028,6 +1082,8 @@ varargs_receiver:
 17. ~~FP Constant Folding (7.3)~~ - DONE (LLVM infrastructure, IEEE 754 compliant)
 18. ~~Varargs Support (9.3)~~ - DONE (V850MachineFunctionInfo, LowerVASTART, fixed CALL ISel)
 19. ~~ADF/SBF 64-bit Arithmetic (2.3)~~ - DONE (ADDC/ADDE→ADF, SUBC/SUBE→SBF for V850E2+)
+20. ~~Atomic Load/Store/Fence (1.4)~~ - DONE (custom lowering, shouldInsertFencesForAtomic, SYNCP fences)
+21. ~~RH850G3M Scheduling (4.4)~~ - DONE (faster div/FPU, branch prediction, G3M-specific instructions)
 
 ### High Priority (Next Phase)
 - None currently queued
@@ -1039,8 +1095,7 @@ varargs_receiver:
 1. Post-Increment Addressing (6.2) - RH850 only, not available on V850E2M
 
 ### Low Priority / Future
-1. RH850G3M Scheduling (4.4)
-2. RH850G4MH Scheduling (4.5)
+1. RH850G4MH Scheduling (4.5)
 3. Hardware Loop Support (6.1)
 4. Loop Strength Reduction (6.3)
 5. Memory Barrier Optimization (8.3)
@@ -1126,6 +1181,8 @@ Metrics to track:
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-02-11 | 1.7 | Added atomic load/store/fence custom lowering (SYNCP fences, shouldInsertFencesForAtomic, MaxAtomicInlineWidth) |
+| 2026-02-11 | 1.6 | Added RH850G3M scheduling model (faster div/FPU, branch prediction, G3M-specific instructions) |
 | 2026-02-07 | 1.5 | Added ADF/SBF 64-bit arithmetic (efficient ADDC/ADDE/SUBC/SUBE for V850E2+) |
 | 2026-01-21 | 1.4 | Added Post-RA Scheduler implementation (anti-dependency breaking, dual-issue optimization) |
 | 2026-01-21 | 1.3 | Added Peephole Optimizer implementation (MOV+ADD folding, ANDI removal, copy propagation) |

@@ -140,18 +140,20 @@ def run_ccrh_compile(source: Path, opt_level: str, cpu: str,
         )
 
     cmd_asm = [
+        "docker", "run", "--rm", "-e", f"CCRH_PATH={os.environ.get('CCRH_PATH')}", "-v", f"{SCRIPT_DIR.parent.parent.parent}:{SCRIPT_DIR.parent.parent.parent}", "-t", "dev:latest",
         str(compile_script),
         f"-O{opt_level}",
-        f"-mcpu={cpu}",
+        f"-Xcpu={cpu}",
         "-S",
         "-o", str(asm_file),
         str(source)
     ]
 
     cmd_obj = [
+        "docker", "run", "--rm", "-e", f"CCRH_PATH={os.environ.get('CCRH_PATH')}", "-v", f"{SCRIPT_DIR.parent.parent.parent}:{SCRIPT_DIR.parent.parent.parent}", "-t", "dev:latest",
         str(compile_script),
         f"-O{opt_level}",
-        f"-mcpu={cpu}",
+        f"-Xcpu={cpu}",
         "-c",
         "-o", str(obj_file),
         str(source)
@@ -204,6 +206,7 @@ def compare_results(llvm_result: BenchmarkResult,
     report_file = output_dir / f"{llvm_result.name}_comparison.txt"
 
     cmd = [
+        "docker", "run", "--rm", "-e", f"CCRH_PATH={os.environ.get('CCRH_PATH')}", "-v", f"{SCRIPT_DIR.parent.parent.parent}:{SCRIPT_DIR.parent.parent.parent}", "-t", "dev:latest",
         sys.executable,
         str(compare_script),
         llvm_result.asm_file,
@@ -299,7 +302,7 @@ def main():
                        help="Only compile with CCRH")
     parser.add_argument("--opt-level", "-O", default="2",
                        help="Optimization level")
-    parser.add_argument("--cpu", default="v850e2m",
+    parser.add_argument("--cpu", default="rh850g3m",
                        help="Target CPU")
     parser.add_argument("--output-dir", "-o", type=Path, default=RESULTS_DIR,
                        help="Output directory")
