@@ -68,6 +68,25 @@ def WriteDISPOSE    : SchedWrite;    // DISPOSE (epilogue)
 def WriteCALLT      : SchedWrite;    // CALLT (table call)
 
 //===----------------------------------------------------------------------===//
+// RH850G3M-Specific Write Types
+//===----------------------------------------------------------------------===//
+
+def WriteLDDW       : SchedWrite;    // 64-bit load (LD.DW)
+def WriteSTDW       : SchedWrite;    // 64-bit store (ST.DW)
+def WriteLDLW       : SchedWrite;    // Load linked (LDL.W)
+def WriteSTCW       : SchedWrite;    // Store conditional (STC.W)
+def WriteROTL       : SchedWrite;    // Rotate left (ROTL)
+def WriteBINS       : SchedWrite;    // Bitfield insert (BINS)
+def WritePUSHSP     : SchedWrite;    // Push to stack (PUSHSP)
+def WritePOPSP      : SchedWrite;    // Pop from stack (POPSP)
+def WriteLOOP       : SchedWrite;    // Hardware loop (LOOP)
+def WriteCACHE      : SchedWrite;    // Cache operation (CACHE)
+def WriteG3MPREF    : SchedWrite;    // Prefetch (PREF)
+def WriteSYNCI      : SchedWrite;    // Instruction sync (SYNCI)
+def WriteSNOOZE     : SchedWrite;    // Low-power snooze (SNOOZE)
+def WriteCLL        : SchedWrite;    // Clear load link (CLL)
+
+//===----------------------------------------------------------------------===//
 // FPU Write Types (V850E2M only)
 //===----------------------------------------------------------------------===//
 
@@ -227,6 +246,24 @@ def : ReadAdvance<ReadStoreData, 0>;
 def : ReadAdvance<ReadJmp, 0>;
 def : ReadAdvance<ReadBranch, 0>;
 def : ReadAdvance<ReadCMOV, 0>;
+
+// G3M write resources - mark as unsupported for base V850
+let Unsupported = true in {
+  def : WriteRes<WriteLDDW, []>;
+  def : WriteRes<WriteSTDW, []>;
+  def : WriteRes<WriteLDLW, []>;
+  def : WriteRes<WriteSTCW, []>;
+  def : WriteRes<WriteROTL, []>;
+  def : WriteRes<WriteBINS, []>;
+  def : WriteRes<WritePUSHSP, []>;
+  def : WriteRes<WritePOPSP, []>;
+  def : WriteRes<WriteLOOP, []>;
+  def : WriteRes<WriteCACHE, []>;
+  def : WriteRes<WriteG3MPREF, []>;
+  def : WriteRes<WriteSYNCI, []>;
+  def : WriteRes<WriteSNOOZE, []>;
+  def : WriteRes<WriteCLL, []>;
+}
 
 // FPU write resources - mark as unsupported for base V850
 let Unsupported = true in {

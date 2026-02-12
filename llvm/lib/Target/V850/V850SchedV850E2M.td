@@ -164,6 +164,24 @@ def : WriteRes<WriteDISPOSE, [V850E2MLpipe]> {
 // CALLT: 10-10-10
 def : WriteRes<WriteCALLT, [V850E2MUnitBranch]> { let Latency = 10; }
 
+// G3M write resources - mark as unsupported for V850E2M
+let Unsupported = true in {
+  def : WriteRes<WriteLDDW, []>;
+  def : WriteRes<WriteSTDW, []>;
+  def : WriteRes<WriteLDLW, []>;
+  def : WriteRes<WriteSTCW, []>;
+  def : WriteRes<WriteROTL, []>;
+  def : WriteRes<WriteBINS, []>;
+  def : WriteRes<WritePUSHSP, []>;
+  def : WriteRes<WritePOPSP, []>;
+  def : WriteRes<WriteLOOP, []>;
+  def : WriteRes<WriteCACHE, []>;
+  def : WriteRes<WriteG3MPREF, []>;
+  def : WriteRes<WriteSYNCI, []>;
+  def : WriteRes<WriteSNOOZE, []>;
+  def : WriteRes<WriteCLL, []>;
+}
+
 //===----------------------------------------------------------------------===//
 // V850E2M FPU Instruction Latencies
 //
