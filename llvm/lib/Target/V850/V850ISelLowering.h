@@ -26,14 +26,14 @@ class V850Subtarget;
 namespace V850ISD {
 enum NodeType : unsigned {
   FIRST_NUMBER = ISD::BUILTIN_OP_END,
-  RET_GLUE,    // Return with a glue operand
-  CALL,        // Function call
-  TAIL,        // Tail call
-  WRAPPER,     // Global address wrapper
-  GPRel,       // GP-relative address (small data section)
-  BR_CC,       // Branch on condition code
-  CMP,         // Compare
-  SELECT_CC,   // Select with condition code
+  RET_GLUE,  // Return with a glue operand
+  CALL,      // Function call
+  TAIL,      // Tail call
+  WRAPPER,   // Global address wrapper
+  GPRel,     // GP-relative address (small data section)
+  BR_CC,     // Branch on condition code
+  CMP,       // Compare
+  SELECT_CC, // Select with condition code
 
   // Multiply operations (V850E1+)
   // SMUL: Signed 32x32->64 multiply, returns (low, high)
@@ -65,8 +65,8 @@ enum NodeType : unsigned {
   CLR1_MEM,
   // NOT1_MEM: Toggle bit in memory byte - chain = NOT1_MEM chain, addr, bitnum
   NOT1_MEM,
-  // TST1_MEM: Test bit in memory - (result, chain) = TST1_MEM chain, addr, bitnum
-  // Returns 1 if bit was 0 (Z flag set), 0 otherwise
+  // TST1_MEM: Test bit in memory - (result, chain) = TST1_MEM chain, addr,
+  // bitnum Returns 1 if bit was 0 (Z flag set), 0 otherwise
   TST1_MEM,
 
   // BR_JT: Jump table branch using SWITCH instruction (V850E1+)
@@ -112,6 +112,9 @@ public:
   SDValue LowerINTRINSIC_W_CHAIN(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerBR_JT(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerVASTART(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerATOMIC_FENCE(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerATOMIC_LOAD(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerATOMIC_STORE(SDValue Op, SelectionDAG &DAG) const;
 
   /// getJumpTableEncoding - Return the entry encoding for jump tables.
   /// V850E1+ uses inline jump tables with SWITCH instruction.
@@ -135,6 +138,8 @@ public:
 
   TargetLowering::AtomicExpansionKind
   shouldExpandAtomicRMWInIR(AtomicRMWInst *AI) const override;
+
+  bool shouldInsertFencesForAtomic(const Instruction *I) const override;
 
   // Custom instruction insertion for pseudo instructions
   MachineBasicBlock *
@@ -160,8 +165,7 @@ private:
   bool CanLowerReturn(CallingConv::ID CallConv, MachineFunction &MF,
                       bool IsVarArg,
                       const SmallVectorImpl<ISD::OutputArg> &Outs,
-                      LLVMContext &Context,
-                      const Type *RetTy) const override;
+                      LLVMContext &Context, const Type *RetTy) const override;
 
   SDValue LowerReturn(SDValue Chain, CallingConv::ID CallConv, bool isVarArg,
                       const SmallVectorImpl<ISD::OutputArg> &Outs,

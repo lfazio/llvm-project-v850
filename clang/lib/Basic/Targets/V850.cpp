@@ -36,18 +36,16 @@ static constexpr auto BuiltinInfos = Builtin::MakeInfos<NumBuiltins>({
 });
 
 const char *const V850TargetInfo::GCCRegNames[] = {
-    "r0",  "r1",  "r2",  "r3",  "r4",  "r5",  "r6",  "r7",
-    "r8",  "r9",  "r10", "r11", "r12", "r13", "r14", "r15",
-    "r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23",
-    "r24", "r25", "r26", "r27", "r28", "r29", "r30", "r31"
-};
+    "r0",  "r1",  "r2",  "r3",  "r4",  "r5",  "r6",  "r7",  "r8",  "r9",  "r10",
+    "r11", "r12", "r13", "r14", "r15", "r16", "r17", "r18", "r19", "r20", "r21",
+    "r22", "r23", "r24", "r25", "r26", "r27", "r28", "r29", "r30", "r31"};
 
 ArrayRef<const char *> V850TargetInfo::getGCCRegNames() const {
   return llvm::ArrayRef(GCCRegNames);
 }
 
 void V850TargetInfo::getTargetDefines(const LangOptions &Opts,
-                                       MacroBuilder &Builder) const {
+                                      MacroBuilder &Builder) const {
   Builder.defineMacro("__v850__");
   Builder.defineMacro("__V850__");
   Builder.defineMacro("__v850");
@@ -109,7 +107,7 @@ void V850TargetInfo::getTargetDefines(const LangOptions &Opts,
     // Bit 1 = single precision (32-bit)
     // Bit 2 = double precision (64-bit)
     // V850E2M FPU supports both single and double precision
-    Builder.defineMacro("__V850_FP__", "0x6");  // SP + DP
+    Builder.defineMacro("__V850_FP__", "0x6"); // SP + DP
 
     // FMA support - V850E2M has MADDF.S/MSUBF.S instructions
     Builder.defineMacro("__V850_FEATURE_FMA__", "1");
@@ -169,6 +167,14 @@ bool V850TargetInfo::setCPU(const std::string &Name) {
   // V850E2M and later have FPU by default (includes RH850 variants)
   HasFPU = (CPU >= CK_V850E2M);
 
+  // V850E2M has CAXI (compare-and-exchange) for 32-bit atomics.
+  // V850 is single-core in-order, so aligned loads/stores up to 32-bit
+  // are inherently atomic.
+  if (CPU >= CK_V850E2M) {
+    MaxAtomicInlineWidth = 32;
+    MaxAtomicPromoteWidth = 32;
+  }
+
   return CPU != CK_NONE;
 }
 
@@ -176,7 +182,8 @@ bool V850TargetInfo::initFeatureMap(
     llvm::StringMap<bool> &Features, DiagnosticsEngine &Diags, StringRef CPU,
     const std::vector<std::string> &FeaturesVec) const {
   // Enable features based on CPU variant
-  // Features are cumulative: g3mh includes g3m includes v850e2m includes v850e2 includes v850e1
+  // Features are cumulative: g3mh includes g3m includes v850e2m includes v850e2
+  // includes v850e1
   CPUKind CpuKind = llvm::StringSwitch<CPUKind>(CPU)
                         .Case("v850", CK_V850)
                         .Case("v850e1", CK_V850E1)
@@ -219,7 +226,7 @@ bool V850TargetInfo::initFeatureMap(
 }
 
 bool V850TargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
-                                           DiagnosticsEngine &Diags) {
+                                          DiagnosticsEngine &Diags) {
   for (const auto &Feature : Features) {
     if (Feature == "+v850fpu")
       HasFPU = true;

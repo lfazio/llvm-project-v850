@@ -188,6 +188,14 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
   if (STI.hasV850E2M()) {
     setMaxAtomicSizeInBitsSupported(32);
     setMinCmpXchgSizeInBits(32);
+    // V850E2M has SYNCP/SYNCM/SYNCE barrier instructions
+    setOperationAction(ISD::ATOMIC_FENCE, MVT::Other, Custom);
+    // Atomic loads/stores are custom-lowered to regular loads/stores.
+    // V850 is single-core in-order, so aligned loads/stores are inherently
+    // atomic. Memory ordering is handled by fences (SYNCP) inserted by
+    // shouldInsertFencesForAtomic().
+    setOperationAction(ISD::ATOMIC_LOAD, MVT::i32, Custom);
+    setOperationAction(ISD::ATOMIC_STORE, MVT::i32, Custom);
   } else {
     setMaxAtomicSizeInBitsSupported(0);
   }
@@ -325,6 +333,12 @@ SDValue V850TargetLowering::LowerOperation(SDValue Op,
     return LowerBR_JT(Op, DAG);
   case ISD::VASTART:
     return LowerVASTART(Op, DAG);
+  case ISD::ATOMIC_FENCE:
+    return LowerATOMIC_FENCE(Op, DAG);
+  case ISD::ATOMIC_LOAD:
+    return LowerATOMIC_LOAD(Op, DAG);
+  case ISD::ATOMIC_STORE:
+    return LowerATOMIC_STORE(Op, DAG);
   }
 }
 
@@ -695,6 +709,59 @@ SDValue V850TargetLowering::LowerVASTART(SDValue Op, SelectionDAG &DAG) const {
   const Value *SV = cast<SrcValueSDNode>(Op.getOperand(2))->getValue();
   return DAG.getStore(Op.getOperand(0), DL, FI, Op.getOperand(1),
                       MachinePointerInfo(SV));
+}
+
+SDValue V850TargetLowering::LowerATOMIC_FENCE(SDValue Op,
+                                              SelectionDAG &DAG) const {
+  SDLoc DL(Op);
+  AtomicOrdering Ord = static_cast<AtomicOrdering>(Op.getConstantOperandVal(1));
+
+  // For V850E2M+, use SYNCP as the hardware memory barrier.
+  // SYNCP is the strongest barrier (full pipeline synchronization).
+  // For weaker orderings we could use SYNCM or SYNCE, but SYNCP is always safe.
+  if (Ord != AtomicOrdering::NotAtomic) {
+    return SDValue(
+        DAG.getMachineNode(V850::SYNCP, DL, MVT::Other, Op.getOperand(0)), 0);
+  }
+
+  // For NotAtomic, just return the chain (compiler fence only).
+  return Op.getOperand(0);
+}
+
+SDValue V850TargetLowering::LowerATOMIC_LOAD(SDValue Op,
+                                             SelectionDAG &DAG) const {
+  auto *Node = cast<AtomicSDNode>(Op.getNode());
+  SDLoc DL(Op);
+
+  // V850 is single-core in-order, so aligned loads are inherently atomic.
+  // Convert atomic load to a regular load. Memory ordering is handled by
+  // fences inserted by shouldInsertFencesForAtomic().
+  assert(Node->getMemoryVT() == MVT::i32 && "Expected i32 atomic load");
+  return DAG.getLoad(MVT::i32, DL, Node->getChain(), Node->getBasePtr(),
+                     Node->getMemOperand());
+}
+
+SDValue V850TargetLowering::LowerATOMIC_STORE(SDValue Op,
+                                              SelectionDAG &DAG) const {
+  auto *Node = cast<AtomicSDNode>(Op.getNode());
+  SDLoc DL(Op);
+
+  // V850 is single-core in-order, so aligned stores are inherently atomic.
+  // Convert atomic store to a regular store. Memory ordering is handled by
+  // fences inserted by shouldInsertFencesForAtomic().
+  assert(Node->getMemoryVT() == MVT::i32 && "Expected i32 atomic store");
+  return DAG.getStore(Node->getChain(), DL, Node->getVal(), Node->getBasePtr(),
+                      Node->getMemOperand());
+}
+
+bool V850TargetLowering::shouldInsertFencesForAtomic(
+    const Instruction *I) const {
+  // V850 is single-core in-order. Atomic loads/stores are regular loads/stores
+  // with fences for ordering. Insert fences around atomic load/store to handle
+  // acquire/release/seq_cst ordering, and reduce the atomic to monotonic.
+  if (isa<LoadInst>(I) || isa<StoreInst>(I))
+    return true;
+  return false;
 }
 
 //===----------------------------------------------------------------------===//

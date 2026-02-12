@@ -2035,6 +2035,11 @@ let Predicates = [HasV850E2M] in {
   // Intrinsic pattern for CAXI
   def : Pat<(int_v850_caxi GPR:$addr, GPR:$expected, GPR:$new),
             (CAXI GPR:$addr, GPR:$expected, GPR:$new)>;
+
+  // Note: Atomic load/store patterns are NOT needed here.
+  // V850ISelLowering custom-lowers ATOMIC_LOAD/ATOMIC_STORE to regular
+  // load/store DAG nodes. Memory ordering is handled by fences (SYNCP)
+  // inserted by shouldInsertFencesForAtomic().
 }
 
 // V850E2M intrinsic patterns (separate from DecoderNamespace block)
