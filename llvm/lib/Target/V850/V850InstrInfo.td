@@ -712,12 +712,14 @@ def MULHI : FormatVI<0b110111, (outs GPR:$reg2), (ins GPR:$reg1, simm16:$imm16),
 
 // Bcond class for conditional branches
 // Opcode: 1011 (4 bits)
+// Uses PSW since all conditional branches read the condition code flags.
 class Bcond<bits<4> cc, string mnemonic>
     : FormatIII<0b1011, (outs), (ins brtarget9:$disp9),
                 mnemonic#"\t$disp9", []> {
   let cond = cc;
   let isBranch = 1;
   let isTerminator = 1;
+  let Uses = [PSW];
 }
 
 def BV : Bcond<0b0000, "bv">;   // Overflow
@@ -767,6 +769,7 @@ class Bcond17<bits<4> cc, string mnemonic>
 
   let isBranch = 1;
   let isTerminator = 1;
+  let Uses = [PSW];
 }
 
 // Extended conditional branch instructions (RH850G3M+)
