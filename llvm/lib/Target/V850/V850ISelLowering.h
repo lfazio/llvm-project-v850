@@ -141,6 +141,14 @@ public:
 
   bool shouldInsertFencesForAtomic(const Instruction *I) const override;
 
+  // LL/SC support for RH850G3M (LDL.W/STC.W)
+  Value *emitLoadLinked(IRBuilderBase &Builder, Type *ValueTy, Value *Addr,
+                        AtomicOrdering Ord) const override;
+  Value *emitStoreConditional(IRBuilderBase &Builder, Value *Val, Value *Addr,
+                              AtomicOrdering Ord) const override;
+  void emitAtomicCmpXchgNoStoreLLBalance(
+      IRBuilderBase &Builder) const override;
+
   // Custom instruction insertion for pseudo instructions
   MachineBasicBlock *
   EmitInstrWithCustomInserter(MachineInstr &MI,

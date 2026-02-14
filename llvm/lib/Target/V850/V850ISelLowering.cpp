@@ -28,6 +28,7 @@
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/IntrinsicsV850.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -1638,14 +1639,74 @@ V850TargetLowering::shouldExpandAtomicCmpXchgInIR(AtomicCmpXchgInst *CI) const {
 
 TargetLowering::AtomicExpansionKind
 V850TargetLowering::shouldExpandAtomicRMWInIR(AtomicRMWInst *AI) const {
-  // V850E2M only has compare-and-swap, no atomic RMW instructions
-  // Expand atomic RMW to compare-and-swap loop when V850E2M is available
   unsigned Size = AI->getType()->getPrimitiveSizeInBits();
-  if (Subtarget.hasV850E2M() && Size == 32)
+  if (Size != 32)
+    return AtomicExpansionKind::None;
+
+  // RH850G3M has LDL.W/STC.W (load-linked/store-conditional) which is more
+  // efficient for atomic RMW than CAXI-based CAS loops. LDL.W/STC.W avoids
+  // the double-load overhead of compare-and-swap.
+  if (Subtarget.hasRH850G3M())
+    return AtomicExpansionKind::LLSC;
+
+  // V850E2M has CAXI for 32-bit compare-and-swap
+  if (Subtarget.hasV850E2M())
     return AtomicExpansionKind::CmpXChg;
 
-  // For other sizes or without V850E2M, use library calls
   return AtomicExpansionKind::None;
+}
+
+Value *V850TargetLowering::emitLoadLinked(IRBuilderBase &Builder,
+                                          Type *ValueTy, Value *Addr,
+                                          AtomicOrdering Ord) const {
+  // Use LDL.W (load-linked) intrinsic for G3M.
+  // V850's LDL.W has no ordering variants, so emit explicit SYNCP fence
+  // for release/acq_rel/seq_cst orderings (leading fence).
+  Module *M = Builder.GetInsertBlock()->getModule();
+
+  if (isReleaseOrStronger(Ord)) {
+    Function *Syncp =
+        Intrinsic::getOrInsertDeclaration(M, Intrinsic::v850_syncp);
+    Builder.CreateCall(Syncp);
+  }
+
+  Function *LDL =
+      Intrinsic::getOrInsertDeclaration(M, Intrinsic::v850_ldl_w);
+  return Builder.CreateCall(LDL, {Addr}, "ldl");
+}
+
+Value *V850TargetLowering::emitStoreConditional(IRBuilderBase &Builder,
+                                                Value *Val, Value *Addr,
+                                                AtomicOrdering Ord) const {
+  // Use STC.W (store-conditional) intrinsic for G3M.
+  // STC.W returns 1 on success, 0 on failure.
+  // LLVM AtomicExpandPass expects 0 on success, non-zero on failure.
+  // Invert the result with XOR.
+  Module *M = Builder.GetInsertBlock()->getModule();
+  Function *STC =
+      Intrinsic::getOrInsertDeclaration(M, Intrinsic::v850_stc_w);
+  Value *Result = Builder.CreateCall(STC, {Addr, Val}, "stc");
+
+  // V850's STC.W has no ordering variants, so emit explicit SYNCP fence
+  // for acquire/acq_rel/seq_cst orderings (trailing fence).
+  if (isAcquireOrStronger(Ord)) {
+    Function *Syncp =
+        Intrinsic::getOrInsertDeclaration(M, Intrinsic::v850_syncp);
+    Builder.CreateCall(Syncp);
+  }
+
+  return Builder.CreateXor(Result, ConstantInt::get(Result->getType(), 1),
+                           "stc.fail");
+}
+
+void V850TargetLowering::emitAtomicCmpXchgNoStoreLLBalance(
+    IRBuilderBase &Builder) const {
+  // Emit CLL (clear load link) to release the exclusive monitor when
+  // a cmpxchg comparison fails and the store-conditional is skipped.
+  // This prevents holding the exclusive monitor unnecessarily.
+  Module *M = Builder.GetInsertBlock()->getModule();
+  Function *CLL = Intrinsic::getOrInsertDeclaration(M, Intrinsic::v850_cll);
+  Builder.CreateCall(CLL);
 }
 
 //===----------------------------------------------------------------------===//
