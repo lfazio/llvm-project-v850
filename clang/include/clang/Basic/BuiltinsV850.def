@@ -472,5 +472,16 @@ TARGET_BUILTIN(__builtin_v850_ldl_w, "UiUiC*", "n", "rh850g3m")
 // failure.
 TARGET_BUILTIN(__builtin_v850_stc_w, "iUi*Ui", "n", "rh850g3m")
 
+// CACHE - Cache operation
+// void __builtin_v850_cache(unsigned int cacheop, void *addr)
+// Performs cache operation specified by cacheop on cache line at addr.
+// cacheop values: CHBII=0x00, CIBII=0x20, CFALI=0x30, CISTI=0x38, CILDI=0x60
+TARGET_BUILTIN(__builtin_v850_cache, "vIUiv*", "n", "rh850g3m")
+
+// PREF - Prefetch
+// void __builtin_v850_pref(unsigned int prefop, void *addr)
+// Prefetches data at addr. prefop specifies prefetch type.
+TARGET_BUILTIN(__builtin_v850_pref, "vIUiv*", "n", "rh850g3m")
+
 #undef BUILTIN
 #undef TARGET_BUILTIN

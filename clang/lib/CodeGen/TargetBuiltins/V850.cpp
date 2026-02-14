@@ -656,5 +656,17 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
     Function *F = CGM.getIntrinsic(Intrinsic::v850_stc_w);
     return Builder.CreateCall(F, {Addr, Val});
   }
+  case V850::BI__builtin_v850_cache: {
+    Value *CacheOp = EmitScalarExpr(E->getArg(0));
+    Value *Addr = EmitScalarExpr(E->getArg(1));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_cache);
+    return Builder.CreateCall(F, {CacheOp, Addr});
+  }
+  case V850::BI__builtin_v850_pref: {
+    Value *PrefOp = EmitScalarExpr(E->getArg(0));
+    Value *Addr = EmitScalarExpr(E->getArg(1));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_pref);
+    return Builder.CreateCall(F, {PrefOp, Addr});
+  }
   }
 }

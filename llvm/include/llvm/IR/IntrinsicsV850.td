@@ -387,4 +387,19 @@ let TargetPrefix = "v850" in { // All intrinsics start with "llvm.v850.".
       : Intrinsic<[llvm_i32_ty], [llvm_ptr_ty, llvm_i32_ty],
                   [IntrWriteMem, IntrArgMemOnly, NoCapture<ArgIndex<0>>]>;
 
+  // CACHE - Cache operation
+  // void @llvm.v850.cache(i32 %cacheop, ptr %addr)
+  // Performs cache operation specified by cacheop on the cache line
+  // containing addr. Operations include invalidate, flush, etc.
+  def int_v850_cache
+      : Intrinsic<[], [llvm_i32_ty, llvm_ptr_ty],
+                  [IntrNoMem, IntrHasSideEffects, ImmArg<ArgIndex<0>>]>;
+
+  // PREF - Prefetch
+  // void @llvm.v850.pref(i32 %prefop, ptr %addr)
+  // Prefetches data at addr with prefetch operation type prefop.
+  def int_v850_pref
+      : Intrinsic<[], [llvm_i32_ty, llvm_ptr_ty],
+                  [IntrReadMem, IntrArgMemOnly, ImmArg<ArgIndex<0>>]>;
+
 } // TargetPrefix = "v850"

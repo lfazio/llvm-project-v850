@@ -32,6 +32,20 @@ int test_stc_w(unsigned int *addr, unsigned int value) {
   return __builtin_v850_stc_w(addr, value);
 }
 
+// CHECK-LABEL: @test_cache
+void test_cache(void *addr) {
+  // CHECK: call void @llvm.v850.cache(i32 0, ptr %{{.*}})
+  __builtin_v850_cache(0x00, addr);  // CHBII
+  // CHECK: call void @llvm.v850.cache(i32 48, ptr %{{.*}})
+  __builtin_v850_cache(0x30, addr);  // CFALI
+}
+
+// CHECK-LABEL: @test_pref
+void test_pref(void *addr) {
+  // CHECK: call void @llvm.v850.pref(i32 0, ptr %{{.*}})
+  __builtin_v850_pref(0x00, addr);
+}
+
 // CHECK-LABEL: @test_atomic_add
 unsigned int test_atomic_add(unsigned int *addr, unsigned int value) {
   // This function shows how LDL/STC can be used for atomic operations

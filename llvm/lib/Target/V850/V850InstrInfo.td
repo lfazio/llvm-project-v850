@@ -3396,4 +3396,12 @@ let Predicates = [HasRH850G3M] in {
   // STC.W intrinsic - returns success/failure in the same register
   def : Pat<(int_v850_stc_w GPR:$addr, GPR:$val), (STC_W GPR:$val, GPR:$addr)>;
 
+  // CACHE intrinsic (standalone pattern to avoid mayLoad/mayStore conflicts)
+  def : Pat<(int_v850_cache timm:$cacheop, GPR:$reg1),
+            (CACHE timm:$cacheop, GPR:$reg1)>;
+
+  // PREF intrinsic (standalone pattern to avoid mayLoad/mayStore conflicts)
+  def : Pat<(int_v850_pref timm:$prefop, GPR:$reg1),
+            (PREF timm:$prefop, GPR:$reg1)>;
+
 } // Predicates = [HasRH850G3M]
