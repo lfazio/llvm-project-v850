@@ -20,6 +20,18 @@
 
 #include <stdint.h>
 
+#if defined(__GNUC__) || defined(__clang__)
+#define NOINLINE __attribute__((noinline))
+#else
+#define NOINLINE
+#endif
+
+#if defined(__GNUC__)
+#define PREFETCH(addr, a, b) __builtin_prefetch(addr, a, b)
+#else
+#define PREFETCH(addr, a, b) ((void)0)
+#endif
+
 /*=========================================================================
  * Section 1: Rotate operations
  *
@@ -261,7 +273,7 @@ int many_regs(int a, int b, int c, int d) {
 }
 
 /* Deep call chain (tests PREPARE/DISPOSE vs PUSHSP/POPSP) */
-int __attribute__((noinline)) deep_callee(int a, int b, int c, int d) {
+NOINLINE int deep_callee(int a, int b, int c, int d) {
     return a * b + c * d;
 }
 
@@ -288,7 +300,7 @@ int sum_with_prefetch(const int *arr, int n) {
     for (int i = 0; i < n; i++) {
         /* Prefetch next cache line (64 bytes ahead = 16 ints) */
         if (i + 16 < n)
-            __builtin_prefetch(&arr[i + 16], 0, 3);
+            PREFETCH(&arr[i + 16], 0, 3);
         sum += arr[i];
     }
     return sum;
