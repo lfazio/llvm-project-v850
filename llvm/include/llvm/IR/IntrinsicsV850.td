@@ -264,6 +264,20 @@ let TargetPrefix = "v850" in { // All intrinsics start with "llvm.v850.".
       : Intrinsic<[llvm_i32_ty], [llvm_i32_ty],
                   [IntrNoMem, IntrHasSideEffects, ImmArg<ArgIndex<0>>]>;
 
+  // LDSR with selID - Load to system register with group (RH850G3M+)
+  // void @llvm.v850.ldsr.sel(i32 %value, i32 %regID, i32 %selID)
+  def int_v850_ldsr_sel
+      : Intrinsic<[], [llvm_i32_ty, llvm_i32_ty, llvm_i32_ty],
+                  [IntrNoMem, IntrHasSideEffects, ImmArg<ArgIndex<1>>,
+                   ImmArg<ArgIndex<2>>]>;
+
+  // STSR with selID - Store from system register with group (RH850G3M+)
+  // i32 @llvm.v850.stsr.sel(i32 %regID, i32 %selID)
+  def int_v850_stsr_sel
+      : Intrinsic<[llvm_i32_ty], [llvm_i32_ty, llvm_i32_ty],
+                  [IntrNoMem, IntrHasSideEffects, ImmArg<ArgIndex<0>>,
+                   ImmArg<ArgIndex<1>>]>;
+
   //===----------------------------------------------------------------------===//
   // Multiply-Accumulate Operations (V850E2M+)
   //

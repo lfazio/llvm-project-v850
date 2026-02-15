@@ -309,6 +309,7 @@ def : InstRW<[WriteCACHE], (instrs CACHE)>;
 def : InstRW<[WriteG3MPREF], (instrs PREF)>;
 def : InstRW<[WriteSYNCI], (instrs SYNCI)>;
 def : InstRW<[WriteSNOOZE], (instrs SNOOZE)>;
+def : InstRW<[WriteSys], (instrs LDSR_sel, STSR_sel)>;
 
 // Bcond17 instructions (branch with 17-bit displacement)
 def : InstRW<[WriteBranch], (instrs BV_17, BC_17, BZ_17, BNH_17, BN_17,

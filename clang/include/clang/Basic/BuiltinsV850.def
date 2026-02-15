@@ -491,5 +491,15 @@ TARGET_BUILTIN(__builtin_v850_pref, "vIUiv*", "n", "rh850g3m")
 // pos must be 0-31, width must be 1-32, pos+width must be <= 32.
 TARGET_BUILTIN(__builtin_v850_bins, "UiUiUiIUiIUi", "nc", "rh850g3m")
 
+// LDSR with selID - Load to system register with group specification
+// void __builtin_v850_ldsr_group(unsigned int value, unsigned int regID,
+//                                unsigned int selID)
+TARGET_BUILTIN(__builtin_v850_ldsr_group, "vUiIUiIUi", "n", "rh850g3m")
+
+// STSR with selID - Store from system register with group specification
+// unsigned int __builtin_v850_stsr_group(unsigned int regID,
+//                                        unsigned int selID)
+TARGET_BUILTIN(__builtin_v850_stsr_group, "UiIUiIUi", "n", "rh850g3m")
+
 #undef BUILTIN
 #undef TARGET_BUILTIN

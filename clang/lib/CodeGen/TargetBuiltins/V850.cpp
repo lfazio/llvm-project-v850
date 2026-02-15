@@ -676,5 +676,18 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
     Function *F = CGM.getIntrinsic(Intrinsic::v850_bins);
     return Builder.CreateCall(F, {Dst, Src, Pos, Width});
   }
+  case V850::BI__builtin_v850_ldsr_group: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Value *RegID = EmitScalarExpr(E->getArg(1));
+    Value *SelID = EmitScalarExpr(E->getArg(2));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr_sel);
+    return Builder.CreateCall(F, {Val, RegID, SelID});
+  }
+  case V850::BI__builtin_v850_stsr_group: {
+    Value *RegID = EmitScalarExpr(E->getArg(0));
+    Value *SelID = EmitScalarExpr(E->getArg(1));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr_sel);
+    return Builder.CreateCall(F, {RegID, SelID});
+  }
   }
 }

@@ -265,6 +265,28 @@ class FormatIX<bits<6> opcode, bits<6> subop, dag outs, dag ins,
   let Inst{20-16} = 0;              // RFU
 }
 
+// Format IX with selID: LDSR/STSR with group specification (RH850G3M+)
+// Same as FormatIX but bits 20-16 encode selID (register group/bank)
+// Marked isCodeGenOnly because selID in bits 20-16 creates decoder conflicts
+// with all FormatIX instructions. Disassembly handled by custom decoder in
+// V850Disassembler.cpp. Assembly matching works via the AsmMatcher tables.
+class FormatIX_sel<bits<6> opcode, bits<6> subop, dag outs, dag ins,
+                   string asmstr, list<dag> pattern>
+    : V850Inst32<outs, ins, asmstr, pattern> {
+  bits<5> reg1;
+  bits<5> reg2;
+  bits<5> selID;
+
+  let Inst{15-11} = reg2;
+  let Inst{10-5}  = opcode;       // Extended opcode
+  let Inst{4-0}   = reg1;
+  let Inst{31-27} = 0;
+  let Inst{26-21} = subop;
+  let Inst{20-16} = selID;
+
+  let isCodeGenOnly = 1;
+}
+
 //===----------------------------------------------------------------------===//
 // Format X: Extended 2 (32-bit)
 // First halfword: 15-13 = RFU(0), 12-11 = sub-op[1:0], 10-5 = opcode, 4-0 = imm/vector

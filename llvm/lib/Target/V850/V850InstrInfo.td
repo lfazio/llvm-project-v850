@@ -871,6 +871,27 @@ def STSR : FormatIX<0b111111, 0b100100, (outs GPR:$reg2), (ins SysReg:$regID),
   let reg1 = regID;
 }
 
+// LDSR reg2, regID, selID - Load to system register with group (RH850G3M+)
+// Same encoding as LDSR but bits[20-16] = selID (register group)
+let Predicates = [HasRH850G3M] in
+def LDSR_sel
+    : FormatIX_sel<0b111111, 0b100000, (outs),
+                   (ins GPR:$reg2, uimm5:$regID, uimm5:$selID),
+                   "ldsr\t$reg2, $regID, $selID", []> {
+  bits<5> regID;
+  let reg1 = regID;
+}
+
+// STSR regID, reg2, selID - Store from system register with group (RH850G3M+)
+let Predicates = [HasRH850G3M] in
+def STSR_sel
+    : FormatIX_sel<0b111111, 0b100100, (outs GPR:$reg2),
+                   (ins uimm5:$regID, uimm5:$selID),
+                   "stsr\t$regID, $reg2, $selID", []> {
+  bits<5> regID;
+  let reg1 = regID;
+}
+
 // SHR reg1, reg2 - Shift right logical by register
 // Opcode: 111111 (0x3F), sub-op: 000010 (0x02)
 // Flags: CY, OV=0, S, Z modified
@@ -2915,6 +2936,14 @@ let Predicates = [HasV850E2M] in {
   def : Pat<(int_v850_ldsr GPR:$val, (i32 28)), (LDSR GPR:$val, EIWR)>;
   def : Pat<(int_v850_ldsr GPR:$val, (i32 29)), (LDSR GPR:$val, FEWR)>;
   def : Pat<(int_v850_ldsr GPR:$val, (i32 31)), (LDSR GPR:$val, BSEL)>;
+}
+
+// RH850G3M+ System Register Access with selID (group specification)
+let Predicates = [HasRH850G3M] in {
+  def : Pat<(int_v850_ldsr_sel GPR:$val, timm:$regID, timm:$selID),
+            (LDSR_sel GPR:$val, uimm5:$regID, uimm5:$selID)>;
+  def : Pat<(int_v850_stsr_sel timm:$regID, timm:$selID),
+            (STSR_sel uimm5:$regID, uimm5:$selID)>;
 }
 
 //===----------------------------------------------------------------------===//

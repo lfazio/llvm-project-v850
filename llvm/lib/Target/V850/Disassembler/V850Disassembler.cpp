@@ -340,6 +340,38 @@ DecodeStatus V850Disassembler::getInstruction32(MCInst &MI, uint64_t &Size,
     }
   }
 
+  // Check for LDSR/STSR with non-zero selID (RH850G3M+)
+  // These are encoded as standard LDSR/STSR but with bits[20:16] != 0
+  if (HasRH850G3M) {
+    unsigned SelID = (Insn32 >> 16) & 0x1F;
+    unsigned Opcode = (Insn32 >> 5) & 0x3F; // bits[10:5]
+    unsigned SubOp = (Insn32 >> 21) & 0x3F; // bits[26:21]
+    if (SelID != 0 && Opcode == 0b111111 && (Insn32 >> 27) == 0) {
+      unsigned Reg2 = (Insn32 >> 11) & 0x1F;
+      unsigned RegID = Insn32 & 0x1F;
+      if (SubOp == 0b100000) {
+        // LDSR_sel: ldsr reg2, regID, selID
+        MI.clear();
+        MI.setOpcode(V850::LDSR_sel);
+        MI.addOperand(MCOperand::createReg(GPRDecoderTable[Reg2]));
+        MI.addOperand(MCOperand::createImm(RegID));
+        MI.addOperand(MCOperand::createImm(SelID));
+        Size = 4;
+        return MCDisassembler::Success;
+      }
+      if (SubOp == 0b100100) {
+        // STSR_sel: stsr regID, reg2, selID
+        MI.clear();
+        MI.setOpcode(V850::STSR_sel);
+        MI.addOperand(MCOperand::createReg(GPRDecoderTable[Reg2]));
+        MI.addOperand(MCOperand::createImm(RegID));
+        MI.addOperand(MCOperand::createImm(SelID));
+        Size = 4;
+        return MCDisassembler::Success;
+      }
+    }
+  }
+
   // Try base 32-bit decoder; this favors integer instructions that
   // otherwise can be mis-decoded by the E2M table (which contains FPU
   // encodings that overlap extended opcode patterns).
