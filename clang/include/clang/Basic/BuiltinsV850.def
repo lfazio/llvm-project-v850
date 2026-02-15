@@ -501,5 +501,55 @@ TARGET_BUILTIN(__builtin_v850_ldsr_group, "vUiIUiIUi", "n", "rh850g3m")
 //                                        unsigned int selID)
 TARGET_BUILTIN(__builtin_v850_stsr_group, "UiIUiIUi", "n", "rh850g3m")
 
+//===----------------------------------------------------------------------===//
+// RH850G3M+ Named System Register Access (Groups 1-2)
+//
+// Convenience builtins for commonly-used G3M system registers.
+// These expand to ldsr/stsr with the correct regID and selID.
+//===----------------------------------------------------------------------===//
+
+// --- Group 1: Machine Configuration ---
+
+// RBASE - Reset vector base address (regID=2, selID=1)
+TARGET_BUILTIN(__builtin_v850_read_rbase, "Ui", "n", "rh850g3m")
+TARGET_BUILTIN(__builtin_v850_write_rbase, "vUi", "n", "rh850g3m")
+
+// EBASE - Exception handler vector base (regID=3, selID=1)
+TARGET_BUILTIN(__builtin_v850_read_ebase, "Ui", "n", "rh850g3m")
+TARGET_BUILTIN(__builtin_v850_write_ebase, "vUi", "n", "rh850g3m")
+
+// INTBP - Interrupt handler table base pointer (regID=4, selID=1)
+TARGET_BUILTIN(__builtin_v850_read_intbp, "Ui", "n", "rh850g3m")
+TARGET_BUILTIN(__builtin_v850_write_intbp, "vUi", "n", "rh850g3m")
+
+// SCBP - SYSCALL base pointer (regID=12, selID=1)
+TARGET_BUILTIN(__builtin_v850_read_scbp, "Ui", "n", "rh850g3m")
+TARGET_BUILTIN(__builtin_v850_write_scbp, "vUi", "n", "rh850g3m")
+
+// --- Group 2: Thread/Interrupt ---
+
+// MEA - Memory error address (regID=6, selID=2)
+TARGET_BUILTIN(__builtin_v850_read_mea, "Ui", "n", "rh850g3m")
+TARGET_BUILTIN(__builtin_v850_write_mea, "vUi", "n", "rh850g3m")
+
+// MEI - Memory error information (regID=8, selID=2)
+TARGET_BUILTIN(__builtin_v850_read_mei, "Ui", "n", "rh850g3m")
+TARGET_BUILTIN(__builtin_v850_write_mei, "vUi", "n", "rh850g3m")
+
+// ISPR - Interrupt priority register (regID=10, selID=2)
+TARGET_BUILTIN(__builtin_v850_read_ispr, "Ui", "n", "rh850g3m")
+TARGET_BUILTIN(__builtin_v850_write_ispr, "vUi", "n", "rh850g3m")
+
+// PMR - Interrupt priority masking register (regID=11, selID=2)
+TARGET_BUILTIN(__builtin_v850_read_pmr, "Ui", "n", "rh850g3m")
+TARGET_BUILTIN(__builtin_v850_write_pmr, "vUi", "n", "rh850g3m")
+
+// ICSR - Interrupt control status register (regID=12, selID=2, read-only)
+TARGET_BUILTIN(__builtin_v850_read_icsr, "Ui", "n", "rh850g3m")
+
+// INTCFG - Interrupt function setting (regID=13, selID=2)
+TARGET_BUILTIN(__builtin_v850_read_intcfg, "Ui", "n", "rh850g3m")
+TARGET_BUILTIN(__builtin_v850_write_intcfg, "vUi", "n", "rh850g3m")
+
 #undef BUILTIN
 #undef TARGET_BUILTIN
