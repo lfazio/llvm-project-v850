@@ -104,7 +104,8 @@ void V850FrameLowering::emitPrologue(MachineFunction &MF,
   // - Without PREPARE: CSR space is included in StackSize (via frame indices),
   //   so total CFA offset = StackSize.
   unsigned CalleeSavedSize = FuncInfo->getCalleeSavedStackSize();
-  int64_t TotalCFAOffset = UsedPrepare ? CalleeSavedSize + StackSize : StackSize;
+  int64_t TotalCFAOffset =
+      UsedPrepare ? CalleeSavedSize + StackSize : StackSize;
 
   // Adjust stack pointer: SP = SP - StackSize
   // Prefer 16-bit ADDi for small offsets, then 32-bit ADDI, then use a register
@@ -144,7 +145,8 @@ void V850FrameLowering::emitPrologue(MachineFunction &MF,
 
   // Set up frame pointer if needed
   // For proper frame pointer chain, FP should point to where old FP was saved
-  // so that [FP] = previous frame's FP. This enables debuggers to walk the stack.
+  // so that [FP] = previous frame's FP. This enables debuggers to walk the
+  // stack.
   //
   // Frame layout (growing downward):
   //   [CFA = original SP]
@@ -345,7 +347,8 @@ bool V850FrameLowering::spillCalleeSavedRegisters(
   if (canUsePrepareDispose(MF, CSI)) {
     unsigned List12 = buildList12Mask(CSI);
 
-    // Mark that we're using PREPARE/DISPOSE (CSR area is separate from local frame)
+    // Mark that we're using PREPARE/DISPOSE (CSR area is separate from local
+    // frame)
     FuncInfo->setUsesPrepareDispose(true);
 
     // Add all callee-saved registers as live-in
@@ -447,14 +450,14 @@ bool V850FrameLowering::restoreCalleeSavedRegisters(
       // DISPOSEr imm5, list12, [LP] - restore, deallocate, and return
       // imm5 = 0 (emitEpilogue handles remaining stack adjustment)
       MachineInstrBuilder MIB = BuildMI(MBB, MI, DL, TII.get(V850::DISPOSEr))
-          .addImm(0)
-          .addImm(List12)
-          .addReg(V850::LP)
-          .setMIFlag(MachineInstr::FrameDestroy);
+                                    .addImm(0)
+                                    .addImm(List12)
+                                    .addReg(V850::LP)
+                                    .setMIFlag(MachineInstr::FrameDestroy);
 
-      // Copy implicit operands from RET (e.g., "implicit $r10" for return value)
-      // This is essential to prevent Machine Copy Propagation from removing
-      // the return value copy as dead code.
+      // Copy implicit operands from RET (e.g., "implicit $r10" for return
+      // value) This is essential to prevent Machine Copy Propagation from
+      // removing the return value copy as dead code.
       for (const MachineOperand &MO : MI->operands()) {
         if (MO.isReg() && MO.isImplicit())
           MIB.add(MO);
@@ -473,7 +476,8 @@ bool V850FrameLowering::restoreCalleeSavedRegisters(
     // Note: CFI restore directives are not emitted in the epilogue because
     // unwinding uses the CFI state from the prologue. This follows the
     // "prologue-only" CFI philosophy used by most LLVM backends.
-    // The key CFI information for unwinding is emitted in spillCalleeSavedRegisters.
+    // The key CFI information for unwinding is emitted in
+    // spillCalleeSavedRegisters.
 
     return true;
   }

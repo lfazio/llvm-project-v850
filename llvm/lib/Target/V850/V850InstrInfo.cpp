@@ -153,21 +153,36 @@ static bool isCondBranchOpcode(unsigned Opc) {
 /// Return the opcode of the branch with the opposite condition.
 unsigned V850InstrInfo::getOppositeBranchOpcode(unsigned Opc) const {
   switch (Opc) {
-  case V850::BV:   return V850::BNV;
-  case V850::BNV:  return V850::BV;
-  case V850::BC:   return V850::BNC;
-  case V850::BNC:  return V850::BC;
-  case V850::BZ:   return V850::BNZ;
-  case V850::BNZ:  return V850::BZ;
-  case V850::BNH:  return V850::BH;
-  case V850::BH:   return V850::BNH;
-  case V850::BN:   return V850::BP;
-  case V850::BP:   return V850::BN;
-  case V850::BLT:  return V850::BGE;
-  case V850::BGE:  return V850::BLT;
-  case V850::BLE:  return V850::BGT;
-  case V850::BGT:  return V850::BLE;
-  case V850::BSA:  return 0;  // No opposite for saturated
+  case V850::BV:
+    return V850::BNV;
+  case V850::BNV:
+    return V850::BV;
+  case V850::BC:
+    return V850::BNC;
+  case V850::BNC:
+    return V850::BC;
+  case V850::BZ:
+    return V850::BNZ;
+  case V850::BNZ:
+    return V850::BZ;
+  case V850::BNH:
+    return V850::BH;
+  case V850::BH:
+    return V850::BNH;
+  case V850::BN:
+    return V850::BP;
+  case V850::BP:
+    return V850::BN;
+  case V850::BLT:
+    return V850::BGE;
+  case V850::BGE:
+    return V850::BLT;
+  case V850::BLE:
+    return V850::BGT;
+  case V850::BGT:
+    return V850::BLE;
+  case V850::BSA:
+    return 0; // No opposite for saturated
   default:
     return 0;
   }
@@ -279,12 +294,9 @@ unsigned V850InstrInfo::removeBranch(MachineBasicBlock &MBB,
   return Count;
 }
 
-unsigned V850InstrInfo::insertBranch(MachineBasicBlock &MBB,
-                                     MachineBasicBlock *TBB,
-                                     MachineBasicBlock *FBB,
-                                     ArrayRef<MachineOperand> Cond,
-                                     const DebugLoc &DL,
-                                     int *BytesAdded) const {
+unsigned V850InstrInfo::insertBranch(
+    MachineBasicBlock &MBB, MachineBasicBlock *TBB, MachineBasicBlock *FBB,
+    ArrayRef<MachineOperand> Cond, const DebugLoc &DL, int *BytesAdded) const {
   assert(TBB && "insertBranch must not be told to insert a fallthrough");
 
   if (BytesAdded)
@@ -325,7 +337,7 @@ bool V850InstrInfo::reverseBranchCondition(
   unsigned Opc = Cond[0].getImm();
   unsigned NewOpc = getOppositeBranchOpcode(Opc);
   if (NewOpc == 0)
-    return true;  // Cannot reverse
+    return true; // Cannot reverse
 
   Cond[0].setImm(NewOpc);
   return false;
@@ -367,22 +379,54 @@ void V850InstrInfo::insertSelect(MachineBasicBlock &MBB,
   switch (BranchOpc) {
   default:
     llvm_unreachable("Unknown branch condition for CMOV");
-  case V850::BV:  CMOVCond = 0;  break;  // V (overflow)
-  case V850::BC:  CMOVCond = 1;  break;  // C/L (carry/lower)
-  case V850::BZ:  CMOVCond = 2;  break;  // Z (zero)
-  case V850::BNH: CMOVCond = 3;  break;  // NH (not higher)
-  case V850::BN:  CMOVCond = 4;  break;  // S/N (negative)
-  case V850::BR:  CMOVCond = 5;  break;  // T (always) - shouldn't happen
-  case V850::BLT: CMOVCond = 6;  break;  // LT (less than signed)
-  case V850::BLE: CMOVCond = 7;  break;  // LE (less or equal signed)
-  case V850::BNV: CMOVCond = 8;  break;  // NV (no overflow)
-  case V850::BNC: CMOVCond = 9;  break;  // NC/NL (no carry)
-  case V850::BNZ: CMOVCond = 10; break;  // NZ (not zero)
-  case V850::BH:  CMOVCond = 11; break;  // H (higher)
-  case V850::BP:  CMOVCond = 12; break;  // NS/P (positive)
-  case V850::BSA: CMOVCond = 13; break;  // SA (saturated)
-  case V850::BGE: CMOVCond = 14; break;  // GE (greater or equal signed)
-  case V850::BGT: CMOVCond = 15; break;  // GT (greater than signed)
+  case V850::BV:
+    CMOVCond = 0;
+    break; // V (overflow)
+  case V850::BC:
+    CMOVCond = 1;
+    break; // C/L (carry/lower)
+  case V850::BZ:
+    CMOVCond = 2;
+    break; // Z (zero)
+  case V850::BNH:
+    CMOVCond = 3;
+    break; // NH (not higher)
+  case V850::BN:
+    CMOVCond = 4;
+    break; // S/N (negative)
+  case V850::BR:
+    CMOVCond = 5;
+    break; // T (always) - shouldn't happen
+  case V850::BLT:
+    CMOVCond = 6;
+    break; // LT (less than signed)
+  case V850::BLE:
+    CMOVCond = 7;
+    break; // LE (less or equal signed)
+  case V850::BNV:
+    CMOVCond = 8;
+    break; // NV (no overflow)
+  case V850::BNC:
+    CMOVCond = 9;
+    break; // NC/NL (no carry)
+  case V850::BNZ:
+    CMOVCond = 10;
+    break; // NZ (not zero)
+  case V850::BH:
+    CMOVCond = 11;
+    break; // H (higher)
+  case V850::BP:
+    CMOVCond = 12;
+    break; // NS/P (positive)
+  case V850::BSA:
+    CMOVCond = 13;
+    break; // SA (saturated)
+  case V850::BGE:
+    CMOVCond = 14;
+    break; // GE (greater or equal signed)
+  case V850::BGT:
+    CMOVCond = 15;
+    break; // GT (greater than signed)
   }
 
   // Build: cmov cond, TrueReg, FalseReg, DstReg
@@ -482,9 +526,7 @@ void V850InstrInfo::insertIndirectBranch(MachineBasicBlock &MBB,
 // - Total overhead per call site: 4 bytes (JARL replaces inlined code)
 // - Frame overhead: 2 bytes (JMP [LP] at end of outlined function)
 
-enum MachineOutlinerConstructionID {
-  MachineOutlinerDefault
-};
+enum MachineOutlinerConstructionID { MachineOutlinerDefault };
 
 bool V850InstrInfo::isFunctionSafeToOutlineFrom(
     MachineFunction &MF, bool OutlineFromLinkOnceODRs) const {
@@ -550,8 +592,8 @@ V850InstrInfo::getOutliningCandidateInfo(
   if (SequenceSize <= CallOverhead)
     return std::nullopt;
 
-  int Benefit = (NumCandidates - 1) * (SequenceSize - CallOverhead) -
-                FrameOverhead;
+  int Benefit =
+      (NumCandidates - 1) * (SequenceSize - CallOverhead) - FrameOverhead;
   if (Benefit <= 0)
     return std::nullopt;
 

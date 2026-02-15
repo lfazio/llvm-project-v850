@@ -36,7 +36,8 @@ using namespace llvm;
 #define DEBUG_TYPE "v850-peephole"
 
 STATISTIC(NumMovAddFolded, "Number of MOV+ADD pairs folded to MOV imm");
-STATISTIC(NumRedundantAndiRemoved, "Number of redundant ANDI removed after load");
+STATISTIC(NumRedundantAndiRemoved,
+          "Number of redundant ANDI removed after load");
 STATISTIC(NumCopyPropagated, "Number of MOV copy propagations");
 
 static cl::opt<bool>
@@ -55,9 +56,7 @@ public:
 
   V850PeepholeOptimizer() : MachineFunctionPass(ID) {}
 
-  StringRef getPassName() const override {
-    return "V850 Peephole Optimizer";
-  }
+  StringRef getPassName() const override { return "V850 Peephole Optimizer"; }
 
   bool runOnMachineFunction(MachineFunction &MF) override;
 
@@ -80,8 +79,8 @@ private:
 
 char V850PeepholeOptimizer::ID = 0;
 
-INITIALIZE_PASS(V850PeepholeOptimizer, DEBUG_TYPE,
-                "V850 Peephole Optimizer", false, false)
+INITIALIZE_PASS(V850PeepholeOptimizer, DEBUG_TYPE, "V850 Peephole Optimizer",
+                false, false)
 
 FunctionPass *llvm::createV850PeepholeOptimizerPass() {
   return new V850PeepholeOptimizer();
@@ -187,7 +186,8 @@ bool V850PeepholeOptimizer::tryFoldMovAddToMovImm(
                     << " to MOV " << Imm << "\n");
 
   // Create new MOVi instruction
-  BuildMI(MBB, UseInstr, UseInstr->getDebugLoc(), TII->get(V850::MOVi), ResultReg)
+  BuildMI(MBB, UseInstr, UseInstr->getDebugLoc(), TII->get(V850::MOVi),
+          ResultReg)
       .addImm(Imm);
 
   // Remove both original instructions

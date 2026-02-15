@@ -146,8 +146,7 @@ public:
                         AtomicOrdering Ord) const override;
   Value *emitStoreConditional(IRBuilderBase &Builder, Value *Val, Value *Addr,
                               AtomicOrdering Ord) const override;
-  void emitAtomicCmpXchgNoStoreLLBalance(
-      IRBuilderBase &Builder) const override;
+  void emitAtomicCmpXchgNoStoreLLBalance(IRBuilderBase &Builder) const override;
 
   // Custom instruction insertion for pseudo instructions
   MachineBasicBlock *

@@ -49,8 +49,8 @@ class V850Subtarget : public V850GenSubtargetInfo {
 public:
   /// This constructor initializes the data members to match that
   /// of the specified triple.
-  V850Subtarget(const Triple &TT, const std::string &CPU,
-                const std::string &FS, const TargetMachine &TM);
+  V850Subtarget(const Triple &TT, const std::string &CPU, const std::string &FS,
+                const TargetMachine &TM);
 
   V850Subtarget &initializeSubtargetDependencies(StringRef CPU, StringRef FS);
 
@@ -87,11 +87,10 @@ public:
 
   // Post-RA scheduling support
   // Enable anti-dependency breaking for all registers to improve scheduling
-  AntiDepBreakMode getAntiDepBreakMode() const override {
-    return ANTIDEP_ALL;
-  }
+  AntiDepBreakMode getAntiDepBreakMode() const override { return ANTIDEP_ALL; }
 
-  // Specify GPR register class for critical path analysis during post-RA scheduling
+  // Specify GPR register class for critical path analysis during post-RA
+  // scheduling
   void getCriticalPathRCs(RegClassVector &CriticalPathRCs) const override;
 };
 

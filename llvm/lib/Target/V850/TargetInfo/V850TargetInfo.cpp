@@ -17,6 +17,8 @@ Target &llvm::getTheV850Target() {
   return TheV850Target;
 }
 
-extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void LLVMInitializeV850TargetInfo() {
-  RegisterTarget<Triple::v850> X(getTheV850Target(), "v850", "NEC V850", "V850");
+extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void
+LLVMInitializeV850TargetInfo() {
+  RegisterTarget<Triple::v850> X(getTheV850Target(), "v850", "NEC V850",
+                                 "V850");
 }

@@ -23,10 +23,10 @@
 
 using namespace llvm;
 
-static cl::opt<unsigned>
-    SSThreshold("v850-ssection-threshold", cl::Hidden,
-                cl::desc("Small data and bss section threshold size (default=8)"),
-                cl::init(8));
+static cl::opt<unsigned> SSThreshold(
+    "v850-ssection-threshold", cl::Hidden,
+    cl::desc("Small data and bss section threshold size (default=8)"),
+    cl::init(8));
 
 static cl::opt<bool>
     LocalSData("v850-local-sdata", cl::Hidden,
@@ -50,8 +50,8 @@ void V850ELFTargetObjectFile::Initialize(MCContext &Ctx,
   SmallDataSection = getContext().getELFSection(
       ".sdata", ELF::SHT_PROGBITS, ELF::SHF_WRITE | ELF::SHF_ALLOC);
 
-  SmallBSSSection = getContext().getELFSection(
-      ".sbss", ELF::SHT_NOBITS, ELF::SHF_WRITE | ELF::SHF_ALLOC);
+  SmallBSSSection = getContext().getELFSection(".sbss", ELF::SHT_NOBITS,
+                                               ELF::SHF_WRITE | ELF::SHF_ALLOC);
 
   this->TM = &static_cast<const V850TargetMachine &>(TM);
 }
@@ -73,10 +73,11 @@ bool V850ELFTargetObjectFile::IsGlobalInSmallSection(
 }
 
 bool V850ELFTargetObjectFile::IsGlobalInSmallSection(const GlobalObject *GO,
-                                                      const TargetMachine &TM,
-                                                      SectionKind Kind) const {
+                                                     const TargetMachine &TM,
+                                                     SectionKind Kind) const {
   return IsGlobalInSmallSectionImpl(GO, TM) &&
-         (Kind.isData() || Kind.isBSS() || Kind.isCommon() || Kind.isReadOnly());
+         (Kind.isData() || Kind.isBSS() || Kind.isCommon() ||
+          Kind.isReadOnly());
 }
 
 bool V850ELFTargetObjectFile::IsGlobalInSmallSectionImpl(

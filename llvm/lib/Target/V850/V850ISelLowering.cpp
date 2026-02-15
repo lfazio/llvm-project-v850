@@ -1656,8 +1656,8 @@ V850TargetLowering::shouldExpandAtomicRMWInIR(AtomicRMWInst *AI) const {
   return AtomicExpansionKind::None;
 }
 
-Value *V850TargetLowering::emitLoadLinked(IRBuilderBase &Builder,
-                                          Type *ValueTy, Value *Addr,
+Value *V850TargetLowering::emitLoadLinked(IRBuilderBase &Builder, Type *ValueTy,
+                                          Value *Addr,
                                           AtomicOrdering Ord) const {
   // Use LDL.W (load-linked) intrinsic for G3M.
   // V850's LDL.W has no ordering variants, so emit explicit SYNCP fence
@@ -1670,8 +1670,7 @@ Value *V850TargetLowering::emitLoadLinked(IRBuilderBase &Builder,
     Builder.CreateCall(Syncp);
   }
 
-  Function *LDL =
-      Intrinsic::getOrInsertDeclaration(M, Intrinsic::v850_ldl_w);
+  Function *LDL = Intrinsic::getOrInsertDeclaration(M, Intrinsic::v850_ldl_w);
   return Builder.CreateCall(LDL, {Addr}, "ldl");
 }
 
@@ -1683,8 +1682,7 @@ Value *V850TargetLowering::emitStoreConditional(IRBuilderBase &Builder,
   // LLVM AtomicExpandPass expects 0 on success, non-zero on failure.
   // Invert the result with XOR.
   Module *M = Builder.GetInsertBlock()->getModule();
-  Function *STC =
-      Intrinsic::getOrInsertDeclaration(M, Intrinsic::v850_stc_w);
+  Function *STC = Intrinsic::getOrInsertDeclaration(M, Intrinsic::v850_stc_w);
   Value *Result = Builder.CreateCall(STC, {Addr, Val}, "stc");
 
   // V850's STC.W has no ordering variants, so emit explicit SYNCP fence

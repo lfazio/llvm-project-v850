@@ -11,11 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "V850TargetMachine.h"
+#include "TargetInfo/V850TargetInfo.h"
 #include "V850.h"
 #include "V850MachineFunctionInfo.h"
 #include "V850Subtarget.h"
 #include "V850TargetObjectFile.h"
-#include "TargetInfo/V850TargetInfo.h"
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/CodeGen/TargetPassConfig.h"
 #include "llvm/IR/LegacyPassManager.h"

@@ -24,7 +24,8 @@ class V850MCAsmInfo : public MCAsmInfoELF {
   void anchor() override;
 
 public:
-  explicit V850MCAsmInfo(const Triple &TheTriple, const MCTargetOptions &Options);
+  explicit V850MCAsmInfo(const Triple &TheTriple,
+                         const MCTargetOptions &Options);
 };
 
 } // namespace llvm

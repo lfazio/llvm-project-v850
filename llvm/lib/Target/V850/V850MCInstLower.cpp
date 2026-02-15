@@ -40,13 +40,12 @@ V850MCInstLower::GetExternalSymbolSymbol(const MachineOperand &MO) const {
   return Printer.GetExternalSymbolSymbol(MO.getSymbolName());
 }
 
-MCSymbol *
-V850MCInstLower::GetJumpTableSymbol(const MachineOperand &MO) const {
+MCSymbol *V850MCInstLower::GetJumpTableSymbol(const MachineOperand &MO) const {
   const DataLayout &DL = Printer.getDataLayout();
   SmallString<256> Name;
-  raw_svector_ostream(Name) << DL.getPrivateGlobalPrefix() << "JTI"
-                            << Printer.getFunctionNumber() << '_'
-                            << MO.getIndex();
+  raw_svector_ostream(Name)
+      << DL.getPrivateGlobalPrefix() << "JTI" << Printer.getFunctionNumber()
+      << '_' << MO.getIndex();
   return Ctx.getOrCreateSymbol(Name);
 }
 
@@ -54,9 +53,9 @@ MCSymbol *
 V850MCInstLower::GetConstantPoolIndexSymbol(const MachineOperand &MO) const {
   const DataLayout &DL = Printer.getDataLayout();
   SmallString<256> Name;
-  raw_svector_ostream(Name) << DL.getPrivateGlobalPrefix() << "CPI"
-                            << Printer.getFunctionNumber() << '_'
-                            << MO.getIndex();
+  raw_svector_ostream(Name)
+      << DL.getPrivateGlobalPrefix() << "CPI" << Printer.getFunctionNumber()
+      << '_' << MO.getIndex();
   return Ctx.getOrCreateSymbol(Name);
 }
 
@@ -66,7 +65,7 @@ V850MCInstLower::GetBlockAddressSymbol(const MachineOperand &MO) const {
 }
 
 MCOperand V850MCInstLower::LowerSymbolOperand(const MachineOperand &MO,
-                                               MCSymbol *Sym) const {
+                                              MCSymbol *Sym) const {
   const MCExpr *Expr = MCSymbolRefExpr::create(Sym, Ctx);
 
   // Check for target flags that require special handling

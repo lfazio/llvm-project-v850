@@ -25,7 +25,7 @@ using namespace llvm;
 void V850Subtarget::anchor() {}
 
 V850Subtarget &V850Subtarget::initializeSubtargetDependencies(StringRef CPU,
-                                                               StringRef FS) {
+                                                              StringRef FS) {
   StringRef CPUName = CPU;
   if (CPUName.empty())
     CPUName = "v850";
@@ -38,8 +38,7 @@ V850Subtarget &V850Subtarget::initializeSubtargetDependencies(StringRef CPU,
 V850Subtarget::V850Subtarget(const Triple &TT, const std::string &CPU,
                              const std::string &FS, const TargetMachine &TM)
     : V850GenSubtargetInfo(TT, CPU, /*TuneCPU*/ CPU, FS),
-      InstrInfo(initializeSubtargetDependencies(CPU, FS)),
-      TLInfo(TM, *this),
+      InstrInfo(initializeSubtargetDependencies(CPU, FS)), TLInfo(TM, *this),
       FrameLowering(*this) {}
 
 void V850Subtarget::getCriticalPathRCs(RegClassVector &CriticalPathRCs) const {
