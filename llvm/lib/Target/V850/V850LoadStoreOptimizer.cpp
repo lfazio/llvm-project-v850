@@ -166,6 +166,14 @@ bool V850LoadStoreOptimizer::tryMergeLoadPair(MachineBasicBlock &MBB) {
       continue;
     }
 
+    // Don't merge volatile or ordered memory accesses — the hardware may
+    // handle individual word accesses differently from doubleword accesses
+    // for MMIO/volatile regions.
+    if (MI.hasOrderedMemoryRef()) {
+      ++MBBI;
+      continue;
+    }
+
     // Found a LDW. Look for a partner within a small window.
     Register DestReg1 = MI.getOperand(0).getReg();
     Register BaseReg1 = MI.getOperand(1).getReg();
@@ -184,6 +192,10 @@ bool V850LoadStoreOptimizer::tryMergeLoadPair(MachineBasicBlock &MBB) {
          ++NextI, ++Count) {
       MachineInstr &NextMI = *NextI;
       if (NextMI.getOpcode() != V850::LDW)
+        continue;
+
+      // Skip volatile/ordered candidates too.
+      if (NextMI.hasOrderedMemoryRef())
         continue;
 
       Register DestReg2 = NextMI.getOperand(0).getReg();
@@ -235,11 +247,9 @@ bool V850LoadStoreOptimizer::tryMergeLoadPair(MachineBasicBlock &MBB) {
         continue;
 
       // Check for hazards between the two instructions.
-      MachineInstr &FirstMI = (LowMI == &MI) ? MI : NextMI;
-      MachineInstr &SecondMI = (LowMI == &MI) ? NextMI : MI;
-      if (&FirstMI != &SecondMI &&
-          FirstMI.getIterator() != std::prev(SecondMI.getIterator())) {
-        if (isHazardBetween(FirstMI, SecondMI, BaseReg1, EvenReg, OddReg))
+      // Always use program order: MI comes before NextMI in the MBB.
+      if (MI.getIterator() != std::prev(NextMI.getIterator())) {
+        if (isHazardBetween(MI, NextMI, BaseReg1, EvenReg, OddReg))
           continue;
       }
 
@@ -293,6 +303,12 @@ bool V850LoadStoreOptimizer::tryMergeStorePair(MachineBasicBlock &MBB) {
       continue;
     }
 
+    // Don't merge volatile or ordered memory accesses.
+    if (MI.hasOrderedMemoryRef()) {
+      ++MBBI;
+      continue;
+    }
+
     // Found a STW. Look for a partner.
     Register SrcReg1 = MI.getOperand(0).getReg();
     Register BaseReg1 = MI.getOperand(1).getReg();
@@ -310,6 +326,10 @@ bool V850LoadStoreOptimizer::tryMergeStorePair(MachineBasicBlock &MBB) {
          ++NextI, ++Count) {
       MachineInstr &NextMI = *NextI;
       if (NextMI.getOpcode() != V850::STW)
+        continue;
+
+      // Skip volatile/ordered candidates too.
+      if (NextMI.hasOrderedMemoryRef())
         continue;
 
       Register SrcReg2 = NextMI.getOperand(0).getReg();
