@@ -668,5 +668,13 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
     Function *F = CGM.getIntrinsic(Intrinsic::v850_pref);
     return Builder.CreateCall(F, {PrefOp, Addr});
   }
+  case V850::BI__builtin_v850_bins: {
+    Value *Dst = EmitScalarExpr(E->getArg(0));
+    Value *Src = EmitScalarExpr(E->getArg(1));
+    Value *Pos = EmitScalarExpr(E->getArg(2));
+    Value *Width = EmitScalarExpr(E->getArg(3));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_bins);
+    return Builder.CreateCall(F, {Dst, Src, Pos, Width});
+  }
   }
 }

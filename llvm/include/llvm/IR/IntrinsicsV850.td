@@ -402,4 +402,14 @@ let TargetPrefix = "v850" in { // All intrinsics start with "llvm.v850.".
       : Intrinsic<[], [llvm_i32_ty, llvm_ptr_ty],
                   [IntrReadMem, IntrArgMemOnly, ImmArg<ArgIndex<0>>]>;
 
+  // BINS - Bitfield Insert (RH850G3M+)
+  // i32 @llvm.v850.bins(i32 %dst, i32 %src, i32 %pos, i32 %width)
+  // Inserts 'width' bits from src (starting at bit 0) into dst at position
+  // 'pos'. Returns the modified dst value.
+  // Constraints: 0 <= pos <= 31, 1 <= width <= 32, pos + width <= 32
+  def int_v850_bins
+      : Intrinsic<[llvm_i32_ty],
+                  [llvm_i32_ty, llvm_i32_ty, llvm_i32_ty, llvm_i32_ty],
+                  [IntrNoMem, ImmArg<ArgIndex<2>>, ImmArg<ArgIndex<3>>]>;
+
 } // TargetPrefix = "v850"

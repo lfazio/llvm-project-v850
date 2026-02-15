@@ -301,7 +301,7 @@ def : InstRW<[WriteLDLW], (instrs LDL_W)>;
 def : InstRW<[WriteSTCW], (instrs STC_W)>;
 def : InstRW<[WriteCLL], (instrs CLL)>;
 def : InstRW<[WriteROTL], (instrs ROTL_imm, ROTL_reg)>;
-def : InstRW<[WriteBINS], (instrs BINS0, BINS1, BINS2)>;
+def : InstRW<[WriteBINS], (instrs BINS0, BINS1, BINS2, BINS_pseudo)>;
 def : InstRW<[WritePUSHSP], (instrs PUSHSP)>;
 def : InstRW<[WritePOPSP], (instrs POPSP)>;
 def : InstRW<[WriteLOOP], (instrs LOOP)>;

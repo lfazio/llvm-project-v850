@@ -12,10 +12,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "MCTargetDesc/V850InstPrinter.h"
+#include "TargetInfo/V850TargetInfo.h"
 #include "V850.h"
 #include "V850MCInstLower.h"
 #include "V850TargetMachine.h"
-#include "TargetInfo/V850TargetInfo.h"
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/MachineConstantPool.h"
@@ -59,7 +59,7 @@ public:
 } // end of anonymous namespace
 
 void V850AsmPrinter::PrintSymbolOperand(const MachineOperand &MO,
-                                         raw_ostream &O) {
+                                        raw_ostream &O) {
   uint64_t Offset = MO.getOffset();
   if (Offset)
     O << '(' << Offset << '+';
@@ -71,7 +71,7 @@ void V850AsmPrinter::PrintSymbolOperand(const MachineOperand &MO,
 }
 
 void V850AsmPrinter::printOperand(const MachineInstr *MI, int OpNum,
-                                   raw_ostream &O) {
+                                  raw_ostream &O) {
   const MachineOperand &MO = MI->getOperand(OpNum);
   switch (MO.getType()) {
   default:
@@ -92,7 +92,7 @@ void V850AsmPrinter::printOperand(const MachineInstr *MI, int OpNum,
 }
 
 bool V850AsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
-                                      const char *ExtraCode, raw_ostream &O) {
+                                     const char *ExtraCode, raw_ostream &O) {
   if (ExtraCode && ExtraCode[0])
     return AsmPrinter::PrintAsmOperand(MI, OpNo, ExtraCode, O);
 
@@ -101,9 +101,8 @@ bool V850AsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
 }
 
 bool V850AsmPrinter::PrintAsmMemoryOperand(const MachineInstr *MI,
-                                            unsigned OpNo,
-                                            const char *ExtraCode,
-                                            raw_ostream &O) {
+                                           unsigned OpNo, const char *ExtraCode,
+                                           raw_ostream &O) {
   if (ExtraCode && ExtraCode[0])
     return true; // Unknown modifier.
 
@@ -117,7 +116,7 @@ bool V850AsmPrinter::PrintAsmMemoryOperand(const MachineInstr *MI,
 
 void V850AsmPrinter::emitInstruction(const MachineInstr *MI) {
   V850_MC::verifyInstructionPredicates(MI->getOpcode(),
-                                        getSubtargetInfo().getFeatureBits());
+                                       getSubtargetInfo().getFeatureBits());
 
   // Handle pseudo-instructions that need expansion
   switch (MI->getOpcode()) {
@@ -143,9 +142,8 @@ void V850AsmPrinter::emitInstruction(const MachineInstr *MI) {
       JarlInst.addOperand(MCOperand::createExpr(
           MCSymbolRefExpr::create(getSymbol(MO.getGlobal()), OutContext)));
     } else if (MO.isSymbol()) {
-      JarlInst.addOperand(MCOperand::createExpr(
-          MCSymbolRefExpr::create(
-              GetExternalSymbolSymbol(MO.getSymbolName()), OutContext)));
+      JarlInst.addOperand(MCOperand::createExpr(MCSymbolRefExpr::create(
+          GetExternalSymbolSymbol(MO.getSymbolName()), OutContext)));
     } else if (MO.isMBB()) {
       JarlInst.addOperand(MCOperand::createExpr(
           MCSymbolRefExpr::create(MO.getMBB()->getSymbol(), OutContext)));
@@ -195,18 +193,19 @@ void V850AsmPrinter::emitInstruction(const MachineInstr *MI) {
     // Emit: .Lhelper: add 2, lp (adjust LP past 2-byte jmp instruction)
     OutStreamer->emitLabel(HelperLabel);
     MCInst AddInst;
-    AddInst.setOpcode(V850::ADDi);  // add imm5, reg2
-    // Operand order: reg2 (out), imm5 (in), rs (in, same as reg2 via constraint)
-    AddInst.addOperand(MCOperand::createReg(V850::LP));  // reg2 output
-    AddInst.addOperand(MCOperand::createImm(2));         // imm5: jmp is 2 bytes
-    AddInst.addOperand(MCOperand::createReg(V850::LP));  // rs input
+    AddInst.setOpcode(V850::ADDi); // add imm5, reg2
+    // Operand order: reg2 (out), imm5 (in), rs (in, same as reg2 via
+    // constraint)
+    AddInst.addOperand(MCOperand::createReg(V850::LP)); // reg2 output
+    AddInst.addOperand(MCOperand::createImm(2));        // imm5: jmp is 2 bytes
+    AddInst.addOperand(MCOperand::createReg(V850::LP)); // rs input
     EmitToStreamer(*OutStreamer, AddInst);
 
     // Emit: br .Ljmp (branch back to execute jmp)
     MCInst BrInst;
     BrInst.setOpcode(V850::BR);
-    BrInst.addOperand(MCOperand::createExpr(
-        MCSymbolRefExpr::create(JmpLabel, OutContext)));
+    BrInst.addOperand(
+        MCOperand::createExpr(MCSymbolRefExpr::create(JmpLabel, OutContext)));
     EmitToStreamer(*OutStreamer, BrInst);
     return;
   }
@@ -220,9 +219,8 @@ void V850AsmPrinter::emitInstruction(const MachineInstr *MI) {
       JrInst.addOperand(MCOperand::createExpr(
           MCSymbolRefExpr::create(getSymbol(MO.getGlobal()), OutContext)));
     } else if (MO.isSymbol()) {
-      JrInst.addOperand(MCOperand::createExpr(
-          MCSymbolRefExpr::create(
-              GetExternalSymbolSymbol(MO.getSymbolName()), OutContext)));
+      JrInst.addOperand(MCOperand::createExpr(MCSymbolRefExpr::create(
+          GetExternalSymbolSymbol(MO.getSymbolName()), OutContext)));
     } else {
       llvm_unreachable("Unknown TAIL_CALL target operand type");
     }
@@ -261,7 +259,8 @@ void V850AsmPrinter::emitInstruction(const MachineInstr *MI) {
       // Entry = (target - table_base) >> 1
       // But since we're emitting .hword with a subtraction expression,
       // the assembler will compute the difference
-      const MCExpr *Value = MCSymbolRefExpr::create(MBB->getSymbol(), OutContext);
+      const MCExpr *Value =
+          MCSymbolRefExpr::create(MBB->getSymbol(), OutContext);
       const MCExpr *Base = MCSymbolRefExpr::create(JTISymbol, OutContext);
       const MCExpr *Diff = MCBinaryExpr::createSub(Value, Base, OutContext);
       // Shift right by 1 (divide by 2) since SWITCH multiplies by 2
@@ -269,6 +268,34 @@ void V850AsmPrinter::emitInstruction(const MachineInstr *MI) {
           Diff, MCConstantExpr::create(1, OutContext), OutContext);
       OutStreamer->emitValue(ShiftedDiff, 2); // 2 bytes = halfword
     }
+    return;
+  }
+  case V850::BINS_pseudo: {
+    // BINS_pseudo expands to BINS0, BINS1, or BINS2 based on msb/lsb values.
+    // Operands: 0=dst(out), 1=dst_in(tied), 2=src(reg1), 3=pos, 4=width
+    unsigned SrcReg = MI->getOperand(2).getReg();
+    unsigned DstReg = MI->getOperand(0).getReg();
+    unsigned Pos = MI->getOperand(3).getImm();
+    unsigned Width = MI->getOperand(4).getImm();
+    unsigned Lsb = Pos;
+    unsigned Msb = Pos + Width - 1;
+
+    // Select the BINS variant based on msb/lsb ranges.
+    unsigned Opc;
+    if (Msb >= 16 && Lsb >= 16)
+      Opc = V850::BINS0;
+    else if (Msb >= 16 && Lsb < 16)
+      Opc = V850::BINS1;
+    else
+      Opc = V850::BINS2;
+
+    MCInst BinsInst;
+    BinsInst.setOpcode(Opc);
+    BinsInst.addOperand(MCOperand::createReg(DstReg));
+    BinsInst.addOperand(MCOperand::createReg(SrcReg));
+    BinsInst.addOperand(MCOperand::createImm(Msb));
+    BinsInst.addOperand(MCOperand::createImm(Lsb));
+    EmitToStreamer(*OutStreamer, BinsInst);
     return;
   }
   default:
@@ -294,6 +321,7 @@ INITIALIZE_PASS(V850AsmPrinter, "v850-asm-printer", "V850 Assembly Printer",
                 false, false)
 
 // Force static initialization.
-extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void LLVMInitializeV850AsmPrinter() {
+extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void
+LLVMInitializeV850AsmPrinter() {
   RegisterAsmPrinter<V850AsmPrinter> X(getTheV850Target());
 }

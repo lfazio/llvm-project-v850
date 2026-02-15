@@ -483,5 +483,13 @@ TARGET_BUILTIN(__builtin_v850_cache, "vIUiv*", "n", "rh850g3m")
 // Prefetches data at addr. prefop specifies prefetch type.
 TARGET_BUILTIN(__builtin_v850_pref, "vIUiv*", "n", "rh850g3m")
 
+// BINS - Bitfield Insert
+// unsigned int __builtin_v850_bins(unsigned int dst, unsigned int src,
+//                                  unsigned int pos, unsigned int width)
+// Inserts 'width' bits from src (starting at bit 0) into dst at position 'pos'.
+// Returns the modified dst value.
+// pos must be 0-31, width must be 1-32, pos+width must be <= 32.
+TARGET_BUILTIN(__builtin_v850_bins, "UiUiUiIUiIUi", "nc", "rh850g3m")
+
 #undef BUILTIN
 #undef TARGET_BUILTIN

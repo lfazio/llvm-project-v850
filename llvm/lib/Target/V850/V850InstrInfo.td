@@ -3326,6 +3326,19 @@ def BINS2 : V850Inst32<(outs GPR:$reg2), (ins GPR:$reg1, uimm5:$msb, uimm5:$lsb)
   let Inst{16}    = 0;
 }
 
+// BINS pseudo instruction for CodeGen.
+// Takes (dst, src, pos, width) where pos and width are immediates.
+// Expanded to BINS0/1/2 in the AsmPrinter based on computed msb/lsb values.
+let Predicates = [HasRH850G3M],
+    hasSideEffects = 0, mayLoad = 0, mayStore = 0,
+    Constraints = "$dst = $dst_in" in
+def BINS_pseudo : V850Pseudo<(outs GPR:$dst),
+                             (ins GPR:$dst_in, GPR:$src, uimm5:$pos, uimm5:$width),
+                             "# BINS_pseudo $src, $pos, $width, $dst",
+                             [(set GPR:$dst,
+                               (int_v850_bins GPR:$dst_in, GPR:$src,
+                                             timm:$pos, timm:$width))]>;
+
 //===----------------------------------------------------------------------===//
 // LD.DW - Load Double Word (RH850G3M+)
 // Format XIV (48-bit)
