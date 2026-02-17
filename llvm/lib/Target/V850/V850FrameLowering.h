@@ -14,6 +14,7 @@
 #define LLVM_LIB_TARGET_V850_V850FRAMELOWERING_H
 
 #include "V850.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/CodeGen/TargetFrameLowering.h"
 
 namespace llvm {
@@ -69,9 +70,26 @@ private:
   bool canUsePrepareDispose(const MachineFunction &MF,
                             ArrayRef<CalleeSavedInfo> CSI) const;
 
+  /// Check if PUSHSP/POPSP instructions can be used for the given CSI.
+  /// Returns true if RH850G3M+ and CSI is non-empty.
+  bool canUsePushspPopsp(const MachineFunction &MF,
+                         ArrayRef<CalleeSavedInfo> CSI) const;
+
   /// Build the list12 register mask for PREPARE/DISPOSE from CSI.
   /// Returns the 12-bit mask where bit N corresponds to register r(20+N).
   unsigned buildList12Mask(ArrayRef<CalleeSavedInfo> CSI) const;
+
+  /// A contiguous range of registers for PUSHSP/POPSP.
+  struct RegRange {
+    unsigned StartReg; // First register (rh) - LLVM register number
+    unsigned EndReg;   // Last register (rt) - LLVM register number
+    unsigned Count;    // Number of registers in range
+  };
+
+  /// Find contiguous register ranges in CSI for PUSHSP/POPSP.
+  /// Returns ranges sorted by ascending hardware register number.
+  SmallVector<RegRange, 4>
+  findContiguousRanges(ArrayRef<CalleeSavedInfo> CSI) const;
 };
 
 } // end namespace llvm

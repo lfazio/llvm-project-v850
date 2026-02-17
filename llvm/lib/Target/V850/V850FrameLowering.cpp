@@ -21,8 +21,17 @@
 #include "llvm/CodeGen/MachineModuleInfo.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/Target/TargetOptions.h"
+#include <algorithm>
 
 using namespace llvm;
+
+/// Map hardware encoding (0-31) to LLVM MCPhysReg.
+static const MCPhysReg HWEncToReg[] = {
+    V850::R0,  V850::R1,  V850::R2,  V850::SP,  V850::GP,  V850::TP,  V850::R6,
+    V850::R7,  V850::R8,  V850::R9,  V850::R10, V850::R11, V850::R12, V850::R13,
+    V850::R14, V850::R15, V850::R16, V850::R17, V850::R18, V850::R19, V850::R20,
+    V850::R21, V850::R22, V850::R23, V850::R24, V850::R25, V850::R26, V850::R27,
+    V850::R28, V850::R29, V850::EP,  V850::LP};
 
 V850FrameLowering::V850FrameLowering(const V850Subtarget &STI)
     : TargetFrameLowering(TargetFrameLowering::StackGrowsDown,
@@ -77,16 +86,18 @@ void V850FrameLowering::emitPrologue(MachineFunction &MF,
 
   MachineBasicBlock::iterator MBBI = MBB.begin();
 
-  // Skip past any PREPARE instruction and its associated CFI directives
-  // so that prologue code (especially FP setup) comes after CSR saves.
-  // This is required because PREPARE saves the old register values before
-  // modification, and CFI directives must follow their associated instructions.
-  bool UsedPrepare = false;
+  // Skip past any PREPARE/PUSHSP instructions and their associated CFI
+  // directives so that prologue code (especially FP setup) comes after CSR
+  // saves. This is required because PREPARE/PUSHSP saves the old register
+  // values before modification, and CFI directives must follow their
+  // associated instructions.
+  bool UsedBlockCSRSave = false;
   while (MBBI != MBB.end() &&
          (MBBI->getOpcode() == V850::PREPARE ||
+          MBBI->getOpcode() == V850::PUSHSP ||
           MBBI->getOpcode() == TargetOpcode::CFI_INSTRUCTION)) {
-    if (MBBI->getOpcode() == V850::PREPARE)
-      UsedPrepare = true;
+    if (MBBI->getOpcode() == V850::PREPARE || MBBI->getOpcode() == V850::PUSHSP)
+      UsedBlockCSRSave = true;
     ++MBBI;
   }
 
@@ -99,13 +110,13 @@ void V850FrameLowering::emitPrologue(MachineFunction &MF,
     return;
 
   // Calculate total CFA offset for CFI directives.
-  // - With PREPARE: CSRs are saved by PREPARE (separate from StackSize),
-  //   so total CFA offset = CalleeSavedSize + StackSize.
-  // - Without PREPARE: CSR space is included in StackSize (via frame indices),
-  //   so total CFA offset = StackSize.
+  // - With PREPARE/PUSHSP: CSRs are saved by the block instruction (separate
+  //   from StackSize), so total CFA offset = CalleeSavedSize + StackSize.
+  // - Without block save: CSR space is included in StackSize (via frame
+  //   indices), so total CFA offset = StackSize.
   unsigned CalleeSavedSize = FuncInfo->getCalleeSavedStackSize();
   int64_t TotalCFAOffset =
-      UsedPrepare ? CalleeSavedSize + StackSize : StackSize;
+      UsedBlockCSRSave ? CalleeSavedSize + StackSize : StackSize;
 
   // Adjust stack pointer: SP = SP - StackSize
   // Prefer 16-bit ADDi for small offsets, then 32-bit ADDI, then use a register
@@ -152,14 +163,20 @@ void V850FrameLowering::emitPrologue(MachineFunction &MF,
   //   [CFA = original SP]
   //   [CalleeSavedSize bytes of saved registers at CFA-4, CFA-8, ...]
   //   [LocalFrameSize bytes of local variables]
-  //   [SP after complete prologue = CFA - StackSize]
+  //   [SP after complete prologue]
+  //
+  // With block CSR save (PREPARE/PUSHSP):
+  //   SP = CFA - CalleeSavedSize - StackSize
+  //   FP = SP + (CalleeSavedSize + StackSize - FPOffset)
+  // Without block CSR save:
+  //   SP = CFA - StackSize (StackSize includes CSR space)
+  //   FP = SP + (StackSize - FPOffset)
   //
   // FPOffset = offset from CFA to saved r29 (e.g., 12 means r29 at CFA-12)
   // FP should point to saved r29: FP = CFA - FPOffset
-  // Since SP = CFA - StackSize: FP = SP + (StackSize - FPOffset)
   if (hasFP(MF)) {
     int FPOffset = FuncInfo->getFPOffset();
-    int FPFromSP = StackSize - FPOffset;
+    int FPFromSP = static_cast<int>(TotalCFAOffset) - FPOffset;
 
     // FP = SP + FPFromSP (to point to saved r29 location)
     if (FPFromSP == 0) {
@@ -212,6 +229,33 @@ void V850FrameLowering::emitEpilogue(MachineFunction &MF,
   if (StackSize == 0)
     return;
 
+  // When using block CSR save (PUSHSP/POPSP or DISPOSE), the
+  // restoreCalleeSavedRegisters has already inserted restore instructions
+  // before the terminator. We must insert epilogue code (local frame
+  // deallocation and SP restore from FP) BEFORE those restore instructions,
+  // because:
+  //   1. POPSP/DISPOSE reads from SP, so SP must point to the CSR area first
+  //   2. FP-based SP restore must use r29 before it's restored by POPSP
+  //
+  // Walk backwards from the terminator to skip past POPSP, DISPOSE, DISPOSEr,
+  // and CFI_INSTRUCTION directives that were inserted by restoreCSR.
+  if (FuncInfo->usesBlockCSRSave()) {
+    while (MBBI != MBB.begin()) {
+      auto Prev = std::prev(MBBI);
+      if (Prev->getOpcode() == V850::POPSP ||
+          Prev->getOpcode() == V850::DISPOSE ||
+          Prev->getOpcode() == V850::DISPOSEr ||
+          Prev->getOpcode() == TargetOpcode::CFI_INSTRUCTION) {
+        MBBI = Prev;
+      } else {
+        break;
+      }
+    }
+    // Update DL to match the new insertion point
+    if (MBBI != MBB.end() && MBBI->getDebugLoc())
+      DL = MBBI->getDebugLoc();
+  }
+
   // Restore stack pointer from frame pointer if used
   // FP = SP + (StackSize - FPOffset)
   // So SP = FP - (StackSize - FPOffset) = FP - StackSize + FPOffset
@@ -247,11 +291,10 @@ void V850FrameLowering::emitEpilogue(MachineFunction &MF,
     }
 
     // After restoring SP from FP, switch CFA back to SP-based
-    // For PREPARE/DISPOSE: CSRs are still on stack, CFA = SP + CalleeSavedSize
-    // For fallback: everything is deallocated, CFA = SP + 0
+    // CSRs are still on stack, CFA = SP + CalleeSavedSize
     unsigned CalleeSavedSize = FuncInfo->getCalleeSavedStackSize();
     CFIInstBuilder CFIBuilder(MBB, MBBI, MachineInstr::FrameDestroy);
-    if (FuncInfo->usesPrepareDispose()) {
+    if (FuncInfo->usesBlockCSRSave()) {
       CFIBuilder.buildDefCFA(V850::SP, CalleeSavedSize);
     } else {
       CFIBuilder.buildDefCFA(V850::SP, 0);
@@ -288,12 +331,11 @@ void V850FrameLowering::emitEpilogue(MachineFunction &MF,
     }
 
     // After stack deallocation, update CFA offset
-    // For PREPARE/DISPOSE: CSRs are still on stack, CFA = SP + CalleeSavedSize
+    // For PUSHSP/POPSP: local frame deallocated, CSRs remain
     // For fallback: everything is deallocated, CFA = SP + 0
     unsigned CalleeSavedSize = FuncInfo->getCalleeSavedStackSize();
     CFIInstBuilder CFIBuilder(MBB, MBBI, MachineInstr::FrameDestroy);
-    if (FuncInfo->usesPrepareDispose()) {
-      // PREPARE/DISPOSE: local frame deallocated, CSRs remain
+    if (FuncInfo->usesBlockCSRSave()) {
       CFIBuilder.buildDefCFAOffset(CalleeSavedSize);
     } else if (CalleeSavedSize > 0) {
       // Fallback: entire frame (including CSRs) deallocated
@@ -390,6 +432,55 @@ bool V850FrameLowering::spillCalleeSavedRegisters(
     return true;
   }
 
+  // Try to use PUSHSP instruction (RH850G3M+)
+  // PUSHSP handles any contiguous register range, not limited to r20-r31.
+  // This is used when PREPARE can't be used (e.g., FP is required, or
+  // registers are outside the r20-r31 range for interrupt handlers).
+  if (canUsePushspPopsp(MF, CSI)) {
+    SmallVector<RegRange, 4> Ranges = findContiguousRanges(CSI);
+
+    // Mark that we're using PUSHSP/POPSP (CSR area is separate from local
+    // frame, same semantics as PREPARE/DISPOSE)
+    FuncInfo->setUsesPushspPopsp(true);
+
+    // Add all callee-saved registers as live-in
+    for (const CalleeSavedInfo &I : CSI)
+      MBB.addLiveIn(I.getReg());
+
+    // Emit PUSHSP for each contiguous range.
+    // Each PUSHSP adjusts SP by (count * 4) bytes.
+    // Registers are stored in ascending order: rh at highest address
+    // (old_SP - 4), rh+1 at old_SP - 8, etc.
+    int CumulativeOffset = 0; // Running CFA offset
+    int CFIOffset = -4;       // Running CFI offset from CFA
+
+    for (const RegRange &Range : Ranges) {
+      BuildMI(MBB, MI, DL, TII.get(V850::PUSHSP))
+          .addReg(Range.StartReg)
+          .addReg(Range.EndReg)
+          .setMIFlag(MachineInstr::FrameSetup);
+
+      CumulativeOffset += Range.Count * 4;
+
+      // Emit CFI directives after each PUSHSP
+      MachineBasicBlock::iterator CFIInsertPt = std::prev(MI);
+      CFIInstBuilder CFIBuilder(MBB, CFIInsertPt, MachineInstr::FrameSetup);
+
+      // Update CFA offset to reflect cumulative PUSHSP adjustments
+      CFIBuilder.buildDefCFAOffset(CumulativeOffset);
+
+      // Emit cfi_offset for each register in this range (ascending order)
+      unsigned StartHW = TRI->getEncodingValue(Range.StartReg);
+      unsigned EndHW = TRI->getEncodingValue(Range.EndReg);
+      for (unsigned HW = StartHW; HW <= EndHW; ++HW) {
+        CFIBuilder.buildOffset(HWEncToReg[HW], CFIOffset);
+        CFIOffset -= 4;
+      }
+    }
+
+    return true;
+  }
+
   // Fallback: use individual store instructions
   CFIInstBuilder CFIBuilder(MBB, MI, MachineInstr::FrameSetup);
   int Offset = -4;
@@ -479,6 +570,23 @@ bool V850FrameLowering::restoreCalleeSavedRegisters(
     // The key CFI information for unwinding is emitted in
     // spillCalleeSavedRegisters.
 
+    return true;
+  }
+
+  // Try to use POPSP instruction (RH850G3M+)
+  if (canUsePushspPopsp(MF, CSI)) {
+    SmallVector<RegRange, 4> Ranges = findContiguousRanges(CSI);
+
+    // POPSP restores in reverse order of PUSHSP: last range popped first.
+    // This correctly mirrors the stack layout from PUSHSP.
+    for (const RegRange &Range : llvm::reverse(Ranges)) {
+      BuildMI(MBB, MI, DL, TII.get(V850::POPSP))
+          .addReg(Range.StartReg)
+          .addReg(Range.EndReg)
+          .setMIFlag(MachineInstr::FrameDestroy);
+    }
+
+    // Note: CFI restore directives not emitted (prologue-only philosophy).
     return true;
   }
 
@@ -619,4 +727,59 @@ V850FrameLowering::buildList12Mask(ArrayRef<CalleeSavedInfo> CSI) const {
   }
 
   return List12;
+}
+
+//===----------------------------------------------------------------------===//
+// PUSHSP/POPSP Support (RH850G3M+)
+//===----------------------------------------------------------------------===//
+
+bool V850FrameLowering::canUsePushspPopsp(const MachineFunction &MF,
+                                          ArrayRef<CalleeSavedInfo> CSI) const {
+  // PUSHSP/POPSP requires RH850G3M or later
+  const V850Subtarget &Subtarget = MF.getSubtarget<V850Subtarget>();
+  if (!Subtarget.hasRH850G3M())
+    return false;
+
+  // Need at least one register to save
+  if (CSI.empty())
+    return false;
+
+  return true;
+}
+
+SmallVector<V850FrameLowering::RegRange, 4>
+V850FrameLowering::findContiguousRanges(ArrayRef<CalleeSavedInfo> CSI) const {
+  SmallVector<RegRange, 4> Ranges;
+
+  if (CSI.empty())
+    return Ranges;
+
+  // Collect and sort hardware encodings
+  SmallVector<unsigned, 16> HWRegs;
+  for (const CalleeSavedInfo &I : CSI) {
+    unsigned HWReg = TRI->getEncodingValue(I.getReg());
+    HWRegs.push_back(HWReg);
+  }
+  llvm::sort(HWRegs);
+
+  // Remove duplicates (shouldn't happen, but be safe)
+  HWRegs.erase(llvm::unique(HWRegs), HWRegs.end());
+
+  // Find contiguous ranges
+  unsigned Start = HWRegs[0];
+  unsigned Prev = HWRegs[0];
+  for (unsigned i = 1; i < HWRegs.size(); ++i) {
+    if (HWRegs[i] == Prev + 1) {
+      Prev = HWRegs[i];
+    } else {
+      // End of range
+      Ranges.push_back({HWEncToReg[Start], HWEncToReg[Prev], Prev - Start + 1});
+      Start = HWRegs[i];
+      Prev = HWRegs[i];
+    }
+  }
+  // Last range
+  Ranges.push_back({HWEncToReg[Start], HWEncToReg[Prev], Prev - Start + 1});
+
+  return Ranges;
 }
