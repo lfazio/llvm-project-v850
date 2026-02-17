@@ -246,11 +246,13 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::FP_TO_SINT, MVT::i32, Legal);
     setOperationAction(ISD::FP_TO_UINT, MVT::i32, Legal);
 
-    // Comparisons - expand to library calls (complex FP compare status
-    // handling)
-    setOperationAction(ISD::SETCC, MVT::f32, Expand);
-    setOperationAction(ISD::SELECT_CC, MVT::f32, Expand);
-    setOperationAction(ISD::BR_CC, MVT::f32, Expand);
+    // FP comparisons - CMPF.S + TRFSR + SETF/CMOV/BR sequence
+    // SETCC f32 is Legal (handled in ISel via CMPF.S + TRFSR + SETF)
+    // SELECT_CC f32 and BR_CC f32 are Custom (lowered via V850ISD::FP_CMP)
+    setOperationAction(ISD::SETCC, MVT::f32, Legal);
+    setOperationAction(ISD::SELECT_CC, MVT::f32, Custom);
+    setOperationAction(ISD::SELECT, MVT::f32, Expand);
+    setOperationAction(ISD::BR_CC, MVT::f32, Custom);
 
     // Double-precision - expand to library calls for now
     // (would need register pair handling for hardware support)
@@ -389,6 +391,8 @@ const char *V850TargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "V850ISD::BR_JT";
   case V850ISD::SASF:
     return "V850ISD::SASF";
+  case V850ISD::FP_CMP:
+    return "V850ISD::FP_CMP";
   }
   return nullptr;
 }
@@ -457,6 +461,78 @@ SDValue V850TargetLowering::LowerConstantPool(SDValue Op,
   return DAG.getNode(V850ISD::WRAPPER, DL, VT, Result);
 }
 
+/// Map ISD::CondCode for floating-point to V850 CMPF fcond value.
+/// Returns {fcond, needSwap, needNegate}.
+/// - fcond: V850 CMPF condition code (0-15)
+/// - needSwap: swap LHS/RHS operands before CMPF
+/// - needNegate: negate result (use NZ instead of Z after TRFSR)
+///
+/// V850 CMPF fcond values:
+///   0 (F)    - False              1 (UN)   - Unordered
+///   2 (EQ)   - Equal              3 (UEQ)  - Unordered or Equal
+///   4 (OLT)  - Ordered Less Than  5 (ULT)  - Unordered or Less Than
+///   6 (OLE)  - Ordered Less/Equal 7 (ULE)  - Unordered or Less/Equal
+struct FPCondResult {
+  unsigned FCond;
+  bool NeedSwap;
+  bool NeedNegate;
+};
+
+static FPCondResult getFPCondCode(ISD::CondCode CC) {
+  switch (CC) {
+  default:
+    llvm_unreachable("Unknown FP condition code");
+  case ISD::SETFALSE:
+  case ISD::SETFALSE2:
+    return {0, false, false}; // F - always false
+  case ISD::SETOEQ:
+    return {2, false, false}; // EQ
+  case ISD::SETOGT:
+    return {4, true, false}; // OLT with swap (LHS > RHS ≡ RHS < LHS)
+  case ISD::SETOGE:
+    return {6, true, false}; // OLE with swap
+  case ISD::SETOLT:
+    return {4, false, false}; // OLT
+  case ISD::SETOLE:
+    return {6, false, false}; // OLE
+  case ISD::SETONE:
+    return {3, false,
+            true}; // !UEQ (not unordered-or-equal = ordered not-equal)
+  case ISD::SETO:
+    return {1, false, true}; // !UN (not unordered = ordered)
+  case ISD::SETUO:
+    return {1, false, false}; // UN
+  case ISD::SETUEQ:
+    return {3, false, false}; // UEQ
+  case ISD::SETUGT:
+    return {5, true, false}; // ULT with swap
+  case ISD::SETUGE:
+    return {7, true, false}; // ULE with swap
+  case ISD::SETULT:
+    return {5, false, false}; // ULT
+  case ISD::SETULE:
+    return {7, false, false}; // ULE
+  case ISD::SETUNE:
+    return {2, false, true}; // !EQ
+  case ISD::SETTRUE:
+  case ISD::SETTRUE2:
+    return {0, false, true}; // !F = always true
+  // Handle generic (non-ordered-specific) codes as ordered equivalents
+  case ISD::SETEQ:
+    return {2, false, false}; // EQ (same as SETOEQ)
+  case ISD::SETNE:
+    return {2, false, true}; // !EQ (same as SETUNE)
+  case ISD::SETLT:
+    return {4, false, false}; // OLT
+  case ISD::SETLE:
+    return {6, false, false}; // OLE
+  case ISD::SETGT:
+    return {4, true, false}; // OLT with swap
+  case ISD::SETGE:
+    return {6, true, false}; // OLE with swap
+  }
+}
+
 SDValue V850TargetLowering::LowerBR_CC(SDValue Op, SelectionDAG &DAG) const {
   SDValue Chain = Op.getOperand(0);
   ISD::CondCode CC = cast<CondCodeSDNode>(Op.getOperand(1))->get();
@@ -465,9 +541,26 @@ SDValue V850TargetLowering::LowerBR_CC(SDValue Op, SelectionDAG &DAG) const {
   SDValue Dest = Op.getOperand(4);
   SDLoc DL(Op);
 
-  SDValue Cmp = DAG.getNode(V850ISD::CMP, DL, MVT::Glue, LHS, RHS);
+  SDValue Cmp;
+  ISD::CondCode BrCC = CC;
+
+  if (LHS.getValueType() == MVT::f32) {
+    // Floating-point comparison: CMPF.S + TRFSR → PSW.Z
+    FPCondResult FPC = getFPCondCode(CC);
+    if (FPC.NeedSwap)
+      std::swap(LHS, RHS);
+    Cmp = DAG.getNode(V850ISD::FP_CMP, DL, MVT::Glue,
+                      DAG.getConstant(FPC.FCond, DL, MVT::i32), LHS, RHS);
+    // After TRFSR: Z=1 if comparison true, Z=0 if false
+    // Use SETEQ (→ BZ) for true, SETNE (→ BNZ) for negated
+    BrCC = FPC.NeedNegate ? ISD::SETNE : ISD::SETEQ;
+  } else {
+    // Integer comparison
+    Cmp = DAG.getNode(V850ISD::CMP, DL, MVT::Glue, LHS, RHS);
+  }
+
   return DAG.getNode(V850ISD::BR_CC, DL, Op.getValueType(), Chain, Dest,
-                     DAG.getConstant(CC, DL, MVT::i32), Cmp);
+                     DAG.getConstant(BrCC, DL, MVT::i32), Cmp);
 }
 
 SDValue V850TargetLowering::LowerSELECT_CC(SDValue Op,
@@ -478,10 +571,36 @@ SDValue V850TargetLowering::LowerSELECT_CC(SDValue Op,
   SDValue FalseV = Op.getOperand(3);
   ISD::CondCode CC = cast<CondCodeSDNode>(Op.getOperand(4))->get();
   SDLoc DL(Op);
+  EVT ResultVT = Op.getValueType();
 
-  SDValue Cmp = DAG.getNode(V850ISD::CMP, DL, MVT::Glue, LHS, RHS);
-  return DAG.getNode(V850ISD::SELECT_CC, DL, Op.getValueType(), TrueV, FalseV,
-                     DAG.getConstant(CC, DL, MVT::i32), Cmp);
+  SDValue Cmp;
+  ISD::CondCode SelCC = CC;
+
+  if (LHS.getValueType() == MVT::f32) {
+    // Floating-point comparison: CMPF.S + TRFSR → PSW.Z
+    FPCondResult FPC = getFPCondCode(CC);
+    if (FPC.NeedSwap)
+      std::swap(LHS, RHS);
+    Cmp = DAG.getNode(V850ISD::FP_CMP, DL, MVT::Glue,
+                      DAG.getConstant(FPC.FCond, DL, MVT::i32), LHS, RHS);
+    // After TRFSR: Z=1 if comparison true → use SETEQ for CMOV condition
+    SelCC = FPC.NeedNegate ? ISD::SETNE : ISD::SETEQ;
+  } else {
+    // Integer comparison
+    Cmp = DAG.getNode(V850ISD::CMP, DL, MVT::Glue, LHS, RHS);
+  }
+
+  // For f32 result, bitcast to i32 for CMOV, then bitcast back
+  if (ResultVT == MVT::f32) {
+    TrueV = DAG.getNode(ISD::BITCAST, DL, MVT::i32, TrueV);
+    FalseV = DAG.getNode(ISD::BITCAST, DL, MVT::i32, FalseV);
+    SDValue Sel = DAG.getNode(V850ISD::SELECT_CC, DL, MVT::i32, TrueV, FalseV,
+                              DAG.getConstant(SelCC, DL, MVT::i32), Cmp);
+    return DAG.getNode(ISD::BITCAST, DL, MVT::f32, Sel);
+  }
+
+  return DAG.getNode(V850ISD::SELECT_CC, DL, ResultVT, TrueV, FalseV,
+                     DAG.getConstant(SelCC, DL, MVT::i32), Cmp);
 }
 
 // Helper to check if a value is sign-extended from i16
@@ -1726,6 +1845,12 @@ static void EmitReadFPUReg(MachineInstr &MI, MachineBasicBlock *MBB,
                            Register ScratchReg2) {
   DebugLoc DL = MI.getDebugLoc();
 
+  // FPU system register regIDs: FPSR=6, FPEPC=7, FPST=8, FPCC=9, FPCFG=10,
+  // FPEC=11
+  static const unsigned FPURegIDs[] = {6, 7, 8, 9, 10, 11};
+  // BSEL regID = 31
+  static const unsigned BSELRegID = 31;
+
   // movhi 0x20, r0, $scratch1  ; $scratch1 = 0x2000 (FPU Status Bank)
   BuildMI(*MBB, MI, DL, TII.get(V850::MOVHI), ScratchReg1)
       .addImm(0x20)
@@ -1734,14 +1859,11 @@ static void EmitReadFPUReg(MachineInstr &MI, MachineBasicBlock *MBB,
   // ldsr $scratch1, bsel  ; Select FPU bank
   BuildMI(*MBB, MI, DL, TII.get(V850::LDSR))
       .addReg(ScratchReg1)
-      .addReg(V850::BSEL);
+      .addImm(BSELRegID);
 
   // stsr fpu_reg, $result  ; Read FPU register
-  // Map FPU register number to actual register
-  unsigned FPURegs[] = {V850::FPSR, V850::FPEPC, V850::FPST,
-                        V850::FPCC, V850::FPCFG, V850::FPEC};
   BuildMI(*MBB, MI, DL, TII.get(V850::STSR), ResultReg)
-      .addReg(FPURegs[FPURegNo]);
+      .addImm(FPURegIDs[FPURegNo]);
 
   // mov r0, $scratch2  ; $scratch2 = 0
   BuildMI(*MBB, MI, DL, TII.get(V850::MOV), ScratchReg2).addReg(V850::R0);
@@ -1749,7 +1871,7 @@ static void EmitReadFPUReg(MachineInstr &MI, MachineBasicBlock *MBB,
   // ldsr $scratch2, bsel  ; Restore CPU main bank
   BuildMI(*MBB, MI, DL, TII.get(V850::LDSR))
       .addReg(ScratchReg2)
-      .addReg(V850::BSEL);
+      .addImm(BSELRegID);
 }
 
 /// EmitWriteFPUReg - Emit the instruction sequence to write an FPU system
@@ -1767,6 +1889,12 @@ static void EmitWriteFPUReg(MachineInstr &MI, MachineBasicBlock *MBB,
                             Register ScratchReg2) {
   DebugLoc DL = MI.getDebugLoc();
 
+  // FPU system register regIDs: FPSR=6, FPEPC=7, FPST=8, FPCC=9, FPCFG=10,
+  // FPEC=11
+  static const unsigned FPURegIDs[] = {6, 7, 8, 9, 10, 11};
+  // BSEL regID = 31
+  static const unsigned BSELRegID = 31;
+
   // movhi 0x20, r0, $scratch1  ; $scratch1 = 0x2000 (FPU Status Bank)
   BuildMI(*MBB, MI, DL, TII.get(V850::MOVHI), ScratchReg1)
       .addImm(0x20)
@@ -1775,14 +1903,12 @@ static void EmitWriteFPUReg(MachineInstr &MI, MachineBasicBlock *MBB,
   // ldsr $scratch1, bsel  ; Select FPU bank
   BuildMI(*MBB, MI, DL, TII.get(V850::LDSR))
       .addReg(ScratchReg1)
-      .addReg(V850::BSEL);
+      .addImm(BSELRegID);
 
   // ldsr $value, fpu_reg  ; Write FPU register
-  unsigned FPURegs[] = {V850::FPSR, V850::FPEPC, V850::FPST,
-                        V850::FPCC, V850::FPCFG, V850::FPEC};
   BuildMI(*MBB, MI, DL, TII.get(V850::LDSR))
       .addReg(ValueReg)
-      .addReg(FPURegs[FPURegNo]);
+      .addImm(FPURegIDs[FPURegNo]);
 
   // mov r0, $scratch2  ; $scratch2 = 0
   BuildMI(*MBB, MI, DL, TII.get(V850::MOV), ScratchReg2).addReg(V850::R0);
@@ -1790,7 +1916,7 @@ static void EmitWriteFPUReg(MachineInstr &MI, MachineBasicBlock *MBB,
   // ldsr $scratch2, bsel  ; Restore CPU main bank
   BuildMI(*MBB, MI, DL, TII.get(V850::LDSR))
       .addReg(ScratchReg2)
-      .addReg(V850::BSEL);
+      .addImm(BSELRegID);
 }
 
 MachineBasicBlock *

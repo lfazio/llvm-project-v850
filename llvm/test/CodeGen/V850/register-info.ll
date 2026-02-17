@@ -7,8 +7,7 @@
 ; Check register descriptors are defined
 ; CHECK: extern const MCRegisterDesc V850RegDesc[]
 
-; Check register classes exist
-; CHECK: // SysReg Register Class
+; Check register classes exist (SysReg was removed - system registers are now immediates)
 ; CHECK: // FPR Register Class
 ; CHECK: // GPR Register Class
 ; CHECK: // GPRnoR0 Register Class

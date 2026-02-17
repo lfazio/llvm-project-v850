@@ -74,6 +74,7 @@ def FeatureRH850G3MH : SubtargetFeature<"rh850g3mh", "HasRH850G3MH", "true",
 //===----------------------------------------------------------------------===//
 
 include "V850RegisterInfo.td"
+include "V850SystemOperands.td"
 include "V850CallingConv.td"
 include "V850InstrInfo.td"
 include "V850Schedule.td"

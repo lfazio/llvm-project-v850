@@ -86,7 +86,9 @@ ldsr r9, fpcc
 // CHECK: ldsr r10, fpcfg ; encoding: [0xea,0x57,0x00,0x04]
 ldsr r10, fpcfg
 
-// CHECK: ldsr r11, fpec ; encoding: [0xeb,0x5f,0x00,0x04]
+// On v850e2m, regID 11 prints as 'sccfg' (CPU main bank, the default)
+// even when input uses the FPU-bank alias 'fpec'.
+// CHECK: ldsr r11, sccfg ; encoding: [0xeb,0x5f,0x00,0x04]
 ldsr r11, fpec
 
 //===----------------------------------------------------------------------===//

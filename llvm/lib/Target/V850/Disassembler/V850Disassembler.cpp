@@ -98,16 +98,12 @@ static DecodeStatus DecodeFPRRegisterClass(MCInst &Inst, uint32_t RegNo,
   return MCDisassembler::Success;
 }
 
-static DecodeStatus DecodeSysRegRegisterClass(MCInst &Inst, uint32_t RegNo,
-                                              uint64_t Address,
-                                              const MCDisassembler *Decoder) {
-  // System registers have a different encoding
-  // For now, just add the register number as immediate
+static DecodeStatus decodeSystemRegister(MCInst &Inst, uint32_t RegNo,
+                                         int64_t Address,
+                                         const MCDisassembler *Decoder) {
   if (RegNo >= 32)
     return MCDisassembler::Fail;
 
-  // Map system register number to actual register
-  // TODO: Add proper system register handling
   Inst.addOperand(MCOperand::createImm(RegNo));
   return MCDisassembler::Success;
 }

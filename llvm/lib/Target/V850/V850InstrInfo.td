@@ -76,6 +76,19 @@ def uimm9 : Operand<i32>, ImmLeaf<i32, [{return isUInt<9>(Imm);}]> {
   let DecoderMethod = "decodeUImmOperand<9>";
 }
 
+// System register operand (immediate-based, following RISC-V CSR pattern)
+def V850SysRegAsmOperand : AsmOperandClass {
+  let Name = "SysReg";
+  let ParserMethod = "parseSystemRegister";
+  let DiagnosticType = "InvalidSysReg";
+}
+
+def sysreg : Operand<i32>, ImmLeaf<i32, [{return isUInt<5>(Imm);}]> {
+  let ParserMatchClass = V850SysRegAsmOperand;
+  let PrintMethod = "printSystemRegister";
+  let DecoderMethod = "decodeSystemRegister";
+}
+
 // AsmOperandClass for short load/store displacement with implicit EP base
 def Imm7AsmOperand : AsmOperandClass {
   let Name = "Imm7EP";
@@ -857,7 +870,7 @@ def SETF : FormatIX<0b111111, 0b000000, (outs GPR:$reg2), (ins condcode:$cond),
 
 // LDSR reg2, regID - Load to system register
 // Opcode: 111111 (0x3F), sub-op: 100000 (0x20)
-def LDSR : FormatIX<0b111111, 0b100000, (outs), (ins GPR:$reg2, SysReg:$regID),
+def LDSR : FormatIX<0b111111, 0b100000, (outs), (ins GPR:$reg2, sysreg:$regID),
                     "ldsr\t$reg2, $regID", []> {
   bits<5> regID;
   let reg1 = regID;
@@ -865,7 +878,7 @@ def LDSR : FormatIX<0b111111, 0b100000, (outs), (ins GPR:$reg2, SysReg:$regID),
 
 // STSR regID, reg2 - Store from system register
 // Opcode: 111111 (0x3F), sub-op: 100100 (0x24)
-def STSR : FormatIX<0b111111, 0b100100, (outs GPR:$reg2), (ins SysReg:$regID),
+def STSR : FormatIX<0b111111, 0b100100, (outs GPR:$reg2), (ins sysreg:$regID),
                     "stsr\t$regID, $reg2", []> {
   bits<5> regID;
   let reg1 = regID;
@@ -2886,57 +2899,15 @@ def : Pat<(int_v850_ei), (EI)>;
 //===----------------------------------------------------------------------===//
 // Generic System Register Access Patterns
 //
-// These patterns map llvm.v850.ldsr/stsr intrinsics with immediate regID
-// to the corresponding LDSR/STSR instructions with specific system registers.
-//
-// CPU variant requirements:
-// - Base V850:  regID 0-5 (EIPC, EIPSW, FEPC, FEPSW, ECR, PSW)
-// - V850E1+:    regID 16-20 (CTPC, CTPSW, CTBP)
-// - V850E2M+:   regID 28-31 (EIWR, FEWR, DBWR, BSEL)
+// System registers are now modeled as immediate operands (sysreg type).
+// These two generic patterns handle all regID values, eliminating the need
+// for per-register patterns.
 //===----------------------------------------------------------------------===//
 
-// Base V850 System Registers (always available)
-// STSR patterns - Read system register by regID
-def : Pat<(int_v850_stsr(i32 0)), (STSR EIPC)>;  // EIPC
-def : Pat<(int_v850_stsr(i32 1)), (STSR EIPSW)>; // EIPSW
-def : Pat<(int_v850_stsr(i32 2)), (STSR FEPC)>;  // FEPC
-def : Pat<(int_v850_stsr(i32 3)), (STSR FEPSW)>; // FEPSW
-def : Pat<(int_v850_stsr(i32 4)), (STSR ECR)>;   // ECR
-def : Pat<(int_v850_stsr(i32 5)), (STSR PSW)>;   // PSW
-
-// LDSR patterns - Write system register by regID
-def : Pat<(int_v850_ldsr GPR:$val, (i32 0)), (LDSR GPR:$val, EIPC)>;
-def : Pat<(int_v850_ldsr GPR:$val, (i32 1)), (LDSR GPR:$val, EIPSW)>;
-def : Pat<(int_v850_ldsr GPR:$val, (i32 2)), (LDSR GPR:$val, FEPC)>;
-def : Pat<(int_v850_ldsr GPR:$val, (i32 3)), (LDSR GPR:$val, FEPSW)>;
-def : Pat<(int_v850_ldsr GPR:$val, (i32 4)), (LDSR GPR:$val, ECR)>;
-def : Pat<(int_v850_ldsr GPR:$val, (i32 5)), (LDSR GPR:$val, PSW)>;
-
-// V850E1+ System Registers
-let Predicates = [HasV850E1] in {
-  // STSR patterns
-  def : Pat<(int_v850_stsr(i32 16)), (STSR CTPC)>;  // CTPC
-  def : Pat<(int_v850_stsr(i32 17)), (STSR CTPSW)>; // CTPSW
-  def : Pat<(int_v850_stsr(i32 20)), (STSR CTBP)>;  // CTBP
-
-  // LDSR patterns
-  def : Pat<(int_v850_ldsr GPR:$val, (i32 16)), (LDSR GPR:$val, CTPC)>;
-  def : Pat<(int_v850_ldsr GPR:$val, (i32 17)), (LDSR GPR:$val, CTPSW)>;
-  def : Pat<(int_v850_ldsr GPR:$val, (i32 20)), (LDSR GPR:$val, CTBP)>;
-}
-
-// V850E2M+ System Registers
-let Predicates = [HasV850E2M] in {
-  // STSR patterns
-  def : Pat<(int_v850_stsr(i32 28)), (STSR EIWR)>; // EIWR
-  def : Pat<(int_v850_stsr(i32 29)), (STSR FEWR)>; // FEWR
-  def : Pat<(int_v850_stsr(i32 31)), (STSR BSEL)>; // BSEL
-
-  // LDSR patterns
-  def : Pat<(int_v850_ldsr GPR:$val, (i32 28)), (LDSR GPR:$val, EIWR)>;
-  def : Pat<(int_v850_ldsr GPR:$val, (i32 29)), (LDSR GPR:$val, FEWR)>;
-  def : Pat<(int_v850_ldsr GPR:$val, (i32 31)), (LDSR GPR:$val, BSEL)>;
-}
+def : Pat<(int_v850_ldsr GPR:$val, timm:$regID),
+          (LDSR GPR:$val, imm:$regID)>;
+def : Pat<(int_v850_stsr timm:$regID),
+          (STSR imm:$regID)>;
 
 // RH850G3M+ System Register Access with selID (group specification)
 let Predicates = [HasRH850G3M] in {

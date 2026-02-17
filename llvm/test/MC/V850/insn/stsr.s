@@ -86,7 +86,8 @@ stsr fpcc, r9
 // CHECK: stsr fpcfg, r10 ; encoding: [0xea,0x57,0x80,0x04]
 stsr fpcfg, r10
 
-// CHECK: stsr fpec, r11 ; encoding: [0xeb,0x5f,0x80,0x04]
+// On v850e2m, regID 11 prints as 'sccfg' (CPU main bank default)
+// CHECK: stsr sccfg, r11 ; encoding: [0xeb,0x5f,0x80,0x04]
 stsr fpec, r11
 
 //===----------------------------------------------------------------------===//

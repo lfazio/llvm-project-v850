@@ -79,6 +79,13 @@ enum NodeType : unsigned {
   // SASF input, LHS, RHS, condcode
   // First CMP LHS, RHS sets PSW, then SASF checks condition and shifts.
   SASF,
+
+  // FP_CMP: Floating-point compare (V850E2M+ FPU)
+  // Emits CMPF.S/D + TRFSR to set PSW.Z from FP comparison result.
+  // Operands: (fcond, lhs, rhs) → Glue (PSW flags)
+  // After execution, PSW.Z = 1 if comparison is true, 0 if false.
+  // Use BZ/SETF Z for "true" branch, BNZ/SETF NZ for "false" branch.
+  FP_CMP,
 };
 } // namespace V850ISD
 

@@ -109,9 +109,10 @@ ldsr r20, fpcfg
 stsr fpcfg, r20
 
 // FPEC - Floating-point exception control (regID 11)
-// CHECK: ldsr r21, fpec ; encoding: [0xeb,0xaf,0x00,0x04]
+// On v850e2m, regID 11 prints as 'sccfg' (CPU main bank is default)
+// CHECK: ldsr r21, sccfg ; encoding: [0xeb,0xaf,0x00,0x04]
 ldsr r21, fpec
-// CHECK: stsr fpec, r21 ; encoding: [0xeb,0xaf,0x80,0x04]
+// CHECK: stsr sccfg, r21 ; encoding: [0xeb,0xaf,0x80,0x04]
 stsr fpec, r21
 
 //===----------------------------------------------------------------------===//

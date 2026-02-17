@@ -31,10 +31,28 @@
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/SMLoc.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/TargetParser/SubtargetFeature.h"
 #include <cstdint>
 #include <memory>
 
 using namespace llvm;
+
+// System register table entry - matches V850SystemOperands.td definition.
+struct V850SysRegEntry {
+  const char *Name;
+  uint8_t Encoding;
+  FeatureBitset FeaturesRequired;
+
+  bool haveRequiredFeatures(const FeatureBitset &ActiveFeatures) const {
+    return (FeaturesRequired & ActiveFeatures) == FeaturesRequired;
+  }
+};
+
+namespace {
+#define GET_V850SysRegsList_DECL
+#define GET_V850SysRegsList_IMPL
+#include "V850GenSearchableTables.inc"
+} // anonymous namespace
 
 #define DEBUG_TYPE "v850-asm-parser"
 
@@ -65,6 +83,7 @@ class V850AsmParser : public MCTargetAsmParser {
   ParseStatus parseBranchTarget(OperandVector &Operands);
   ParseStatus parseCondCode(OperandVector &Operands);
   ParseStatus parseFPCondCode(OperandVector &Operands);
+  ParseStatus parseSystemRegister(OperandVector &Operands);
 
   MCRegister matchRegisterName(StringRef Name);
   MCRegister matchRegisterAltName(StringRef Name);
@@ -88,6 +107,12 @@ class V850AsmParser : public MCTargetAsmParser {
                               SMLoc IDLoc);
 
 public:
+  // Auto-generated operand diagnostic types
+  enum V850MatchResultTy {
+    Match_Dummy = FIRST_TARGET_MATCH_RESULT_TY,
+#define GET_OPERAND_DIAGNOSTIC_TYPES
+#include "V850GenAsmMatcher.inc"
+  };
   V850AsmParser(const MCSubtargetInfo &STI, MCAsmParser &Parser,
                 const MCInstrInfo &MII, const MCTargetOptions &Options)
       : MCTargetAsmParser(Options, STI, MII), Parser(Parser),
@@ -140,7 +165,13 @@ public:
 
   // Used by TableGen matchers
   bool isGPR() const { return isReg(); }
-  bool isSysReg() const { return isReg(); }
+  bool isSysReg() const {
+    if (!isImm())
+      return false;
+    if (const MCConstantExpr *CE = dyn_cast<MCConstantExpr>(getImm()))
+      return isUInt<5>(CE->getValue());
+    return false;
+  }
 
   bool isSimm5() const {
     if (!isImm())
@@ -413,6 +444,10 @@ public:
     addImmOperands(Inst, N);
   }
 
+  void addSysRegOperands(MCInst &Inst, unsigned N) const {
+    addImmOperands(Inst, N);
+  }
+
   // Add memory operand as two separate operands: base register and displacement
   // This is used by Format VIII instructions (SET1, NOT1, CLR1, TST1)
   // The instruction encoding expects (bit3, reg1, disp16) but assembly is
@@ -484,6 +519,13 @@ ParseStatus V850AsmParser::tryParseRegister(MCRegister &Reg, SMLoc &StartLoc,
 
 ParseStatus V850AsmParser::parseOperand(OperandVector &Operands,
                                         StringRef Mnemonic) {
+  // Try auto-generated custom operand parsers (e.g., parseSystemRegister)
+  ParseStatus Result = MatchOperandParserImpl(Operands, Mnemonic);
+  if (Result.isSuccess())
+    return Result;
+  if (Result.isFailure())
+    return Result;
+
   // Try to parse as register first
   MCRegister Reg;
   SMLoc StartLoc, EndLoc;
@@ -645,6 +687,51 @@ ParseStatus V850AsmParser::parseFPCondCode(OperandVector &Operands) {
   const MCExpr *Expr = MCConstantExpr::create(FCondVal, getContext());
   Operands.push_back(V850Operand::createImm(Expr, StartLoc, EndLoc));
   return ParseStatus::Success;
+}
+
+ParseStatus V850AsmParser::parseSystemRegister(OperandVector &Operands) {
+  SMLoc StartLoc = Parser.getTok().getLoc();
+  SMLoc EndLoc;
+
+  switch (Parser.getTok().getKind()) {
+  default:
+    return ParseStatus::NoMatch;
+
+  case AsmToken::Integer: {
+    // Accept raw integer regID (0-31)
+    const MCExpr *Expr;
+    if (Parser.parseExpression(Expr))
+      return ParseStatus::Failure;
+
+    if (const MCConstantExpr *CE = dyn_cast<MCConstantExpr>(Expr)) {
+      int64_t Imm = CE->getValue();
+      if (!isUInt<5>(Imm)) {
+        Error(StartLoc, "system register ID must be in range [0, 31]");
+        return ParseStatus::Failure;
+      }
+    }
+
+    EndLoc = Parser.getTok().getLoc();
+    Operands.push_back(V850Operand::createImm(Expr, StartLoc, EndLoc));
+    return ParseStatus::Success;
+  }
+
+  case AsmToken::Identifier: {
+    StringRef Name = Parser.getTok().getString();
+
+    // Look up system register by name
+    const V850SysRegEntry *SysReg = lookupV850SysRegByName(Name);
+    if (!SysReg)
+      return ParseStatus::NoMatch;
+
+    EndLoc = Parser.getTok().getEndLoc();
+    Parser.Lex(); // Consume the identifier
+
+    const MCExpr *Expr = MCConstantExpr::create(SysReg->Encoding, getContext());
+    Operands.push_back(V850Operand::createImm(Expr, StartLoc, EndLoc));
+    return ParseStatus::Success;
+  }
+  }
 }
 
 bool V850AsmParser::parseInstruction(ParseInstructionInfo &Info, StringRef Name,
@@ -809,9 +896,14 @@ bool V850AsmParser::validateFPURegisterPair(StringRef Mnemonic,
 bool V850AsmParser::validateSystemRegister(StringRef Mnemonic,
                                            const OperandVector &Operands,
                                            SMLoc IDLoc) {
-  // Only validate LDSR and STSR instructions
+  // Only validate LDSR and STSR instructions (not LDSR_sel/STSR_sel)
   if (!Mnemonic.equals_insensitive("ldsr") &&
       !Mnemonic.equals_insensitive("stsr"))
+    return false;
+
+  // LDSR_sel/STSR_sel have 4+ operands (mnemonic, reg, regID, selID)
+  // Skip validation for those - they use raw uimm5 operands
+  if (Operands.size() > 3)
     return false;
 
   // Get the system register operand
@@ -824,65 +916,46 @@ bool V850AsmParser::validateSystemRegister(StringRef Mnemonic,
 
   const V850Operand &SysRegOp =
       static_cast<const V850Operand &>(*Operands[SysRegOpIdx]);
-  if (!SysRegOp.isReg())
+  if (!SysRegOp.isImm())
     return false;
 
-  MCRegister Reg = SysRegOp.getReg();
+  const MCConstantExpr *CE = dyn_cast<MCConstantExpr>(SysRegOp.getImm());
+  if (!CE)
+    return false;
 
-  // Check CPU feature requirements for system registers
-  // Use getFeatureBits() to check features
+  int64_t RegID = CE->getValue();
+
+  // Check CPU feature requirements based on regID ranges
   const FeatureBitset &Features = STI.getFeatureBits();
-  bool HasV850E1 = Features[V850::FeatureV850E1];
-  bool HasV850E2M = Features[V850::FeatureV850E2M];
-  bool HasV850FPU = Features[V850::FeatureV850FPU];
 
-  // V850E1+ registers (check by register enum, not encoding)
-  if (Reg == V850::CTPC || Reg == V850::CTPSW || Reg == V850::CTBP ||
-      Reg == V850::DBPC || Reg == V850::DBPSW || Reg == V850::DIR ||
-      Reg == V850::BPC || Reg == V850::ASID || Reg == V850::BPAV ||
-      Reg == V850::BPAM || Reg == V850::BPDV || Reg == V850::BPDM) {
-    if (!HasV850E1) {
-      Error(SysRegOp.getStartLoc(),
-            "system register requires V850E1 or later CPU");
-      return true;
-    }
-    return false;
+  // Look up by encoding to find if this regID has feature requirements
+  auto Range = lookupV850SysRegByEncoding(RegID);
+  for (const auto &SysReg : Range) {
+    if (SysReg.haveRequiredFeatures(Features))
+      return false; // Found a matching register with satisfied features
+  }
+  // If we found entries but none matched features, report an error
+  if (Range.begin() != Range.end()) {
+    // Determine which CPU variant is needed from the feature requirements
+    const auto &FirstReg = *Range.begin();
+    StringRef CPUName;
+    if (FirstReg.FeaturesRequired[V850::FeatureV850E2M])
+      CPUName = "V850E2M";
+    else if (FirstReg.FeaturesRequired[V850::FeatureV850E2])
+      CPUName = "V850E2";
+    else if (FirstReg.FeaturesRequired[V850::FeatureV850E1])
+      CPUName = "V850E1";
+    else if (FirstReg.FeaturesRequired[V850::FeatureV850FPU])
+      CPUName = "V850E2M with FPU";
+    else
+      CPUName = "unknown";
+
+    Error(SysRegOp.getStartLoc(),
+          "system register requires " + CPUName + " or later CPU");
+    return true;
   }
 
-  // V850E2M+ registers
-  if (Reg == V850::EIWR || Reg == V850::FEWR || Reg == V850::DBWR ||
-      Reg == V850::BSEL) {
-    if (!HasV850E2M) {
-      Error(SysRegOp.getStartLoc(),
-            "system register requires V850E2M or later CPU");
-      return true;
-    }
-    return false;
-  }
-
-  // V850E2M+ CPU bank registers (SCCFG, SCBP, exception cause registers)
-  if (Reg == V850::SCCFG || Reg == V850::SCBP || Reg == V850::EIIC ||
-      Reg == V850::FEIC || Reg == V850::DBIC) {
-    if (!HasV850E2M) {
-      Error(SysRegOp.getStartLoc(),
-            "system register requires V850E2M or later CPU");
-      return true;
-    }
-    return false;
-  }
-
-  // FPU registers (when BSEL=0x2000)
-  if (Reg == V850::FPSR || Reg == V850::FPEPC || Reg == V850::FPST ||
-      Reg == V850::FPCC || Reg == V850::FPCFG || Reg == V850::FPEC) {
-    if (!HasV850FPU) {
-      Error(SysRegOp.getStartLoc(),
-            "FPU system register requires V850E2M with FPU");
-      return true;
-    }
-    return false;
-  }
-
-  // Base V850 registers (EIPC, EIPSW, FEPC, FEPSW, ECR, PSW): always available
+  // No named register found for this encoding, but raw regID is valid
   return false;
 }
 
@@ -936,6 +1009,8 @@ bool V850AsmParser::matchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
   }
   case Match_MnemonicFail:
     return Error(IDLoc, "unrecognized instruction mnemonic");
+  case Match_InvalidSysReg:
+    return Error(IDLoc, "invalid system register name or ID");
   }
 
   llvm_unreachable("Unknown match type detected!");

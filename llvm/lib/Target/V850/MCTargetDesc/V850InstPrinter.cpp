@@ -15,12 +15,31 @@
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCInst.h"
+#include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/TargetParser/SubtargetFeature.h"
 
 using namespace llvm;
+
+// System register table entry - matches V850SystemOperands.td definition.
+struct V850SysRegEntry {
+  const char *Name;
+  uint8_t Encoding;
+  FeatureBitset FeaturesRequired;
+
+  bool haveRequiredFeatures(const FeatureBitset &ActiveFeatures) const {
+    return (FeaturesRequired & ActiveFeatures) == FeaturesRequired;
+  }
+};
+
+namespace {
+#define GET_V850SysRegsList_DECL
+#define GET_V850SysRegsList_IMPL
+#include "V850GenSearchableTables.inc"
+} // anonymous namespace
 
 #define DEBUG_TYPE "asm-printer"
 
@@ -140,4 +159,26 @@ void V850InstPrinter::printDisp5EP(const MCInst *MI, unsigned OpNo,
     MAI.printExpr(O, *Disp.getExpr());
   }
   O << "[ep]";
+}
+
+void V850InstPrinter::printSystemRegister(const MCInst *MI, unsigned OpNo,
+                                          const MCSubtargetInfo &STI,
+                                          raw_ostream &O) {
+  unsigned Imm = MI->getOperand(OpNo).getImm();
+  auto Range = lookupV850SysRegByEncoding(Imm);
+  const V850SysRegEntry *Best = nullptr;
+  for (const auto &Reg : Range) {
+    if (Reg.haveRequiredFeatures(STI.getFeatureBits()))
+      Best = &Reg;
+  }
+  if (Best) {
+    // When multiple registers share an encoding (e.g., FPEC and SCCFG at
+    // regID 11), the last matching entry wins. This prefers CPU-bank
+    // registers over FPU-bank registers since the CPU main bank (BSEL=0)
+    // is the default.
+    markup(O, Markup::Register) << Best->Name;
+    return;
+  }
+  // Fallback: print raw regID if no matching register name found
+  markup(O, Markup::Register) << Imm;
 }

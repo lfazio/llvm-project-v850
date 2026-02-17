@@ -138,6 +138,21 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
   SDLoc DL(Node);
 
   switch (Node->getOpcode()) {
+  case ISD::BITCAST: {
+    // Handle bitcast between i32 and f32 (GPR and FPR share physical regs)
+    SDValue Src = Node->getOperand(0);
+    EVT SrcVT = Src.getValueType();
+    EVT DstVT = Node->getValueType(0);
+
+    if ((SrcVT == MVT::i32 && DstVT == MVT::f32) ||
+        (SrcVT == MVT::f32 && DstVT == MVT::i32)) {
+      SDNode *Copy = CurDAG->getMachineNode(TargetOpcode::COPY, DL, DstVT, Src);
+      ReplaceNode(Node, Copy);
+      return;
+    }
+    break;
+  }
+
   case ISD::FrameIndex: {
     // Convert FrameIndex to an address - it will be replaced during
     // frame index elimination
@@ -151,17 +166,115 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
   }
 
   case ISD::SETCC: {
-    // ISD::SETCC lhs, rhs, condcode -> CMP + SETF
+    // ISD::SETCC lhs, rhs, condcode -> CMP + SETF (or CMPF + TRFSR + SETF)
     SDValue LHS = Node->getOperand(0);
     SDValue RHS = Node->getOperand(1);
     ISD::CondCode CC = cast<CondCodeSDNode>(Node->getOperand(2))->get();
 
-    // First emit CMP to set flags
+    if (LHS.getValueType() == MVT::f32) {
+      // Floating-point comparison: CMPF.S + TRFSR + SETF
+      // Map ISD condition code to V850 CMPF fcond
+      struct {
+        unsigned FCond;
+        bool NeedSwap;
+        bool NeedNegate;
+      } FPC;
+      switch (CC) {
+      default:
+        llvm_unreachable("Unknown FP condition code in SETCC");
+      case ISD::SETOEQ:
+        FPC = {2, false, false};
+        break;
+      case ISD::SETOGT:
+        FPC = {4, true, false};
+        break;
+      case ISD::SETOGE:
+        FPC = {6, true, false};
+        break;
+      case ISD::SETOLT:
+        FPC = {4, false, false};
+        break;
+      case ISD::SETOLE:
+        FPC = {6, false, false};
+        break;
+      case ISD::SETONE:
+        FPC = {3, false, true};
+        break;
+      case ISD::SETO:
+        FPC = {1, false, true};
+        break;
+      case ISD::SETUO:
+        FPC = {1, false, false};
+        break;
+      case ISD::SETUEQ:
+        FPC = {3, false, false};
+        break;
+      case ISD::SETUGT:
+        FPC = {5, true, false};
+        break;
+      case ISD::SETUGE:
+        FPC = {7, true, false};
+        break;
+      case ISD::SETULT:
+        FPC = {5, false, false};
+        break;
+      case ISD::SETULE:
+        FPC = {7, false, false};
+        break;
+      case ISD::SETUNE:
+        FPC = {2, false, true};
+        break;
+      case ISD::SETEQ:
+        FPC = {2, false, false};
+        break;
+      case ISD::SETNE:
+        FPC = {2, false, true};
+        break;
+      case ISD::SETLT:
+        FPC = {4, false, false};
+        break;
+      case ISD::SETLE:
+        FPC = {6, false, false};
+        break;
+      case ISD::SETGT:
+        FPC = {4, true, false};
+        break;
+      case ISD::SETGE:
+        FPC = {6, true, false};
+        break;
+      }
+
+      if (FPC.NeedSwap)
+        std::swap(LHS, RHS);
+
+      // Emit CMPF.S fcond, reg1(=RHS), reg2(=LHS), fcbit(=0)
+      // Semantics: FPCC[0] = (reg2 fcond reg1) = (LHS fcond RHS)
+      SDValue FCondVal = CurDAG->getTargetConstant(FPC.FCond, DL, MVT::i32);
+      SDValue FCBit = CurDAG->getTargetConstant(0, DL, MVT::i32);
+      SDValue CmpFOps[] = {FCondVal, RHS, LHS, FCBit};
+      SDNode *CmpFNode =
+          CurDAG->getMachineNode(V850::CMPFS, DL, MVT::Glue, CmpFOps);
+      SDValue CmpGlue = SDValue(CmpFNode, 0);
+
+      // Emit TRFSR 0 - transfer FPCC[0] to PSW.Z
+      SDNode *TrfsrNode =
+          CurDAG->getMachineNode(V850::TRFSR, DL, MVT::Glue, FCBit, CmpGlue);
+      SDValue TrfsrGlue = SDValue(TrfsrNode, 0);
+
+      // Emit SETF: Z (cc=2) if comparison true, NZ (cc=10) if negated
+      unsigned SetFCC = FPC.NeedNegate ? 10 : 2;
+      SDValue CondVal = CurDAG->getTargetConstant(SetFCC, DL, MVT::i32);
+      SDNode *SetNode =
+          CurDAG->getMachineNode(V850::SETF, DL, MVT::i32, CondVal, TrfsrGlue);
+      ReplaceNode(Node, SetNode);
+      return;
+    }
+
+    // Integer comparison: CMP + SETF
     SDNode *CmpNode =
         CurDAG->getMachineNode(V850::CMP, DL, MVT::Glue, LHS, RHS);
     SDValue Glue = SDValue(CmpNode, 0);
 
-    // Then emit SETF to read the flag
     unsigned CondCode = getSetFCondCode(CC);
     SDValue CondVal = CurDAG->getTargetConstant(CondCode, DL, MVT::i32);
     SDNode *SetNode =
@@ -299,6 +412,31 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
     SDNode *Call = CurDAG->getMachineNode(Opcode, DL, NodeTys, Ops);
 
     ReplaceNode(Node, Call);
+    return;
+  }
+
+  case V850ISD::FP_CMP: {
+    // V850ISD::FP_CMP fcond, lhs, rhs → Glue
+    // Emit CMPF.S + TRFSR sequence to set PSW.Z from FP comparison
+    SDValue FCondOp = Node->getOperand(0);
+    SDValue LHS = Node->getOperand(1);
+    SDValue RHS = Node->getOperand(2);
+    unsigned FCond = cast<ConstantSDNode>(FCondOp)->getZExtValue();
+
+    SDValue FCondVal = CurDAG->getTargetConstant(FCond, DL, MVT::i32);
+    SDValue FCBit = CurDAG->getTargetConstant(0, DL, MVT::i32);
+
+    // Emit CMPF.S fcond, reg1(=RHS), reg2(=LHS), fcbit(=0)
+    // Semantics: FPCC[0] = (reg2 fcond reg1) = (LHS fcond RHS)
+    SDValue CmpFOps[] = {FCondVal, RHS, LHS, FCBit};
+    SDNode *CmpFNode =
+        CurDAG->getMachineNode(V850::CMPFS, DL, MVT::Glue, CmpFOps);
+    SDValue CmpGlue = SDValue(CmpFNode, 0);
+
+    // Emit TRFSR 0 - transfer FPCC[0] to PSW.Z
+    SDNode *TrfsrNode =
+        CurDAG->getMachineNode(V850::TRFSR, DL, MVT::Glue, FCBit, CmpGlue);
+    ReplaceNode(Node, TrfsrNode);
     return;
   }
 

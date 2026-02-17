@@ -68,10 +68,11 @@ ldsr r16, fpcfg
 stsr fpcfg, r16
 
 // FPEC - Floating-point exception control (regID 11 in FPU bank)
-// CHECK: ldsr r17, fpec ; encoding: [0xeb,0x8f,0x00,0x04]
+// On v850e2m, regID 11 prints as 'sccfg' (CPU main bank is default)
+// CHECK: ldsr r17, sccfg ; encoding: [0xeb,0x8f,0x00,0x04]
 ldsr r17, fpec
 
-// CHECK: stsr fpec, r17 ; encoding: [0xeb,0x8f,0x80,0x04]
+// CHECK: stsr sccfg, r17 ; encoding: [0xeb,0x8f,0x80,0x04]
 stsr fpec, r17
 
 //===----------------------------------------------------------------------===//

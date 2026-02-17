@@ -100,7 +100,7 @@ entry:
 ; CHECK-LABEL: test_read_fpec:
 ; CHECK:       movhi r0, 32, [[SCRATCH:r[0-9]+]]
 ; CHECK-NEXT:  ldsr [[SCRATCH]], bsel
-; CHECK-NEXT:  stsr fpec, [[RESULT:r[0-9]+]]
+; CHECK-NEXT:  stsr sccfg, [[RESULT:r[0-9]+]]
 ; CHECK-NEXT:  mov r0, [[SCRATCH2:r[0-9]+]]
 ; CHECK-NEXT:  ldsr [[SCRATCH2]], bsel
 define i32 @test_read_fpec() {
@@ -182,7 +182,7 @@ entry:
 ; CHECK-LABEL: test_write_fpec:
 ; CHECK:       movhi r0, 32, [[SCRATCH:r[0-9]+]]
 ; CHECK-NEXT:  ldsr [[SCRATCH]], bsel
-; CHECK-NEXT:  ldsr r6, fpec
+; CHECK-NEXT:  ldsr r6, sccfg
 ; CHECK-NEXT:  mov r0, [[SCRATCH2:r[0-9]+]]
 ; CHECK-NEXT:  ldsr [[SCRATCH2]], bsel
 define void @test_write_fpec(i32 %value) {

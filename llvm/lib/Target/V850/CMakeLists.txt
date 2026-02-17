@@ -10,6 +10,7 @@ tablegen(LLVM V850GenDisassemblerTables.inc -gen-disassembler)
 tablegen(LLVM V850GenInstrInfo.inc -gen-instr-info)
 tablegen(LLVM V850GenMCCodeEmitter.inc -gen-emitter)
 tablegen(LLVM V850GenRegisterInfo.inc -gen-register-info)
+tablegen(LLVM V850GenSearchableTables.inc -gen-searchable-tables)
 tablegen(LLVM V850GenSubtargetInfo.inc -gen-subtarget)
 
 add_public_tablegen_target(V850CommonTableGen)

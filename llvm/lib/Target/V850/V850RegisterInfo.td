@@ -370,11 +370,9 @@ def FPCFG : V850SysReg<10, "fpcfg">;
 // Note: Same regID as SCCFG, but SCCFG is in CPU Main Bank (BSEL=0x0000)
 def FPEC  : V850SysReg<11, "fpec">;
 
-// System register class - not allocatable, accessed via LDSR/STSR only
-def SysReg : RegisterClass<"V850", [i32], 32,
-    (add EIPC, EIPSW, FEPC, FEPSW, ECR, PSW, CTPC, CTPSW, CTBP, DBPC, DBPSW,
-     DIR, BPC, ASID, BPAV, BPAM, BPDV, BPDM,
-     SCCFG, SCBP, EIIC, FEIC, DBIC, EIWR, FEWR, DBWR, BSEL,
-     FPSR, FPEPC, FPST, FPCC, FPCFG, FPEC)> {
-  let isAllocatable = 0;
-}
+// Note: System registers are no longer modeled as a register class.
+// They are accessed via LDSR/STSR instructions using immediate regID operands
+// (see V850SystemOperands.td for the name<->encoding lookup table).
+//
+// The register definitions above (EIPC, PSW, FPSR, etc.) are kept because
+// they are referenced in Defs/Uses lists to model side effects accurately.
