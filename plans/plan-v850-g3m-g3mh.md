@@ -23,14 +23,15 @@ and provides implementation steps for each.
 
 | Category | Priority | Missing Items |
 |----------|----------|---------------|
-| **ISel Patterns** | High | LD.DW, ST.DW, BINS |
-| **Atomic Expansion** | High | atomicrmw via LDL.W/STC.W (instead of CAXI) |
-| **Builtins** | Medium | CACHE, PREF, BINS, ROTL |
-| **System Registers** | Medium | G3M Groups 1-7 (~50+ registers) |
-| **Frame Optimization** | Medium | PUSHSP/POPSP for prologue/epilogue |
-| **Post-increment** | Low | LD/ST with [reg1]+ addressing |
+| ~~**ISel Patterns**~~ | ~~High~~ | ~~LD.DW, ST.DW, BINS~~ DONE |
+| ~~**Atomic Expansion**~~ | ~~High~~ | ~~atomicrmw via LDL.W/STC.W~~ DONE |
+| ~~**Builtins**~~ | ~~Medium~~ | ~~CACHE, PREF, BINS, ROTL~~ DONE |
+| ~~**System Registers**~~ | ~~Medium~~ | ~~G3M Groups 1-7~~ DONE (LDSR/STSR sel + named builtins) |
+| ~~**Frame Optimization**~~ | ~~Medium~~ | ~~PUSHSP/POPSP for prologue/epilogue~~ DONE |
+| **SysReg Refactoring** | Medium | Replace pseudo register class with immediate operands |
 | **LOOP instruction** | Low | Hardware loop codegen |
 | **G3MH specifics** | Low | FPU precision changes, FPINT exception |
+| **Post-increment** | Low | LD/ST with [reg1]+ addressing (**G4MH only**, not G3M/G3MH) |
 
 ---
 
@@ -381,6 +382,74 @@ PUSHSP/POPSP supports contiguous register ranges.
 
 ---
 
+## Phase 4b: System Register Refactoring (Medium Priority)
+
+### 4b.1 Replace Pseudo Register Class with Immediate Operands
+
+**Goal:** Migrate LDSR/STSR from using a `SysReg` pseudo register class to using
+immediate operands, matching the approach already used by `LDSR_sel`/`STSR_sel`.
+
+**Current Problem:**
+
+The current implementation defines every system register as a pseudo `V850SysReg`
+register in `V850RegisterInfo.td`, then uses a non-allocatable `SysReg` register
+class as an operand for `LDSR`/`STSR`. This approach has several issues:
+
+1. **Scalability:** Every new system register (especially G3M groups 1-7 with
+   ~50+ registers) requires a new TableGen register definition and pattern.
+2. **regID collisions:** Registers with the same regID but different groups
+   clash (e.g., SCCFG and FPEC both at regID 11, different banks).
+3. **G3M selID already uses immediates:** `LDSR_sel`/`STSR_sel` use
+   `(ins GPR:$reg2, uimm5:$regID, uimm5:$selID)` — the cleaner approach.
+4. **Exhaustive patterns:** Each intrinsic-to-instruction mapping requires a
+   manual `Pat<>` for every regID value (lines 2907-2947 of V850InstrInfo.td).
+
+**Target Design (modeled after RISC-V CSR handling):**
+
+1. **Use immediate operands for LDSR/STSR:**
+   ```tablegen
+   // Replace SysReg operand with immediate
+   def LDSR : FormatIX<..., (outs), (ins GPR:$reg2, uimm5:$regID),
+                        "ldsr\t$reg2, $regID", []>;
+   def STSR : FormatIX<..., (outs GPR:$reg2), (ins uimm5:$regID),
+                        "stsr\t$regID, $reg2", []>;
+   ```
+
+2. **Named register aliases in AsmParser:**
+   - AsmParser maps register names (e.g., "eipc", "psw") to immediate values
+   - This is how RISC-V handles CSR names → CSR addresses
+   - Assembly `ldsr r10, eipc` parses "eipc" as immediate 0
+   - Assembly `ldsr r10, 0` also works (raw regID)
+
+3. **Unify LDSR/LDSR_sel:**
+   - Make selID default to 0 when not specified
+   - Single instruction definition handles both `ldsr r10, eipc` and
+     `ldsr r10, 3, 1` (EBASE in group 1)
+
+4. **Keep V850SysReg definitions only for DWARF:**
+   - System registers with DWARF numbers (EIPC, PSW, etc.) keep their
+     definitions for debug info
+   - Remove them from the `SysReg` register class used by instructions
+   - Or keep SysReg class solely for debugger register tracking
+
+5. **Simplify intrinsic patterns:**
+   - Generic `LDSR` with immediate operand directly matches
+     `int_v850_ldsr(GPR, imm)` without per-register patterns
+   - Named builtins lower to `LDSR` with the appropriate immediate
+
+**Files:**
+- `llvm/lib/Target/V850/V850RegisterInfo.td` - Simplify SysReg definitions
+- `llvm/lib/Target/V850/V850InstrInfo.td` - Change LDSR/STSR operands, remove exhaustive patterns
+- `llvm/lib/Target/V850/AsmParser/V850AsmParser.cpp` - Add named sysreg → immediate mapping
+- `llvm/lib/Target/V850/MCTargetDesc/V850InstPrinter.cpp` - Print named sysreg from immediate
+- `llvm/lib/Target/V850/Disassembler/V850Disassembler.cpp` - Decode sysreg immediate
+
+**Complexity:** Medium (many files touched but each change is straightforward)
+
+**Reference:** RISC-V CSR handling in `llvm/lib/Target/RISCV/`
+
+---
+
 ## Phase 5: G3MH-Specific Features (Low Priority)
 
 ### 5.1 G3MH FPU Changes
@@ -410,27 +479,50 @@ PUSHSP/POPSP supports contiguous register ranges.
 
 ---
 
-## Phase 6: Post-Increment Addressing (Low Priority)
+## Phase 6: Post-Increment Addressing (Low Priority - G4MH Only)
 
 ### 6.1 Post-Increment Load/Store
 
 **Goal:** Use post-increment addressing for loop optimization.
 
-**G3M adds post-increment forms:**
-- `LD.B [reg1]+, reg3` / `LD.B [reg1]-, reg3`
-- `LD.BU [reg1]+, reg3`
-- `LD.H [reg1]+, reg3` / `LD.H [reg1]-, reg3`
-- `LD.HU [reg1]+, reg3`
-- `LD.W [reg1]+, reg3` / `LD.W [reg1]-, reg3`
-- `ST.B reg3, [reg1]+` / `ST.B reg3, [reg1]-`
-- `ST.H reg3, [reg1]+` / `ST.H reg3, [reg1]-`
-- `ST.W reg3, [reg1]+` / `ST.W reg3, [reg1]-`
+**NOTE:** Post-increment/decrement load/store instructions are **RH850G4MH only**.
+They are NOT available on G3M or G3MH (verified against docs/rh850g3m.txt and
+docs/rh850g3mh.txt — the addressing mode concept is described but no instructions
+implement it). The instructions are first defined in docs/rh850g4mh.txt.
+
+**G4MH adds post-increment/decrement forms (Format XI, 32-bit):**
+
+| Instruction | Encoding bits[15:11] | sub-op bits[26:16] | Inc/Dec |
+|-------------|---------------------|--------------------|---------|
+| LD.B [reg1]+, reg3 | 00010 | 01101110000 | +1 |
+| LD.B [reg1]-, reg3 | 00100 | 01101110000 | -1 |
+| LD.BU [reg1]+, reg3 | 00011 | 01101110000 | +1 |
+| LD.BU [reg1]-, reg3 | 00101 | 01101110000 | -1 |
+| LD.H [reg1]+, reg3 | 00010 | 01101110100 | +2 |
+| LD.H [reg1]-, reg3 | 00100 | 01101110100 | -2 |
+| LD.HU [reg1]+, reg3 | 00011 | 01101110100 | +2 |
+| LD.HU [reg1]-, reg3 | 00101 | 01101110100 | -2 |
+| LD.W [reg1]+, reg3 | 00010 | 01101111000 | +4 |
+| LD.W [reg1]-, reg3 | 00100 | 01101111000 | -4 |
+| ST.B reg3, [reg1]+ | 00010 | 01101110010 | +1 |
+| ST.B reg3, [reg1]- | 00100 | 01101110010 | -1 |
+| ST.H reg3, [reg1]+ | 00010 | 01101110110 | +2 |
+| ST.H reg3, [reg1]- | 00100 | 01101110110 | -2 |
+| ST.W reg3, [reg1]+ | 00010 | 01101111010 | +4 |
+| ST.W reg3, [reg1]- | 00100 | 01101111010 | -4 |
+
+All use bits[10:5] = 111111, RRRRR = reg1, wwwww = reg3.
+Constraint: reg1 != reg3 (same register causes undefined behavior).
 
 **Implementation:**
 
-1. **Add instruction definitions** in V850InstrInfo.td
-2. **Add ISel patterns** for `ISD::POST_INC`/`ISD::POST_DEC`
-3. **Set `setIndexedLoadAction()` / `setIndexedStoreAction()`** in ISelLowering
+1. **Add instruction definitions** in V850InstrInfo.td (Format XI)
+2. **Add encoding/decoding** in MCCodeEmitter and Disassembler
+3. **Add ISel patterns** for `ISD::POST_INC`/`ISD::POST_DEC`
+4. **Set `setIndexedLoadAction()` / `setIndexedStoreAction()`** in ISelLowering
+5. **Add assembler/disassembler tests**
+
+**Requires:** `HasRH850G4MH` feature flag (NOT G3M)
 
 **Complexity:** Medium-High (requires LSR integration)
 
@@ -486,26 +578,32 @@ PUSHSP/POPSP supports contiguous register ranges.
 
 ## Implementation Order
 
-### Sprint 1: Core CodeGen Improvements
-1. [1.3] Atomic RMW via LDL.W/STC.W
-2. [2.1] CACHE builtin
-3. [2.2] PREF builtin
+### Sprint 1: Core CodeGen Improvements [DONE]
+1. ~~[1.3] Atomic RMW via LDL.W/STC.W~~
+2. ~~[2.1] CACHE builtin~~
+3. ~~[2.2] PREF builtin~~
 
-### Sprint 2: 64-bit and Bitfield Support
-4. [1.1] LD.DW/ST.DW 64-bit load/store patterns
-5. [1.2] BINS bitfield insert patterns + builtin
+### Sprint 2: 64-bit and Bitfield Support [DONE]
+4. ~~[1.1] LD.DW/ST.DW 64-bit load/store patterns~~
+5. ~~[1.2] BINS bitfield insert patterns + builtin~~
 
-### Sprint 3: System Registers
-6. [3.1] LDSR/STSR with group specification
-7. [3.1] Named builtins for key G3M system registers
+### Sprint 3: System Registers [DONE]
+6. ~~[3.1] LDSR/STSR with group specification~~
+7. ~~[3.1] Named builtins for key G3M system registers~~
 
-### Sprint 4: Frame and Loop Optimization
-8. [4.1] PUSHSP/POPSP frame optimization
-9. [7.1] LOOP instruction pass (if feasible)
+### Sprint 4: Frame Optimization [DONE]
+8. ~~[4.1] PUSHSP/POPSP frame optimization~~
 
-### Sprint 5: Post-Increment and G3MH
-10. [6.1] Post-increment addressing
-11. [5.1] G3MH FPU differences
+### Sprint 5: System Register Refactoring
+9. [4b.1] Replace SysReg pseudo register class with immediate operands
+10. Unify LDSR/LDSR_sel into single instruction with optional selID
+
+### Sprint 6: LOOP and G3MH
+11. [7.1] LOOP instruction pass (if feasible)
+12. [5.1] G3MH FPU differences
+
+### Sprint 7: Post-Increment (G4MH Only)
+13. [6.1] Post-increment load/store instructions and ISel patterns (requires G4MH subtarget)
 
 ---
 
@@ -524,3 +622,4 @@ For each sprint:
 | Date | Version | Changes |
 |------|---------|---------|
 | 2026-02-11 | 1.0 | Initial plan with comprehensive feature analysis |
+| 2026-02-11 | 1.1 | Sprints 1-4 complete; Added Phase 4b: SysReg refactoring (replace pseudo regs with immediates); Updated sprint order; Fixed LoadStoreOptimizer volatile crash |
