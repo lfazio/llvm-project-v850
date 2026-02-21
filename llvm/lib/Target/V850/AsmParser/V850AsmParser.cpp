@@ -38,9 +38,10 @@
 using namespace llvm;
 
 // System register table entry - matches V850SystemOperands.td definition.
+// Encoding is 10-bit: (selID << 5) | regID.
 struct V850SysRegEntry {
   const char *Name;
-  uint8_t Encoding;
+  uint16_t Encoding;
   FeatureBitset FeaturesRequired;
 
   bool haveRequiredFeatures(const FeatureBitset &ActiveFeatures) const {
@@ -169,7 +170,7 @@ public:
     if (!isImm())
       return false;
     if (const MCConstantExpr *CE = dyn_cast<MCConstantExpr>(getImm()))
-      return isUInt<5>(CE->getValue());
+      return isUInt<10>(CE->getValue());
     return false;
   }
 
@@ -519,12 +520,9 @@ ParseStatus V850AsmParser::tryParseRegister(MCRegister &Reg, SMLoc &StartLoc,
 
 ParseStatus V850AsmParser::parseOperand(OperandVector &Operands,
                                         StringRef Mnemonic) {
-  // Try auto-generated custom operand parsers (e.g., parseSystemRegister)
-  ParseStatus Result = MatchOperandParserImpl(Operands, Mnemonic);
-  if (Result.isSuccess())
-    return Result;
-  if (Result.isFailure())
-    return Result;
+  // Note: LDSR and STSR are handled entirely in parseInstruction because they
+  // use FormatIX_SysReg (isCodeGenOnly=1) and require custom selID parsing.
+  // MatchOperandParserImpl is not generated for isCodeGenOnly instructions.
 
   // Try to parse as register first
   MCRegister Reg;
@@ -698,20 +696,38 @@ ParseStatus V850AsmParser::parseSystemRegister(OperandVector &Operands) {
     return ParseStatus::NoMatch;
 
   case AsmToken::Integer: {
-    // Accept raw integer regID (0-31)
-    const MCExpr *Expr;
-    if (Parser.parseExpression(Expr))
+    // Accept raw integer regID (0-31), optionally followed by ", selID" for
+    // RH850G3M+ banked registers. Encoding = (selID << 5) | regID.
+    int64_t RegID;
+    if (Parser.getTok().getKind() != AsmToken::Integer)
+      return ParseStatus::NoMatch;
+    RegID = Parser.getTok().getIntVal();
+    if (!isUInt<5>(RegID)) {
+      Error(StartLoc, "system register ID must be in range [0, 31]");
       return ParseStatus::Failure;
+    }
+    Parser.Lex(); // Consume regID
 
-    if (const MCConstantExpr *CE = dyn_cast<MCConstantExpr>(Expr)) {
-      int64_t Imm = CE->getValue();
-      if (!isUInt<5>(Imm)) {
-        Error(StartLoc, "system register ID must be in range [0, 31]");
+    int64_t SelID = 0;
+    // Check for optional ", selID" (RH850G3M+ banked register)
+    if (Parser.getTok().getKind() == AsmToken::Comma) {
+      Parser.Lex(); // Consume ','
+      SMLoc SelLoc = Parser.getTok().getLoc();
+      if (Parser.getTok().getKind() != AsmToken::Integer) {
+        Error(SelLoc, "expected selID integer after ','");
         return ParseStatus::Failure;
       }
+      SelID = Parser.getTok().getIntVal();
+      if (!isUInt<5>(SelID)) {
+        Error(SelLoc, "system register selID must be in range [0, 31]");
+        return ParseStatus::Failure;
+      }
+      Parser.Lex(); // Consume selID
     }
 
+    int64_t Enc = (SelID << 5) | RegID;
     EndLoc = Parser.getTok().getLoc();
+    const MCExpr *Expr = MCConstantExpr::create(Enc, getContext());
     Operands.push_back(V850Operand::createImm(Expr, StartLoc, EndLoc));
     return ParseStatus::Success;
   }
@@ -719,7 +735,7 @@ ParseStatus V850AsmParser::parseSystemRegister(OperandVector &Operands) {
   case AsmToken::Identifier: {
     StringRef Name = Parser.getTok().getString();
 
-    // Look up system register by name
+    // Look up system register by name; the table returns the 10-bit encoding.
     const V850SysRegEntry *SysReg = lookupV850SysRegByName(Name);
     if (!SysReg)
       return ParseStatus::NoMatch;
@@ -742,6 +758,88 @@ bool V850AsmParser::parseInstruction(ParseInstructionInfo &Info, StringRef Name,
   // If there are no operands, we're done
   if (Parser.getTok().is(AsmToken::EndOfStatement))
     return false;
+
+  // LDSR/STSR use FormatIX_SysReg (isCodeGenOnly=1) and require custom parsing
+  // because the optional selID placement differs per instruction:
+  //   LDSR: ldsr reg2, regID [, selID]   OR   ldsr reg2, sysreg_name
+  //   STSR: stsr regID, reg2 [, selID]   OR   stsr sysreg_name, reg2
+  // For LDSR, selID follows regID directly; for STSR it follows reg2.
+  if (Name.equals_insensitive("ldsr")) {
+    // Parse reg2
+    MCRegister Reg;
+    SMLoc RegStart, RegEnd;
+    if (!tryParseRegister(Reg, RegStart, RegEnd).isSuccess())
+      return Error(Parser.getTok().getLoc(), "expected register for ldsr");
+    Operands.push_back(V850Operand::createReg(Reg, RegStart, RegEnd));
+
+    if (!Parser.getTok().is(AsmToken::Comma))
+      return Error(Parser.getTok().getLoc(), "expected ',' for ldsr");
+    Parser.Lex();
+
+    // Parse sysreg: named OR integer regID [, selID]
+    if (!parseSystemRegister(Operands).isSuccess())
+      return Error(Parser.getTok().getLoc(),
+                   "expected system register for ldsr");
+
+    return false;
+  }
+
+  if (Name.equals_insensitive("stsr")) {
+    SMLoc SysRegStart = Parser.getTok().getLoc();
+    bool numericSysReg = false;
+    int64_t RegID = 0;
+
+    if (Parser.getTok().getKind() == AsmToken::Identifier) {
+      // Named register: stsr sysreg_name, reg2
+      if (!parseSystemRegister(Operands).isSuccess())
+        return Error(SysRegStart, "expected system register for stsr");
+    } else if (Parser.getTok().getKind() == AsmToken::Integer) {
+      // Numeric form: stsr regID, reg2 [, selID]
+      // Don't consume selID yet; it comes after reg2 for STSR.
+      RegID = Parser.getTok().getIntVal();
+      if (!isUInt<5>(RegID))
+        return Error(SysRegStart,
+                     "system register ID must be in range [0, 31]");
+      Parser.Lex(); // Consume regID
+      numericSysReg = true;
+    } else {
+      return Error(SysRegStart, "expected system register for stsr");
+    }
+
+    if (!Parser.getTok().is(AsmToken::Comma))
+      return Error(Parser.getTok().getLoc(), "expected ',' for stsr");
+    Parser.Lex();
+
+    // Parse reg2
+    MCRegister Reg;
+    SMLoc RegStart, RegEnd;
+    if (!tryParseRegister(Reg, RegStart, RegEnd).isSuccess())
+      return Error(Parser.getTok().getLoc(), "expected register for stsr");
+
+    // For numeric form, check for optional ', selID' after reg2
+    int64_t SelID = 0;
+    if (numericSysReg && Parser.getTok().is(AsmToken::Comma)) {
+      Parser.Lex(); // Consume ','
+      SMLoc SelLoc = Parser.getTok().getLoc();
+      if (Parser.getTok().getKind() != AsmToken::Integer)
+        return Error(SelLoc, "expected selID integer after ','");
+      SelID = Parser.getTok().getIntVal();
+      if (!isUInt<5>(SelID))
+        return Error(SelLoc, "selID must be in range [0, 31]");
+      Parser.Lex(); // Consume selID
+    }
+
+    if (numericSysReg) {
+      int64_t Enc = (SelID << 5) | RegID;
+      SMLoc SysRegEnd = RegStart;
+      const MCExpr *Expr = MCConstantExpr::create(Enc, getContext());
+      Operands.push_back(V850Operand::createImm(Expr, SysRegStart, SysRegEnd));
+    }
+    // If named register, parseSystemRegister already added it to Operands.
+
+    Operands.push_back(V850Operand::createReg(Reg, RegStart, RegEnd));
+    return false;
+  }
 
   // Parse first operand
   if (!parseOperand(Operands, Name).isSuccess())
@@ -896,19 +994,14 @@ bool V850AsmParser::validateFPURegisterPair(StringRef Mnemonic,
 bool V850AsmParser::validateSystemRegister(StringRef Mnemonic,
                                            const OperandVector &Operands,
                                            SMLoc IDLoc) {
-  // Only validate LDSR and STSR instructions (not LDSR_sel/STSR_sel)
+  // Only validate LDSR and STSR instructions.
   if (!Mnemonic.equals_insensitive("ldsr") &&
       !Mnemonic.equals_insensitive("stsr"))
     return false;
 
-  // LDSR_sel/STSR_sel have 4+ operands (mnemonic, reg, regID, selID)
-  // Skip validation for those - they use raw uimm5 operands
-  if (Operands.size() > 3)
-    return false;
-
-  // Get the system register operand
-  // LDSR: ldsr reg2, regID -> Operands[0]=mnemonic, [1]=reg2, [2]=regID
-  // STSR: stsr regID, reg2 -> Operands[0]=mnemonic, [1]=regID, [2]=reg2
+  // Get the system register operand.
+  // LDSR: ldsr reg2, sysreg -> Operands[0]=mnemonic, [1]=reg2, [2]=sysreg
+  // STSR: stsr sysreg, reg2 -> Operands[0]=mnemonic, [1]=sysreg, [2]=reg2
   unsigned SysRegOpIdx = Mnemonic.equals_insensitive("ldsr") ? 2 : 1;
 
   if (SysRegOpIdx >= Operands.size())
@@ -923,23 +1016,25 @@ bool V850AsmParser::validateSystemRegister(StringRef Mnemonic,
   if (!CE)
     return false;
 
-  int64_t RegID = CE->getValue();
+  int64_t Enc = CE->getValue(); // 10-bit: (selID << 5) | regID
 
-  // Check CPU feature requirements based on regID ranges
+  // Check CPU feature requirements based on the 10-bit encoding.
   const FeatureBitset &Features = STI.getFeatureBits();
 
-  // Look up by encoding to find if this regID has feature requirements
-  auto Range = lookupV850SysRegByEncoding(RegID);
+  // Look up by 10-bit encoding to find feature requirements.
+  auto Range = lookupV850SysRegByEncoding(Enc);
   for (const auto &SysReg : Range) {
     if (SysReg.haveRequiredFeatures(Features))
-      return false; // Found a matching register with satisfied features
+      return false; // Found a matching register with satisfied features.
   }
-  // If we found entries but none matched features, report an error
+  // If we found entries but none matched features, report an error.
   if (Range.begin() != Range.end()) {
-    // Determine which CPU variant is needed from the feature requirements
+    // Determine which CPU variant is needed from the feature requirements.
     const auto &FirstReg = *Range.begin();
     StringRef CPUName;
-    if (FirstReg.FeaturesRequired[V850::FeatureV850E2M])
+    if (FirstReg.FeaturesRequired[V850::FeatureRH850G3M])
+      CPUName = "RH850G3M";
+    else if (FirstReg.FeaturesRequired[V850::FeatureV850E2M])
       CPUName = "V850E2M";
     else if (FirstReg.FeaturesRequired[V850::FeatureV850E2])
       CPUName = "V850E2";
@@ -955,7 +1050,7 @@ bool V850AsmParser::validateSystemRegister(StringRef Mnemonic,
     return true;
   }
 
-  // No named register found for this encoding, but raw regID is valid
+  // No named register found for this encoding, but raw encoding is valid.
   return false;
 }
 
@@ -966,6 +1061,56 @@ bool V850AsmParser::matchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
                                             bool MatchingInlineAsm) {
   MCInst Inst;
   FeatureBitset MissingFeatures;
+
+  // Handle LDSR/STSR manually: they use FormatIX_SysReg (isCodeGenOnly=1) and
+  // are not in the AsmMatcher table. The operand vector is:
+  //   LDSR: [token "ldsr", reg2, sysreg_imm]
+  //   STSR: [token "stsr", sysreg_imm, reg2]
+  // The MCInst operand order is [reg2, sysreg_imm] for both (outputs first).
+  {
+    StringRef Mnemonic;
+    if (!Operands.empty()) {
+      const V850Operand &Op = static_cast<const V850Operand &>(*Operands[0]);
+      if (Op.isToken())
+        Mnemonic = Op.getToken();
+    }
+    if (Mnemonic.equals_insensitive("ldsr") ||
+        Mnemonic.equals_insensitive("stsr")) {
+      if (Operands.size() != 3)
+        return Error(IDLoc, "expected 2 operands for " + Mnemonic);
+
+      if (validateSystemRegister(Mnemonic, Operands, IDLoc))
+        return true;
+
+      if (Mnemonic.equals_insensitive("ldsr")) {
+        const V850Operand &Reg2Op =
+            static_cast<const V850Operand &>(*Operands[1]);
+        const V850Operand &SysRegOp =
+            static_cast<const V850Operand &>(*Operands[2]);
+        if (!Reg2Op.isReg() || !SysRegOp.isImm())
+          return Error(IDLoc, "invalid operands for ldsr");
+        const MCConstantExpr *CE = dyn_cast<MCConstantExpr>(SysRegOp.getImm());
+        Inst.setOpcode(V850::LDSR);
+        Inst.addOperand(MCOperand::createReg(Reg2Op.getReg()));
+        Inst.addOperand(MCOperand::createImm(CE ? CE->getValue() : 0));
+      } else {
+        // STSR: operands are [sysreg_imm, reg2]; MCInst wants [reg2, sysreg].
+        const V850Operand &SysRegOp =
+            static_cast<const V850Operand &>(*Operands[1]);
+        const V850Operand &Reg2Op =
+            static_cast<const V850Operand &>(*Operands[2]);
+        if (!SysRegOp.isImm() || !Reg2Op.isReg())
+          return Error(IDLoc, "invalid operands for stsr");
+        const MCConstantExpr *CE = dyn_cast<MCConstantExpr>(SysRegOp.getImm());
+        Inst.setOpcode(V850::STSR);
+        Inst.addOperand(MCOperand::createReg(Reg2Op.getReg()));
+        Inst.addOperand(MCOperand::createImm(CE ? CE->getValue() : 0));
+      }
+      Inst.setLoc(IDLoc);
+      Out.emitInstruction(Inst, getSTI());
+      return false;
+    }
+  }
 
   auto Result = MatchInstructionImpl(Operands, Inst, ErrorInfo, MissingFeatures,
                                      MatchingInlineAsm);

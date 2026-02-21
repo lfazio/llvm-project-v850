@@ -98,13 +98,16 @@ static DecodeStatus DecodeFPRRegisterClass(MCInst &Inst, uint32_t RegNo,
   return MCDisassembler::Success;
 }
 
-static DecodeStatus decodeSystemRegister(MCInst &Inst, uint32_t RegNo,
+static DecodeStatus decodeSystemRegister(MCInst &Inst, uint32_t Enc,
                                          int64_t Address,
                                          const MCDisassembler *Decoder) {
-  if (RegNo >= 32)
+  // Enc is the combined 10-bit sysreg encoding: (selID << 5) | regID.
+  // The auto-generated decoder reconstructs this from bits[4:0] (regID) and
+  // bits[20:16] (selID) of the instruction. Validate the 10-bit range.
+  if (Enc >= 1024)
     return MCDisassembler::Fail;
 
-  Inst.addOperand(MCOperand::createImm(RegNo));
+  Inst.addOperand(MCOperand::createImm(Enc));
   return MCDisassembler::Success;
 }
 
@@ -325,6 +328,41 @@ DecodeStatus V850Disassembler::getInstruction32(MCInst &MI, uint64_t &Size,
   bool HasRH850G3M = STI.hasFeature(V850::FeatureRH850G3M);
   bool HasV850E2M = STI.hasFeature(V850::FeatureV850E2M);
 
+  // Manually decode LDSR/STSR since they use FormatIX_SysReg (isCodeGenOnly)
+  // which encodes selID in bits[20:16]. This custom decode handles both
+  // selID=0 (base V850) and selID!=0 (RH850G3M+) cases uniformly.
+  // Bit pattern: bits[10:5]=111111, bits[31:27]=0, bits[26:21]=100000/100100
+  {
+    unsigned Opcode6 = (Insn32 >> 5) & 0x3F; // bits[10:5]
+    unsigned RFU = (Insn32 >> 27) & 0x1F;    // bits[31:27]
+    unsigned SubOp = (Insn32 >> 21) & 0x3F;  // bits[26:21]
+    if (Opcode6 == 0b111111 && RFU == 0 &&
+        (SubOp == 0b100000 || SubOp == 0b100100)) {
+      unsigned Reg2 = (Insn32 >> 11) & 0x1F;  // bits[15:11]
+      unsigned RegID = Insn32 & 0x1F;         // bits[4:0]
+      unsigned SelID = (Insn32 >> 16) & 0x1F; // bits[20:16]
+      unsigned SysReg = (SelID << 5) | RegID; // 10-bit unified encoding
+      MI.clear();
+      if (SubOp == 0b100000) {
+        // LDSR reg2, sysreg
+        MI.setOpcode(V850::LDSR);
+        if (DecodeGPRRegisterClass(MI, Reg2, Address, this) ==
+            MCDisassembler::Fail)
+          return MCDisassembler::Fail;
+        MI.addOperand(MCOperand::createImm(SysReg));
+      } else {
+        // STSR sysreg, reg2
+        MI.setOpcode(V850::STSR);
+        if (DecodeGPRRegisterClass(MI, Reg2, Address, this) ==
+            MCDisassembler::Fail)
+          return MCDisassembler::Fail;
+        MI.addOperand(MCOperand::createImm(SysReg));
+      }
+      Size = 4;
+      return MCDisassembler::Success;
+    }
+  }
+
   // Try RH850G3M-specific instructions first (superset of V850E2M)
   if (HasRH850G3M) {
     MI.clear();
@@ -333,38 +371,6 @@ DecodeStatus V850Disassembler::getInstruction32(MCInst &MI, uint64_t &Size,
     if (Result != MCDisassembler::Fail) {
       Size = 4;
       return Result;
-    }
-  }
-
-  // Check for LDSR/STSR with non-zero selID (RH850G3M+)
-  // These are encoded as standard LDSR/STSR but with bits[20:16] != 0
-  if (HasRH850G3M) {
-    unsigned SelID = (Insn32 >> 16) & 0x1F;
-    unsigned Opcode = (Insn32 >> 5) & 0x3F; // bits[10:5]
-    unsigned SubOp = (Insn32 >> 21) & 0x3F; // bits[26:21]
-    if (SelID != 0 && Opcode == 0b111111 && (Insn32 >> 27) == 0) {
-      unsigned Reg2 = (Insn32 >> 11) & 0x1F;
-      unsigned RegID = Insn32 & 0x1F;
-      if (SubOp == 0b100000) {
-        // LDSR_sel: ldsr reg2, regID, selID
-        MI.clear();
-        MI.setOpcode(V850::LDSR_sel);
-        MI.addOperand(MCOperand::createReg(GPRDecoderTable[Reg2]));
-        MI.addOperand(MCOperand::createImm(RegID));
-        MI.addOperand(MCOperand::createImm(SelID));
-        Size = 4;
-        return MCDisassembler::Success;
-      }
-      if (SubOp == 0b100100) {
-        // STSR_sel: stsr regID, reg2, selID
-        MI.clear();
-        MI.setOpcode(V850::STSR_sel);
-        MI.addOperand(MCOperand::createReg(GPRDecoderTable[Reg2]));
-        MI.addOperand(MCOperand::createImm(RegID));
-        MI.addOperand(MCOperand::createImm(SelID));
-        Size = 4;
-        return MCDisassembler::Success;
-      }
     }
   }
 

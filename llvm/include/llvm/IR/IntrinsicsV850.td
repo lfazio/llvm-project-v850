@@ -251,32 +251,22 @@ let TargetPrefix = "v850" in { // All intrinsics start with "llvm.v850.".
   //===----------------------------------------------------------------------===//
 
   // LDSR - Load to system register
-  // void @llvm.v850.ldsr(i32 %value, i32 %regID)
-  // Writes %value to system register specified by %regID
+  // void @llvm.v850.ldsr(i32 %value, i32 %enc)
+  // Writes %value to system register specified by 10-bit %enc.
+  // enc = (selID << 5) | regID. For base V850, selID=0 and enc == regID.
+  // For RH850G3M+, selID selects the register bank (bits[20:16] of LDSR).
   def int_v850_ldsr
       : Intrinsic<[], [llvm_i32_ty, llvm_i32_ty],
                   [IntrNoMem, IntrHasSideEffects, ImmArg<ArgIndex<1>>]>;
 
   // STSR - Store from system register
-  // i32 @llvm.v850.stsr(i32 %regID)
-  // Reads the system register specified by %regID
+  // i32 @llvm.v850.stsr(i32 %enc)
+  // Reads the system register specified by 10-bit %enc.
+  // enc = (selID << 5) | regID. For base V850, selID=0 and enc == regID.
+  // For RH850G3M+, selID selects the register bank (bits[20:16] of STSR).
   def int_v850_stsr
       : Intrinsic<[llvm_i32_ty], [llvm_i32_ty],
                   [IntrNoMem, IntrHasSideEffects, ImmArg<ArgIndex<0>>]>;
-
-  // LDSR with selID - Load to system register with group (RH850G3M+)
-  // void @llvm.v850.ldsr.sel(i32 %value, i32 %regID, i32 %selID)
-  def int_v850_ldsr_sel
-      : Intrinsic<[], [llvm_i32_ty, llvm_i32_ty, llvm_i32_ty],
-                  [IntrNoMem, IntrHasSideEffects, ImmArg<ArgIndex<1>>,
-                   ImmArg<ArgIndex<2>>]>;
-
-  // STSR with selID - Store from system register with group (RH850G3M+)
-  // i32 @llvm.v850.stsr.sel(i32 %regID, i32 %selID)
-  def int_v850_stsr_sel
-      : Intrinsic<[llvm_i32_ty], [llvm_i32_ty, llvm_i32_ty],
-                  [IntrNoMem, IntrHasSideEffects, ImmArg<ArgIndex<0>>,
-                   ImmArg<ArgIndex<1>>]>;
 
   //===----------------------------------------------------------------------===//
   // Multiply-Accumulate Operations (V850E2M+)

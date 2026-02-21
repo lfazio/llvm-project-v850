@@ -23,7 +23,7 @@ class V850Inst<dag outs, dag ins, string asmstr, list<dag> pattern>
   field bits<32> SoftFail = 0;
 
   let Namespace = "V850";
-  let Size = 2;  // Default to 16-bit, 32-bit instructions override
+  let Size = 2; // Default to 16-bit, 32-bit instructions override
 
   dag OutOperandList = outs;
   dag InOperandList = ins;
@@ -73,14 +73,13 @@ class V850Pseudo<dag outs, dag ins, string asmstr, list<dag> pattern>
 //===----------------------------------------------------------------------===//
 
 class FormatI<bits<6> opcode, dag outs, dag ins, string asmstr,
-              list<dag> pattern>
-    : V850Inst16<outs, ins, asmstr, pattern> {
+              list<dag> pattern> : V850Inst16<outs, ins, asmstr, pattern> {
   bits<5> reg1;
   bits<5> reg2;
 
-  let Inst{15-11} = reg2;
-  let Inst{10-5}  = opcode;
-  let Inst{4-0}   = reg1;
+  let Inst{15 -11} = reg2;
+  let Inst{10 -5} = opcode;
+  let Inst{4 -0} = reg1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -89,14 +88,13 @@ class FormatI<bits<6> opcode, dag outs, dag ins, string asmstr,
 //===----------------------------------------------------------------------===//
 
 class FormatII<bits<6> opcode, dag outs, dag ins, string asmstr,
-               list<dag> pattern>
-    : V850Inst16<outs, ins, asmstr, pattern> {
+               list<dag> pattern> : V850Inst16<outs, ins, asmstr, pattern> {
   bits<5> imm5;
   bits<5> reg2;
 
-  let Inst{15-11} = reg2;
-  let Inst{10-5}  = opcode;
-  let Inst{4-0}   = imm5;
+  let Inst{15 -11} = reg2;
+  let Inst{10 -5} = opcode;
+  let Inst{4 -0} = imm5;
 }
 
 //===----------------------------------------------------------------------===//
@@ -110,9 +108,9 @@ class FormatII_IMM6<bits<5> opcode, dag outs, dag ins, string asmstr,
     : V850Inst16<outs, ins, asmstr, pattern> {
   bits<6> imm6;
 
-  let Inst{15-11} = 0;              // reg2 = 0
-  let Inst{10-6}  = opcode;
-  let Inst{5-0}   = imm6;
+  let Inst{15 -11} = 0; // reg2 = 0
+  let Inst{10 -6} = opcode;
+  let Inst{5 -0} = imm6;
 }
 
 //===----------------------------------------------------------------------===//
@@ -121,15 +119,14 @@ class FormatII_IMM6<bits<5> opcode, dag outs, dag ins, string asmstr,
 //===----------------------------------------------------------------------===//
 
 class FormatIII<bits<4> opcode, dag outs, dag ins, string asmstr,
-                list<dag> pattern>
-    : V850Inst16<outs, ins, asmstr, pattern> {
-  bits<8> disp9;  // Half-displacement (encoder shifts val >> 1)
+                list<dag> pattern> : V850Inst16<outs, ins, asmstr, pattern> {
+  bits<8> disp9; // Half-displacement (encoder shifts val >> 1)
   bits<4> cond;
 
-  let Inst{15-11} = disp9{7-3};
-  let Inst{10-7}  = opcode;
-  let Inst{6-4}   = disp9{2-0};
-  let Inst{3-0}   = cond;
+  let Inst{15 -11} = disp9{7 -3};
+  let Inst{10 -7} = opcode;
+  let Inst{6 -4} = disp9{2 -0};
+  let Inst{3 -0} = cond;
 }
 
 //===----------------------------------------------------------------------===//
@@ -138,14 +135,13 @@ class FormatIII<bits<4> opcode, dag outs, dag ins, string asmstr,
 //===----------------------------------------------------------------------===//
 
 class FormatIV<bits<4> opcode, dag outs, dag ins, string asmstr,
-               list<dag> pattern>
-    : V850Inst16<outs, ins, asmstr, pattern> {
+               list<dag> pattern> : V850Inst16<outs, ins, asmstr, pattern> {
   bits<5> reg2;
   bits<7> disp7;
 
-  let Inst{15-11} = reg2;
-  let Inst{10-7}  = opcode;
-  let Inst{6-0}   = disp7;
+  let Inst{15 -11} = reg2;
+  let Inst{10 -7} = opcode;
+  let Inst{6 -0} = disp7;
 }
 
 //===----------------------------------------------------------------------===//
@@ -157,14 +153,13 @@ class FormatIV<bits<4> opcode, dag outs, dag ins, string asmstr,
 //===----------------------------------------------------------------------===//
 
 class FormatIV_E1<bits<7> opcode, dag outs, dag ins, string asmstr,
-                  list<dag> pattern>
-    : V850Inst16<outs, ins, asmstr, pattern> {
+                  list<dag> pattern> : V850Inst16<outs, ins, asmstr, pattern> {
   bits<5> reg2;
   bits<4> disp4;
 
-  let Inst{15-11} = reg2;
-  let Inst{10-4}  = opcode;
-  let Inst{3-0}   = disp4;
+  let Inst{15 -11} = reg2;
+  let Inst{10 -4} = opcode;
+  let Inst{3 -0} = disp4;
 }
 
 //===----------------------------------------------------------------------===//
@@ -174,16 +169,15 @@ class FormatIV_E1<bits<7> opcode, dag outs, dag ins, string asmstr,
 //===----------------------------------------------------------------------===//
 
 class FormatV<bits<6> opcode, dag outs, dag ins, string asmstr,
-              list<dag> pattern>
-    : V850Inst32<outs, ins, asmstr, pattern> {
+              list<dag> pattern> : V850Inst32<outs, ins, asmstr, pattern> {
   bits<5> reg2;
   bits<22> disp22;
 
-  let Inst{15-11} = reg2;
-  let Inst{10-6}  = opcode{5-1};
-  let Inst{5-0}   = disp22{5-0};
-  let Inst{31-17} = disp22{21-7};
-  let Inst{16}    = disp22{6};
+  let Inst{15 -11} = reg2;
+  let Inst{10 -6} = opcode{5 -1};
+  let Inst{5 -0} = disp22{5 -0};
+  let Inst{31 -17} = disp22{21 -7};
+  let Inst{16} = disp22{6};
 }
 
 //===----------------------------------------------------------------------===//
@@ -193,16 +187,15 @@ class FormatV<bits<6> opcode, dag outs, dag ins, string asmstr,
 //===----------------------------------------------------------------------===//
 
 class FormatVI<bits<6> opcode, dag outs, dag ins, string asmstr,
-               list<dag> pattern>
-    : V850Inst32<outs, ins, asmstr, pattern> {
+               list<dag> pattern> : V850Inst32<outs, ins, asmstr, pattern> {
   bits<5> reg1;
   bits<5> reg2;
   bits<16> imm16;
 
-  let Inst{15-11} = reg2;
-  let Inst{10-5}  = opcode;
-  let Inst{4-0}   = reg1;
-  let Inst{31-16} = imm16;
+  let Inst{15 -11} = reg2;
+  let Inst{10 -5} = opcode;
+  let Inst{4 -0} = reg1;
+  let Inst{31 -16} = imm16;
 }
 
 //===----------------------------------------------------------------------===//
@@ -212,17 +205,16 @@ class FormatVI<bits<6> opcode, dag outs, dag ins, string asmstr,
 //===----------------------------------------------------------------------===//
 
 class FormatVII<bits<6> opcode, dag outs, dag ins, string asmstr,
-                list<dag> pattern>
-    : V850Inst32<outs, ins, asmstr, pattern> {
+                list<dag> pattern> : V850Inst32<outs, ins, asmstr, pattern> {
   bits<5> reg1;
   bits<5> reg2;
   bits<16> disp16;
 
-  let Inst{15-11} = reg2;
-  let Inst{10-5}  = opcode;
-  let Inst{4-0}   = reg1;
-  let Inst{31-17} = disp16{15-1};
-  let Inst{16}    = disp16{0};
+  let Inst{15 -11} = reg2;
+  let Inst{10 -5} = opcode;
+  let Inst{4 -0} = reg1;
+  let Inst{31 -17} = disp16{15 -1};
+  let Inst{16} = disp16{0};
 }
 
 //===----------------------------------------------------------------------===//
@@ -238,11 +230,11 @@ class FormatVIII<bits<6> opcode, bits<2> subop, dag outs, dag ins,
   bits<5> reg1;
   bits<16> disp16;
 
-  let Inst{15-14} = subop;
-  let Inst{13-11} = bit3;
-  let Inst{10-5}  = opcode;
-  let Inst{4-0}   = reg1;
-  let Inst{31-16} = disp16;
+  let Inst{15 -14} = subop;
+  let Inst{13 -11} = bit3;
+  let Inst{10 -5} = opcode;
+  let Inst{4 -0} = reg1;
+  let Inst{31 -16} = disp16;
 }
 
 //===----------------------------------------------------------------------===//
@@ -251,60 +243,71 @@ class FormatVIII<bits<6> opcode, bits<2> subop, dag outs, dag ins,
 // Second halfword: 31-27 = RFU(0), 26-21 = sub-op, 20-16 = RFU(0)
 //===----------------------------------------------------------------------===//
 
-class FormatIX<bits<6> opcode, bits<6> subop, dag outs, dag ins,
-               string asmstr, list<dag> pattern>
-    : V850Inst32<outs, ins, asmstr, pattern> {
+class FormatIX<bits<6> opcode, bits<6> subop, dag outs, dag ins, string asmstr,
+               list<dag> pattern> : V850Inst32<outs, ins, asmstr, pattern> {
   bits<5> reg1;
   bits<5> reg2;
 
-  let Inst{15-11} = reg2;
-  let Inst{10-5}  = opcode;       // Extended opcode
-  let Inst{4-0}   = reg1;
-  let Inst{31-27} = 0;              // RFU
-  let Inst{26-21} = subop;
-  let Inst{20-16} = 0;              // RFU
+  let Inst{15 -11} = reg2;
+  let Inst{10 -5} = opcode; // Extended opcode
+  let Inst{4 -0} = reg1;
+  let Inst{31 -27} = 0; // RFU
+  let Inst{26 -21} = subop;
+  let Inst{20 -16} = 0; // RFU
 }
 
-// Format IX with selID: LDSR/STSR with group specification (RH850G3M+)
-// Same as FormatIX but bits 20-16 encode selID (register group/bank)
-// Marked isCodeGenOnly because selID in bits 20-16 creates decoder conflicts
-// with all FormatIX instructions. Disassembly handled by custom decoder in
-// V850Disassembler.cpp. Assembly matching works via the AsmMatcher tables.
-class FormatIX_sel<bits<6> opcode, bits<6> subop, dag outs, dag ins,
-                   string asmstr, list<dag> pattern>
+// Format IX with unified 10-bit sysreg operand (LDSR/STSR with bank selection)
+// The sysreg operand encodes both regID and selID as a single 10-bit value:
+//   Encoding = (selID << 5) | regID
+// sysreg[4:0] = regID → instruction bits[4:0]
+// sysreg[9:5] = selID → instruction bits[20:16]
+// On base V850, selID=0 so bits[20:16]=0. On RH850G3M+, selID can be non-zero.
+// The auto-generated decoder reconstructs the 10-bit value from both fields.
+// Format IX for LDSR/STSR with unified 10-bit sysreg operand.
+// sysreg encodes both regID (bits[4:0]) and selID (bits[9:5]):
+//   Encoding = (selID << 5) | regID
+// In the instruction: regID -> bits[4:0], selID -> bits[20:16].
+// For base V850, selID=0 so bits[20:16]=0 (same as FormatIX RFU bits).
+// Disassembly is handled by custom decode code in V850Disassembler.cpp
+// that reconstructs the 10-bit sysreg encoding from bits[4:0] (regID)
+// and bits[20:16] (selID).
+class FormatIX_SysReg<bits<6> opcode, bits<6> subop, dag outs, dag ins,
+                      string asmstr, list<dag> pattern>
     : V850Inst32<outs, ins, asmstr, pattern> {
-  bits<5> reg1;
+  bits<10> sysreg; // Combined: selID[9:5] | regID[4:0]
   bits<5> reg2;
-  bits<5> selID;
 
-  let Inst{15-11} = reg2;
-  let Inst{10-5}  = opcode;       // Extended opcode
-  let Inst{4-0}   = reg1;
-  let Inst{31-27} = 0;
-  let Inst{26-21} = subop;
-  let Inst{20-16} = selID;
+  let Inst{15 -11} = reg2;
+  let Inst{10 -5} = opcode;        // Extended opcode
+  let Inst{4 -0} = sysreg{4 -0};   // regID in instruction bits[4:0]
+  let Inst{31 -27} = 0;            // RFU
+  let Inst{26 -21} = subop;
+  let Inst{20 -16} = sysreg{9 -5}; // selID in instruction bits[20:16]
 
+  // Excluded from auto-generated decoder to avoid a conflict caused by the
+  // variable selID field (bits[20:16]). Disassembly is handled by custom code
+  // in V850Disassembler.cpp. Excluded from AsmMatcher; parsing is done
+  // manually in V850AsmParser.cpp (matchAndEmitInstruction).
   let isCodeGenOnly = 1;
 }
 
 //===----------------------------------------------------------------------===//
 // Format X: Extended 2 (32-bit)
-// First halfword: 15-13 = RFU(0), 12-11 = sub-op[1:0], 10-5 = opcode, 4-0 = imm/vector
-// Second halfword: 31-27 = RFU(0), 26-21 = sub-op, 20-16 = RFU(0)
+// First halfword: 15-13 = RFU(0), 12-11 = sub-op[1:0], 10-5 = opcode, 4-0 =
+// imm/vector Second halfword: 31-27 = RFU(0), 26-21 = sub-op, 20-16 = RFU(0)
 //===----------------------------------------------------------------------===//
 
-class FormatX<bits<6> opcode, bits<6> subop, dag outs, dag ins,
-              string asmstr, list<dag> pattern>
-    : V850Inst32<outs, ins, asmstr, pattern> {
+class FormatX<bits<6> opcode, bits<6> subop, dag outs, dag ins, string asmstr,
+              list<dag> pattern> : V850Inst32<outs, ins, asmstr, pattern> {
   bits<5> vector;
 
-  let Inst{15-13} = 0;              // RFU
-  let Inst{12-11} = subop{1-0};
-  let Inst{10-5}  = opcode;
-  let Inst{4-0}   = vector;
-  let Inst{31-27} = 0;              // RFU
-  let Inst{26-21} = subop;
-  let Inst{20-16} = 0;              // RFU
+  let Inst{15 -13} = 0; // RFU
+  let Inst{12 -11} = subop{1 -0};
+  let Inst{10 -5} = opcode;
+  let Inst{4 -0} = vector;
+  let Inst{31 -27} = 0; // RFU
+  let Inst{26 -21} = subop;
+  let Inst{20 -16} = 0; // RFU
 }
 
 //===----------------------------------------------------------------------===//
@@ -325,12 +328,12 @@ class FormatXI<bits<6> opcode, bits<6> subop, bits<5> subid, dag outs, dag ins,
   bits<5> reg2;
   bits<5> reg3;
 
-  let Inst{15-11} = reg2;
-  let Inst{10-5}  = opcode;       // Extended opcode
-  let Inst{4-0}   = reg1;
-  let Inst{31-27} = reg3;
-  let Inst{26-21} = subop;
-  let Inst{20-16} = subid;
+  let Inst{15 -11} = reg2;
+  let Inst{10 -5} = opcode; // Extended opcode
+  let Inst{4 -0} = reg1;
+  let Inst{31 -27} = reg3;
+  let Inst{26 -21} = subop;
+  let Inst{20 -16} = subid;
 }
 
 //===----------------------------------------------------------------------===//
@@ -347,13 +350,13 @@ class FormatXI_IMM9<bits<6> opcode, bits<6> subop, dag outs, dag ins,
   bits<5> reg2;
   bits<5> reg3;
 
-  let Inst{15-11} = reg2;
-  let Inst{10-5}  = opcode;       // Extended opcode
-  let Inst{4-0}   = imm9{4-0};      // imm9[4:0]
-  let Inst{31-27} = reg3;
-  let Inst{26-21} = subop;
-  let Inst{20-17} = imm9{8-5};      // imm9[8:5]
-  let Inst{16}    = 0;
+  let Inst{15 -11} = reg2;
+  let Inst{10 -5} = opcode;    // Extended opcode
+  let Inst{4 -0} = imm9{4 -0}; // imm9[4:0]
+  let Inst{31 -27} = reg3;
+  let Inst{26 -21} = subop;
+  let Inst{20 -17} = imm9{8 -5}; // imm9[8:5]
+  let Inst{16} = 0;
 }
 
 //===----------------------------------------------------------------------===//
@@ -364,20 +367,19 @@ class FormatXI_IMM9<bits<6> opcode, bits<6> subop, dag outs, dag ins,
 //===----------------------------------------------------------------------===//
 
 class FormatXII<bits<6> opcode, bits<6> subop, dag outs, dag ins, string asmstr,
-                     list<dag> pattern>
-    : V850Inst32<outs, ins, asmstr, pattern> {
+                list<dag> pattern> : V850Inst32<outs, ins, asmstr, pattern> {
   bits<5> imm5;
   bits<5> reg2;
   bits<5> reg3;
   bits<4> cond;
 
-  let Inst{15-11} = reg2;
-  let Inst{10-5}  = opcode;       // Extended opcode
-  let Inst{4-0}   = imm5;
-  let Inst{31-27} = reg3;
-  let Inst{26-21} = subop;
-  let Inst{20-17} = cond;
-  let Inst{16}    = 0;
+  let Inst{15 -11} = reg2;
+  let Inst{10 -5} = opcode; // Extended opcode
+  let Inst{4 -0} = imm5;
+  let Inst{31 -27} = reg3;
+  let Inst{26 -21} = subop;
+  let Inst{20 -17} = cond;
+  let Inst{16} = 0;
 }
 
 // Note: For conditional operations with extended opcode, use FormatXII with
@@ -390,18 +392,18 @@ class FormatXII<bits<6> opcode, bits<6> subop, dag outs, dag ins, string asmstr,
 // Used for: PREPARE, DISPOSE
 //===----------------------------------------------------------------------===//
 
-class FormatXIII<bits<5> opcode, dag outs, dag ins, string asmstr, list<dag> pattern>
-    : V850Inst32<outs, ins, asmstr, pattern> {
+class FormatXIII<bits<5> opcode, dag outs, dag ins, string asmstr,
+                 list<dag> pattern> : V850Inst32<outs, ins, asmstr, pattern> {
   bits<5> imm5;
   bits<12> list12;
   bits<5> reg1;
 
-  let Inst{15-11} = 0;              // Fixed
-  let Inst{10-6}  = opcode;        // PREPARE/DISPOSE opcode
-  let Inst{5-1}   = imm5;
-  let Inst{0}     = list12{0};      // list12 bit 0 (r30)
-  let Inst{31-21} = list12{11-1};   // list12 bits 11:1
-  let Inst{20-16} = reg1;
+  let Inst{15 -11} = 0;     // Fixed
+  let Inst{10 -6} = opcode; // PREPARE/DISPOSE opcode
+  let Inst{5 -1} = imm5;
+  let Inst{0} = list12{0};          // list12 bit 0 (r30)
+  let Inst{31 -21} = list12{11 -1}; // list12 bits 11:1
+  let Inst{20 -16} = reg1;
 }
 
 // Note: For PREPARE/DISPOSE without jump register, use FormatXIII with
@@ -415,16 +417,16 @@ class FormatXIII<bits<5> opcode, dag outs, dag ins, string asmstr, list<dag> pat
 // Third halfword:  47-32 = imm32[31:16]
 //===----------------------------------------------------------------------===//
 
-class FormatVI_E1<bits<6> opcode, dag outs, dag ins, string asmstr, list<dag> pattern>
-    : V850Inst48<outs, ins, asmstr, pattern> {
+class FormatVI_E1<bits<6> opcode, dag outs, dag ins, string asmstr,
+                  list<dag> pattern> : V850Inst48<outs, ins, asmstr, pattern> {
   bits<5> reg1;
   bits<32> imm32;
 
-  let Inst{15-11} = 0;                // reg2 field (must be 0)
-  let Inst{10-5}  = opcode;
-  let Inst{4-0}   = reg1;
-  let Inst{31-16} = imm32{15-0};      // imm32[15:0]
-  let Inst{47-32} = imm32{31-16};     // imm32[31:16]
+  let Inst{15 -11} = 0; // reg2 field (must be 0)
+  let Inst{10 -5} = opcode;
+  let Inst{4 -0} = reg1;
+  let Inst{31 -16} = imm32{15 -0};  // imm32[15:0]
+  let Inst{47 -32} = imm32{31 -16}; // imm32[31:16]
 }
 
 //===----------------------------------------------------------------------===//
@@ -435,17 +437,17 @@ class FormatVI_E1<bits<6> opcode, dag outs, dag ins, string asmstr, list<dag> pa
 // Third halfword:  47-32 = disp32[31:16]
 //===----------------------------------------------------------------------===//
 
-class FormatVI_E2<bits<6> opcode, dag outs, dag ins, string asmstr, list<dag> pattern>
-    : V850Inst48<outs, ins, asmstr, pattern> {
+class FormatVI_E2<bits<6> opcode, dag outs, dag ins, string asmstr,
+                  list<dag> pattern> : V850Inst48<outs, ins, asmstr, pattern> {
   bits<5> reg1;
   bits<32> disp32;
 
-  let Inst{15-11} = 0;                // reg2 field (unused)
-  let Inst{10-5}  = opcode;
-  let Inst{4-0}   = reg1;
-  let Inst{16}    = disp32{0};        // disp32 bit 0
-  let Inst{31-17} = disp32{15-1};     // disp32[15:1]
-  let Inst{47-32} = disp32{31-16};    // disp32[31:16]
+  let Inst{15 -11} = 0; // reg2 field (unused)
+  let Inst{10 -5} = opcode;
+  let Inst{4 -0} = reg1;
+  let Inst{16} = disp32{0};          // disp32 bit 0
+  let Inst{31 -17} = disp32{15 -1};  // disp32[15:1]
+  let Inst{47 -32} = disp32{31 -16}; // disp32[31:16]
 }
 
 //===----------------------------------------------------------------------===//
@@ -459,12 +461,12 @@ class FormatVI_E2<bits<6> opcode, dag outs, dag ins, string asmstr, list<dag> pa
 // Double-precision: uses even registers (bit 0 = 0), uses pairs {rN+1, rN}
 //
 // Sub-opcode encoding varies by instruction type:
-// - Arithmetic (ADDF/SUBF/MULF/DIVF): bits 26=1, 25-23=000, 22-21=11, 20-17=subop
+// - Arithmetic (ADDF/SUBF/MULF/DIVF): bits 26=1, 25-23=000, 22-21=11,
+// 20-17=subop
 // - 2-operand (ABSF/NEGF/SQRTF): bits 26=1, 25-23=000, 22-21=10, 20-17=subop
 // - Comparison (CMPF): bits 26=1, 25-23=000, 22-21=0F, 20-17=fff0 (fcbit)
 // - Conversion: various category/type combinations
 //===----------------------------------------------------------------------===//
-
 
 //===----------------------------------------------------------------------===//
 // Format F:I - FPU Instructions (32-bit)
@@ -479,84 +481,81 @@ class FormatVI_E2<bits<6> opcode, dag outs, dag ins, string asmstr, list<dag> pa
 class FormatFI<dag outs, dag ins, string asmstr, list<dag> pattern>
     : V850Inst32<outs, ins, asmstr, pattern> {
   // Common FPU opcode in bits 10-5
-  let Inst{10-5} = 0b111111;
+  let Inst{10 -5} = 0b111111;
 }
 
 // FPU 3-operand instructions: reg3 = reg2 op reg1
 // Used for: ADDF, SUBF, MULF, DIVF, MAXF, MINF
 class FormatFPU_RRR<bits<4> subop, dag outs, dag ins, string asmstr,
-                    list<dag> pattern>
-    : FormatFI<outs, ins, asmstr, pattern> {
+                    list<dag> pattern> : FormatFI<outs, ins, asmstr, pattern> {
   bits<5> reg1;
   bits<5> reg2;
   bits<5> reg3;
 
-  let Inst{15-11} = reg2;
-  let Inst{4-0}   = reg1;
-  let Inst{31-27} = reg3;
-  let Inst{26}    = 1;
-  let Inst{25-23} = 0b000;            // Category
-  let Inst{22-21} = 0b11;             // Type (arithmetic)
-  let Inst{20-17} = subop;
-  let Inst{16}    = 0;
+  let Inst{15 -11} = reg2;
+  let Inst{4 -0} = reg1;
+  let Inst{31 -27} = reg3;
+  let Inst{26} = 1;
+  let Inst{25 -23} = 0b000; // Category
+  let Inst{22 -21} = 0b11;  // Type (arithmetic)
+  let Inst{20 -17} = subop;
+  let Inst{16} = 0;
 }
 
 // FPU 2-operand instructions: reg3 = op(reg2)
 // Used for: ABSF, NEGF, SQRTF, RECIPF, RSQRTF
 class FormatFPU_RR<bits<4> subop, dag outs, dag ins, string asmstr,
-                   list<dag> pattern>
-    : FormatFI<outs, ins, asmstr, pattern> {
+                   list<dag> pattern> : FormatFI<outs, ins, asmstr, pattern> {
   bits<5> reg2;
   bits<5> reg3;
 
-  let Inst{15-11} = reg2;
-  let Inst{4-0}   = 0;                // reg1 unused
-  let Inst{31-27} = reg3;
-  let Inst{26}    = 1;
-  let Inst{25-23} = 0b000;            // Category
-  let Inst{22-21} = 0b10;             // Type (2-operand)
-  let Inst{20-17} = subop;
-  let Inst{16}    = 0;
+  let Inst{15 -11} = reg2;
+  let Inst{4 -0} = 0; // reg1 unused
+  let Inst{31 -27} = reg3;
+  let Inst{26} = 1;
+  let Inst{25 -23} = 0b000; // Category
+  let Inst{22 -21} = 0b10;  // Type (2-operand)
+  let Inst{20 -17} = subop;
+  let Inst{16} = 0;
 }
 
 // FPU 4-operand instructions: reg4 = (reg2 * reg1) +/- reg3
 // Used for: MADDF.S, MSUBF.S, NMADDF.S, NMSUBF.S
 // reg4 is encoded across bits 26 and 20-17
 class FormatFPU_RRRR<bits<2> subop, dag outs, dag ins, string asmstr,
-                     list<dag> pattern>
-    : FormatFI<outs, ins, asmstr, pattern> {
+                     list<dag> pattern> : FormatFI<outs, ins, asmstr, pattern> {
   bits<5> reg1;
   bits<5> reg2;
   bits<5> reg3;
   bits<5> reg4;
 
-  let Inst{15-11} = reg2;
-  let Inst{4-0}   = reg1;
-  let Inst{31-27} = reg3;
-  let Inst{26}    = reg4{4};          // reg4 bit 4
-  let Inst{25-23} = 0b101;            // Category for MADD
-  let Inst{22-21} = subop;            // 00=MADDF, 01=MSUBF, 10=NMADDF, 11=NMSUBF
-  let Inst{20-17} = reg4{3-0};        // reg4 bits 3-0
-  let Inst{16}    = 0;
+  let Inst{15 -11} = reg2;
+  let Inst{4 -0} = reg1;
+  let Inst{31 -27} = reg3;
+  let Inst{26} = reg4{4};        // reg4 bit 4
+  let Inst{25 -23} = 0b101;      // Category for MADD
+  let Inst{22 -21} = subop;      // 00=MADDF, 01=MSUBF, 10=NMADDF, 11=NMSUBF
+  let Inst{20 -17} = reg4{3 -0}; // reg4 bits 3-0
+  let Inst{16} = 0;
 }
 
 // FPU conversion/rounding instructions: reg3 = convert(reg2)
 // The category and type bits vary based on source/dest types
 // subop2 encodes source type, subop encodes destination type
-class FormatFPU_CVT<bits<5> subop2, bits<3> category, bits<2> type, bits<4> subop,
-                    dag outs, dag ins, string asmstr, list<dag> pattern>
-    : FormatFI<outs, ins, asmstr, pattern> {
+class FormatFPU_CVT<bits<5> subop2, bits<3> category, bits<2> type,
+                    bits<4> subop, dag outs, dag ins, string asmstr,
+                    list<dag> pattern> : FormatFI<outs, ins, asmstr, pattern> {
   bits<5> reg2;
   bits<5> reg3;
 
-  let Inst{15-11} = reg2;
-  let Inst{4-0}   = subop2;           // Additional sub-opcode
-  let Inst{31-27} = reg3;
-  let Inst{26}    = 1;
-  let Inst{25-23} = category;
-  let Inst{22-21} = type;
-  let Inst{20-17} = subop;            // Sub-operation code
-  let Inst{16}    = 0;
+  let Inst{15 -11} = reg2;
+  let Inst{4 -0} = subop2; // Additional sub-opcode
+  let Inst{31 -27} = reg3;
+  let Inst{26} = 1;
+  let Inst{25 -23} = category;
+  let Inst{22 -21} = type;
+  let Inst{20 -17} = subop; // Sub-operation code
+  let Inst{16} = 0;
 }
 
 // TRFSR - Transfer floating-point status to PSW.Z
@@ -566,35 +565,35 @@ class FormatFPU_TRFSR<dag outs, dag ins, string asmstr, list<dag> pattern>
     : FormatFI<outs, ins, asmstr, pattern> {
   bits<3> fcbit;
 
-  let Inst{15-11} = 0;
-  let Inst{4-0}   = 0;
-  let Inst{31-27} = 0;
-  let Inst{26}    = 1;
-  let Inst{25-23} = 0b000;
-  let Inst{22-21} = 0b00;
-  let Inst{20}    = 0;
-  let Inst{19-17} = fcbit;
-  let Inst{16}    = 0;
+  let Inst{15 -11} = 0;
+  let Inst{4 -0} = 0;
+  let Inst{31 -27} = 0;
+  let Inst{26} = 1;
+  let Inst{25 -23} = 0b000;
+  let Inst{22 -21} = 0b00;
+  let Inst{20} = 0;
+  let Inst{19 -17} = fcbit;
+  let Inst{16} = 0;
 }
 
 // FPU comparison instructions: FPCC[fcbit] = reg2 cmp reg1
 // Used for: CMPF.S, CMPF.D
-// Encoding: reg2[15:11], 111111[10:5], reg1[4:0] | 0fcond[31:27], 1000011[26:20], fcbit[19:17], dbl[16]
-class FormatFPU_CMP<bit dbl, dag outs, dag ins, string asmstr, list<dag> pattern>
-    : FormatFI<outs, ins, asmstr, pattern> {
+// Encoding: reg2[15:11], 111111[10:5], reg1[4:0] | 0fcond[31:27],
+// 1000011[26:20], fcbit[19:17], dbl[16]
+class FormatFPU_CMP<bit dbl, dag outs, dag ins, string asmstr,
+                    list<dag> pattern> : FormatFI<outs, ins, asmstr, pattern> {
   bits<5> reg1;
   bits<5> reg2;
   bits<4> fcond;
   bits<3> fcbit;
 
-  let Inst{15-11} = reg2;
-  let Inst{4-0}   = reg1;
-  let Inst{31}    = 0;
-  let Inst{30-27} = fcond;
-  let Inst{26}    = 1;
-  let Inst{25-23} = 0b000;
-  let Inst{22-20} = 0b011;
-  let Inst{19-17} = fcbit;
-  let Inst{16}    = dbl;
+  let Inst{15 -11} = reg2;
+  let Inst{4 -0} = reg1;
+  let Inst{31} = 0;
+  let Inst{30 -27} = fcond;
+  let Inst{26} = 1;
+  let Inst{25 -23} = 0b000;
+  let Inst{22 -20} = 0b011;
+  let Inst{19 -17} = fcbit;
+  let Inst{16} = dbl;
 }
-

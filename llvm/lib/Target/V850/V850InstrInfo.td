@@ -83,7 +83,7 @@ def V850SysRegAsmOperand : AsmOperandClass {
   let DiagnosticType = "InvalidSysReg";
 }
 
-def sysreg : Operand<i32>, ImmLeaf<i32, [{return isUInt<5>(Imm);}]> {
+def sysreg : Operand<i32>, ImmLeaf<i32, [{return isUInt<10>(Imm);}]> {
   let ParserMatchClass = V850SysRegAsmOperand;
   let PrintMethod = "printSystemRegister";
   let DecoderMethod = "decodeSystemRegister";
@@ -179,7 +179,8 @@ def brtarget16 : Operand<OtherVT> {
   let ParserMatchClass = Brtarget16AsmOperand;
 }
 
-// 17-bit PC-relative branch target for Bcond disp17 (bit 0 implicitly 0, RH850G3M+)
+// 17-bit PC-relative branch target for Bcond disp17 (bit 0 implicitly 0,
+// RH850G3M+)
 def brtarget17 : Operand<OtherVT> {
   let EncoderMethod = "getBranchTarget17OpValue";
   let DecoderMethod = "decodeBranchTarget17";
@@ -769,16 +770,15 @@ def BGT : Bcond<0b1111, "bgt">; // Greater than (signed)
 //===----------------------------------------------------------------------===//
 
 class Bcond17<bits<4> cc, string mnemonic>
-    : V850Inst32<(outs), (ins brtarget17:$disp17),
-                 mnemonic#"\t$disp17", []>,
+    : V850Inst32<(outs), (ins brtarget17:$disp17), mnemonic#"\t$disp17", []>,
       Requires<[HasRH850G3M]> {
-  bits<16> disp17;  // Half-displacement (encoder shifts val >> 1)
+  bits<16> disp17; // Half-displacement (encoder shifts val >> 1)
 
-  let Inst{15-5} = 0b00000111111;  // Fixed opcode
-  let Inst{4} = disp17{15};        // Sign bit of half-displacement (D)
-  let Inst{3-0} = cc;              // Condition code
-  let Inst{31-17} = disp17{14-0};  // Lower 15 bits of half-displacement
-  let Inst{16} = 1;                // Fixed format marker
+  let Inst{15 -5} = 0b00000111111;  // Fixed opcode
+  let Inst{4} = disp17{15};         // Sign bit of half-displacement (D)
+  let Inst{3 -0} = cc;              // Condition code
+  let Inst{31 -17} = disp17{14 -0}; // Lower 15 bits of half-displacement
+  let Inst{16} = 1;                 // Fixed format marker
 
   let isBranch = 1;
   let isTerminator = 1;
@@ -787,22 +787,22 @@ class Bcond17<bits<4> cc, string mnemonic>
 
 // Extended conditional branch instructions (RH850G3M+)
 // Note: BR (0101) is NOT allowed for Bcond disp17
-def BV_17  : Bcond17<0b0000, "bv">;   // Overflow
-def BC_17  : Bcond17<0b0001, "bc">;   // Carry (also BL)
-def BZ_17  : Bcond17<0b0010, "bz">;   // Zero (also BE)
-def BNH_17 : Bcond17<0b0011, "bnh">;  // Not higher
-def BN_17  : Bcond17<0b0100, "bn">;   // Negative
+def BV_17 : Bcond17<0b0000, "bv">;   // Overflow
+def BC_17 : Bcond17<0b0001, "bc">;   // Carry (also BL)
+def BZ_17 : Bcond17<0b0010, "bz">;   // Zero (also BE)
+def BNH_17 : Bcond17<0b0011, "bnh">; // Not higher
+def BN_17 : Bcond17<0b0100, "bn">;   // Negative
 // BR (0b0101) is NOT valid for disp17 - use JR disp22 instead
-def BLT_17 : Bcond17<0b0110, "blt">;  // Less than (signed)
-def BLE_17 : Bcond17<0b0111, "ble">;  // Less or equal (signed)
-def BNV_17 : Bcond17<0b1000, "bnv">;  // No overflow
-def BNC_17 : Bcond17<0b1001, "bnc">;  // No carry (also BNL)
-def BNZ_17 : Bcond17<0b1010, "bnz">;  // Not zero (also BNE)
-def BH_17  : Bcond17<0b1011, "bh">;   // Higher
-def BP_17  : Bcond17<0b1100, "bp">;   // Positive
-def BSA_17 : Bcond17<0b1101, "bsa">;  // Saturated
-def BGE_17 : Bcond17<0b1110, "bge">;  // Greater or equal (signed)
-def BGT_17 : Bcond17<0b1111, "bgt">;  // Greater than (signed)
+def BLT_17 : Bcond17<0b0110, "blt">; // Less than (signed)
+def BLE_17 : Bcond17<0b0111, "ble">; // Less or equal (signed)
+def BNV_17 : Bcond17<0b1000, "bnv">; // No overflow
+def BNC_17 : Bcond17<0b1001, "bnc">; // No carry (also BNL)
+def BNZ_17 : Bcond17<0b1010, "bnz">; // Not zero (also BNE)
+def BH_17 : Bcond17<0b1011, "bh">;   // Higher
+def BP_17 : Bcond17<0b1100, "bp">;   // Positive
+def BSA_17 : Bcond17<0b1101, "bsa">; // Saturated
+def BGE_17 : Bcond17<0b1110, "bge">; // Greater or equal (signed)
+def BGT_17 : Bcond17<0b1111, "bgt">; // Greater than (signed)
 
 //===----------------------------------------------------------------------===//
 // Jump Instructions - Format V (32-bit)
@@ -868,42 +868,20 @@ def SETF : FormatIX<0b111111, 0b000000, (outs GPR:$reg2), (ins condcode:$cond),
   let reg1 = cond;
 }
 
-// LDSR reg2, regID - Load to system register
+// LDSR reg2, sysreg - Load to system register (unified 10-bit encoding)
 // Opcode: 111111 (0x3F), sub-op: 100000 (0x20)
-def LDSR : FormatIX<0b111111, 0b100000, (outs), (ins GPR:$reg2, sysreg:$regID),
-                    "ldsr\t$reg2, $regID", []> {
-  bits<5> regID;
-  let reg1 = regID;
-}
+// sysreg encodes (selID << 5) | regID. For base V850, selID=0.
+// For RH850G3M+, selID selects the register bank (bits[20:16] of instruction).
+def LDSR : FormatIX_SysReg<0b111111, 0b100000, (outs),
+                           (ins GPR:$reg2, sysreg:$sysreg),
+                           "ldsr\t$reg2, $sysreg", []>;
 
-// STSR regID, reg2 - Store from system register
+// STSR sysreg, reg2 - Store from system register (unified 10-bit encoding)
 // Opcode: 111111 (0x3F), sub-op: 100100 (0x24)
-def STSR : FormatIX<0b111111, 0b100100, (outs GPR:$reg2), (ins sysreg:$regID),
-                    "stsr\t$regID, $reg2", []> {
-  bits<5> regID;
-  let reg1 = regID;
-}
-
-// LDSR reg2, regID, selID - Load to system register with group (RH850G3M+)
-// Same encoding as LDSR but bits[20-16] = selID (register group)
-let Predicates = [HasRH850G3M] in
-def LDSR_sel
-    : FormatIX_sel<0b111111, 0b100000, (outs),
-                   (ins GPR:$reg2, uimm5:$regID, uimm5:$selID),
-                   "ldsr\t$reg2, $regID, $selID", []> {
-  bits<5> regID;
-  let reg1 = regID;
-}
-
-// STSR regID, reg2, selID - Store from system register with group (RH850G3M+)
-let Predicates = [HasRH850G3M] in
-def STSR_sel
-    : FormatIX_sel<0b111111, 0b100100, (outs GPR:$reg2),
-                   (ins uimm5:$regID, uimm5:$selID),
-                   "stsr\t$regID, $reg2, $selID", []> {
-  bits<5> regID;
-  let reg1 = regID;
-}
+// sysreg encodes (selID << 5) | regID. For base V850, selID=0.
+// For RH850G3M+, selID selects the register bank (bits[20:16] of instruction).
+def STSR : FormatIX_SysReg<0b111111, 0b100100, (outs GPR:$reg2),
+                           (ins sysreg:$sysreg), "stsr\t$sysreg, $reg2", []>;
 
 // SHR reg1, reg2 - Shift right logical by register
 // Opcode: 111111 (0x3F), sub-op: 000010 (0x02)
@@ -2899,23 +2877,14 @@ def : Pat<(int_v850_ei), (EI)>;
 //===----------------------------------------------------------------------===//
 // Generic System Register Access Patterns
 //
-// System registers are now modeled as immediate operands (sysreg type).
-// These two generic patterns handle all regID values, eliminating the need
-// for per-register patterns.
+// System registers are modeled as 10-bit immediate operands (sysreg type)
+// where Encoding = (selID << 5) | regID. For base V850, selID=0 and
+// the encoding equals the regID. For RH850G3M+, selID selects the bank.
+// These two generic patterns handle all encoding values.
 //===----------------------------------------------------------------------===//
 
-def : Pat<(int_v850_ldsr GPR:$val, timm:$regID),
-          (LDSR GPR:$val, imm:$regID)>;
-def : Pat<(int_v850_stsr timm:$regID),
-          (STSR imm:$regID)>;
-
-// RH850G3M+ System Register Access with selID (group specification)
-let Predicates = [HasRH850G3M] in {
-  def : Pat<(int_v850_ldsr_sel GPR:$val, timm:$regID, timm:$selID),
-            (LDSR_sel GPR:$val, uimm5:$regID, uimm5:$selID)>;
-  def : Pat<(int_v850_stsr_sel timm:$regID, timm:$selID),
-            (STSR_sel uimm5:$regID, uimm5:$selID)>;
-}
+def : Pat<(int_v850_ldsr GPR:$val, timm:$enc), (LDSR GPR:$val, imm:$enc)>;
+def : Pat<(int_v850_stsr timm:$enc), (STSR imm:$enc)>;
 
 //===----------------------------------------------------------------------===//
 // MAC/MACU Intrinsic Patterns
@@ -3151,239 +3120,245 @@ let Predicates = [HasRH850G3M], DecoderNamespace = "RH850G3M" in {
     }
   } // isCommutable = 0
 
-//===----------------------------------------------------------------------===//
-// PUSHSP - Push registers to Stack (RH850G3M+)
-//
-// Format XI: 01000111111RRRRR wwwww00101100000
-// Pushes registers from rh to rt onto stack, updating SP.
-//===----------------------------------------------------------------------===//
+  //===----------------------------------------------------------------------===//
+  // PUSHSP - Push registers to Stack (RH850G3M+)
+  //
+  // Format XI: 01000111111RRRRR wwwww00101100000
+  // Pushes registers from rh to rt onto stack, updating SP.
+  //===----------------------------------------------------------------------===//
 
-let hasSideEffects = 1, mayLoad = 0, mayStore = 1, Uses = [SP], Defs = [SP] in
-def PUSHSP : V850Inst32<(outs), (ins GPR:$reg1, GPR:$reg2),
-                        "pushsp $reg1, $reg2", []> {
-  bits<5> reg1;
-  bits<5> reg2;
+  let hasSideEffects = 1, mayLoad = 0, mayStore = 1, Uses = [SP],
+      Defs = [SP] in def PUSHSP : V850Inst32<(outs), (ins GPR:$reg1, GPR:$reg2),
+                                             "pushsp $reg1, $reg2", []> {
+    bits<5> reg1;
+    bits<5> reg2;
 
-  let Inst{15-11} = 0b01000;
-  let Inst{10-5}  = 0b111111;    // Extended opcode
-  let Inst{4-0}   = reg1;
-  let Inst{31-27} = reg2;
-  let Inst{26-16} = 0b00101100000;
-}
+    let Inst{15 -11} = 0b01000;
+    let Inst{10 -5} = 0b111111; // Extended opcode
+    let Inst{4 -0} = reg1;
+    let Inst{31 -27} = reg2;
+    let Inst{26 -16} = 0b00101100000;
+  }
 
-//===----------------------------------------------------------------------===//
-// POPSP - Pop registers from Stack (RH850G3M+)
-//
-// Format XI: 01100111111RRRRR wwwww00101100000
-// Pops registers from rt to rh from stack, updating SP.
-//===----------------------------------------------------------------------===//
+  //===----------------------------------------------------------------------===//
+  // POPSP - Pop registers from Stack (RH850G3M+)
+  //
+  // Format XI: 01100111111RRRRR wwwww00101100000
+  // Pops registers from rt to rh from stack, updating SP.
+  //===----------------------------------------------------------------------===//
 
-let hasSideEffects = 1, mayLoad = 1, mayStore = 0, Uses = [SP], Defs = [SP] in
-def POPSP : V850Inst32<(outs), (ins GPR:$reg1, GPR:$reg2),
-                       "popsp $reg1, $reg2", []> {
-  bits<5> reg1;
-  bits<5> reg2;
+  let hasSideEffects = 1, mayLoad = 1, mayStore = 0, Uses = [SP],
+      Defs = [SP] in def POPSP : V850Inst32<(outs), (ins GPR:$reg1, GPR:$reg2),
+                                            "popsp $reg1, $reg2", []> {
+    bits<5> reg1;
+    bits<5> reg2;
 
-  let Inst{15-11} = 0b01100;
-  let Inst{10-5}  = 0b111111;    // Extended opcode
-  let Inst{4-0}   = reg1;
-  let Inst{31-27} = reg2;
-  let Inst{26-16} = 0b00101100000;
-}
+    let Inst{15 -11} = 0b01100;
+    let Inst{10 -5} = 0b111111; // Extended opcode
+    let Inst{4 -0} = reg1;
+    let Inst{31 -27} = reg2;
+    let Inst{26 -16} = 0b00101100000;
+  }
 
-//===----------------------------------------------------------------------===//
-// LOOP - Hardware Loop (RH850G3M+)
-//
-// Format VII: 00000110111RRRRR ddddddddddddddd1
-// Decrements reg1, branches backward if not zero.
-//===----------------------------------------------------------------------===//
+  //===----------------------------------------------------------------------===//
+  // LOOP - Hardware Loop (RH850G3M+)
+  //
+  // Format VII: 00000110111RRRRR ddddddddddddddd1
+  // Decrements reg1, branches backward if not zero.
+  //===----------------------------------------------------------------------===//
 
-let isBranch = 1, isTerminator = 1, Uses = [PSW] in
-def LOOP : V850Inst32<(outs GPR:$reg1_out), (ins GPR:$reg1, brtarget16:$disp16),
-                      "loop $reg1, $disp16", []> {
-  bits<5> reg1;
-  bits<15> disp16;  // Half-displacement (encoder shifts val >> 1)
-  let Constraints = "$reg1_out = $reg1";
+  let isBranch = 1, isTerminator = 1,
+      Uses = [PSW] in def LOOP
+      : V850Inst32<(outs GPR:$reg1_out), (ins GPR:$reg1, brtarget16:$disp16),
+                   "loop $reg1, $disp16", []> {
+    bits<5> reg1;
+    bits<15> disp16; // Half-displacement (encoder shifts val >> 1)
+    let Constraints = "$reg1_out = $reg1";
 
-  let Inst{15-11} = 0b00000;
-  let Inst{10-5}  = 0b110111;
-  let Inst{4-0}   = reg1;
-  let Inst{31-17} = disp16{14-0};
-  let Inst{16}    = 0b1;
-}
+    let Inst{15 -11} = 0b00000;
+    let Inst{10 -5} = 0b110111;
+    let Inst{4 -0} = reg1;
+    let Inst{31 -17} = disp16{14 -0};
+    let Inst{16} = 0b1;
+  }
 
-//===----------------------------------------------------------------------===//
-// CACHE - Cache Operation (RH850G3M+)
-//
-// Format X: 111pp111111RRRRR PPPPP00101100000
-// Performs cache operations specified by cacheop.
-//===----------------------------------------------------------------------===//
+  //===----------------------------------------------------------------------===//
+  // CACHE - Cache Operation (RH850G3M+)
+  //
+  // Format X: 111pp111111RRRRR PPPPP00101100000
+  // Performs cache operations specified by cacheop.
+  //===----------------------------------------------------------------------===//
 
-let hasSideEffects = 1, mayLoad = 0, mayStore = 0 in
-def CACHE : V850Inst32<(outs), (ins uimm7:$cacheop, GPR:$reg1),
-                       "cache $cacheop, [$reg1]", []> {
-  bits<7> cacheop;
-  bits<5> reg1;
+  let hasSideEffects = 1, mayLoad = 0,
+      mayStore =
+          0 in def CACHE : V850Inst32<(outs), (ins uimm7:$cacheop, GPR:$reg1),
+                                      "cache $cacheop, [$reg1]", []> {
+    bits<7> cacheop;
+    bits<5> reg1;
 
-  let Inst{15-13} = 0b111;
-  let Inst{12-11} = cacheop{6-5};
-  let Inst{10-5}  = 0b111111;
-  let Inst{4-0}   = reg1;
-  let Inst{31-27} = cacheop{4-0};
-  let Inst{26-16} = 0b00101100000;
-}
+    let Inst{15 -13} = 0b111;
+    let Inst{12 -11} = cacheop{6 -5};
+    let Inst{10 -5} = 0b111111;
+    let Inst{4 -0} = reg1;
+    let Inst{31 -27} = cacheop{4 -0};
+    let Inst{26 -16} = 0b00101100000;
+  }
 
-//===----------------------------------------------------------------------===//
-// PREF - Prefetch (RH850G3M+)
-//
-// Format X: 11011111111RRRRR PPPPP00101100000
-// Prefetches data at address in reg1.
-//===----------------------------------------------------------------------===//
+  //===----------------------------------------------------------------------===//
+  // PREF - Prefetch (RH850G3M+)
+  //
+  // Format X: 11011111111RRRRR PPPPP00101100000
+  // Prefetches data at address in reg1.
+  //===----------------------------------------------------------------------===//
 
-let hasSideEffects = 0, mayLoad = 1, mayStore = 0 in
-def PREF : V850Inst32<(outs), (ins uimm5:$prefop, GPR:$reg1),
-                      "pref $prefop, [$reg1]", []> {
-  bits<5> prefop;
-  bits<5> reg1;
+  let hasSideEffects = 0, mayLoad = 1,
+      mayStore =
+          0 in def PREF : V850Inst32<(outs), (ins uimm5:$prefop, GPR:$reg1),
+                                     "pref $prefop, [$reg1]", []> {
+    bits<5> prefop;
+    bits<5> reg1;
 
-  let Inst{15-11} = 0b11011;
-  let Inst{10-5}  = 0b111111;
-  let Inst{4-0}   = reg1;
-  let Inst{31-27} = prefop;
-  let Inst{26-16} = 0b00101100000;
-}
+    let Inst{15 -11} = 0b11011;
+    let Inst{10 -5} = 0b111111;
+    let Inst{4 -0} = reg1;
+    let Inst{31 -27} = prefop;
+    let Inst{26 -16} = 0b00101100000;
+  }
 
-//===----------------------------------------------------------------------===//
-// BINS - Bitfield Insert (RH850G3M+)
-// Three variants based on msb/lsb positions
-// Assembly syntax: bins reg1, pos, width, reg2
-// But encoding uses msb = pos+width-1, lsb = pos
-//===----------------------------------------------------------------------===//
+  //===----------------------------------------------------------------------===//
+  // BINS - Bitfield Insert (RH850G3M+)
+  // Three variants based on msb/lsb positions
+  // Assembly syntax: bins reg1, pos, width, reg2
+  // But encoding uses msb = pos+width-1, lsb = pos
+  //===----------------------------------------------------------------------===//
 
-// BINS variant 1: msb >= 16, lsb >= 16
-// Opcode: rrrrr111111RRRRR MMMMK0001001LLL0
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
-def BINS0 : V850Inst32<(outs GPR:$reg2), (ins GPR:$reg1, uimm5:$msb, uimm5:$lsb),
-                       "bins $reg1, $lsb, $msb, $reg2", []> {
-  bits<5> reg2;
-  bits<5> reg1;
-  bits<5> msb;  // msb = pos + width - 1
-  bits<5> lsb;  // lsb = pos
+  // BINS variant 1: msb >= 16, lsb >= 16
+  // Opcode: rrrrr111111RRRRR MMMMK0001001LLL0
+  let hasSideEffects = 0, mayLoad = 0,
+      mayStore = 0 in def BINS0
+      : V850Inst32<(outs GPR:$reg2), (ins GPR:$reg1, uimm5:$msb, uimm5:$lsb),
+                   "bins $reg1, $lsb, $msb, $reg2", []> {
+    bits<5> reg2;
+    bits<5> reg1;
+    bits<5> msb; // msb = pos + width - 1
+    bits<5> lsb; // lsb = pos
 
-  let Inst{15-11} = reg2;
-  let Inst{10-5}  = 0b111111;
-  let Inst{4-0}   = reg1;
-  let Inst{31-28} = msb{3-0};   // MMMM
-  let Inst{27}    = lsb{3};     // K
-  let Inst{26-24} = 0b000;
-  let Inst{23-21} = 0b100;      // sub-opcode variant 0
-  let Inst{20}    = 1;
-  let Inst{19-17} = lsb{2-0};   // LLL
-  let Inst{16}    = 0;
-}
+    let Inst{15 -11} = reg2;
+    let Inst{10 -5} = 0b111111;
+    let Inst{4 -0} = reg1;
+    let Inst{31 -28} = msb{3 -0}; // MMMM
+    let Inst{27} = lsb{3};        // K
+    let Inst{26 -24} = 0b000;
+    let Inst{23 -21} = 0b100; // sub-opcode variant 0
+    let Inst{20} = 1;
+    let Inst{19 -17} = lsb{2 -0}; // LLL
+    let Inst{16} = 0;
+  }
 
-// BINS variant 2: msb >= 16, lsb < 16
-// Opcode: rrrrr111111RRRRR MMMMK0001011LLL0
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
-def BINS1 : V850Inst32<(outs GPR:$reg2), (ins GPR:$reg1, uimm5:$msb, uimm5:$lsb),
-                       "bins $reg1, $lsb, $msb, $reg2", []> {
-  bits<5> reg2;
-  bits<5> reg1;
-  bits<5> msb;
-  bits<5> lsb;
+  // BINS variant 2: msb >= 16, lsb < 16
+  // Opcode: rrrrr111111RRRRR MMMMK0001011LLL0
+  let hasSideEffects = 0, mayLoad = 0,
+      mayStore = 0 in def BINS1
+      : V850Inst32<(outs GPR:$reg2), (ins GPR:$reg1, uimm5:$msb, uimm5:$lsb),
+                   "bins $reg1, $lsb, $msb, $reg2", []> {
+    bits<5> reg2;
+    bits<5> reg1;
+    bits<5> msb;
+    bits<5> lsb;
 
-  let Inst{15-11} = reg2;
-  let Inst{10-5}  = 0b111111;
-  let Inst{4-0}   = reg1;
-  let Inst{31-28} = msb{3-0};   // MMMM
-  let Inst{27}    = lsb{3};     // K
-  let Inst{26-24} = 0b000;
-  let Inst{23-21} = 0b101;      // sub-opcode variant 1
-  let Inst{20}    = 1;
-  let Inst{19-17} = lsb{2-0};   // LLL
-  let Inst{16}    = 0;
-}
+    let Inst{15 -11} = reg2;
+    let Inst{10 -5} = 0b111111;
+    let Inst{4 -0} = reg1;
+    let Inst{31 -28} = msb{3 -0}; // MMMM
+    let Inst{27} = lsb{3};        // K
+    let Inst{26 -24} = 0b000;
+    let Inst{23 -21} = 0b101; // sub-opcode variant 1
+    let Inst{20} = 1;
+    let Inst{19 -17} = lsb{2 -0}; // LLL
+    let Inst{16} = 0;
+  }
 
-// BINS variant 3: msb < 16, lsb < 16
-// Opcode: rrrrr111111RRRRR MMMMK0001101LLL0
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
-def BINS2 : V850Inst32<(outs GPR:$reg2), (ins GPR:$reg1, uimm5:$msb, uimm5:$lsb),
-                       "bins $reg1, $lsb, $msb, $reg2", []> {
-  bits<5> reg2;
-  bits<5> reg1;
-  bits<5> msb;
-  bits<5> lsb;
+  // BINS variant 3: msb < 16, lsb < 16
+  // Opcode: rrrrr111111RRRRR MMMMK0001101LLL0
+  let hasSideEffects = 0, mayLoad = 0,
+      mayStore = 0 in def BINS2
+      : V850Inst32<(outs GPR:$reg2), (ins GPR:$reg1, uimm5:$msb, uimm5:$lsb),
+                   "bins $reg1, $lsb, $msb, $reg2", []> {
+    bits<5> reg2;
+    bits<5> reg1;
+    bits<5> msb;
+    bits<5> lsb;
 
-  let Inst{15-11} = reg2;
-  let Inst{10-5}  = 0b111111;
-  let Inst{4-0}   = reg1;
-  let Inst{31-28} = msb{3-0};   // MMMM
-  let Inst{27}    = lsb{3};     // K
-  let Inst{26-24} = 0b000;
-  let Inst{23-21} = 0b110;      // sub-opcode variant 2
-  let Inst{20}    = 1;
-  let Inst{19-17} = lsb{2-0};   // LLL
-  let Inst{16}    = 0;
-}
+    let Inst{15 -11} = reg2;
+    let Inst{10 -5} = 0b111111;
+    let Inst{4 -0} = reg1;
+    let Inst{31 -28} = msb{3 -0}; // MMMM
+    let Inst{27} = lsb{3};        // K
+    let Inst{26 -24} = 0b000;
+    let Inst{23 -21} = 0b110; // sub-opcode variant 2
+    let Inst{20} = 1;
+    let Inst{19 -17} = lsb{2 -0}; // LLL
+    let Inst{16} = 0;
+  }
 
-// BINS pseudo instruction for CodeGen.
-// Takes (dst, src, pos, width) where pos and width are immediates.
-// Expanded to BINS0/1/2 in the AsmPrinter based on computed msb/lsb values.
-let Predicates = [HasRH850G3M],
-    hasSideEffects = 0, mayLoad = 0, mayStore = 0,
-    Constraints = "$dst = $dst_in" in
-def BINS_pseudo : V850Pseudo<(outs GPR:$dst),
-                             (ins GPR:$dst_in, GPR:$src, uimm5:$pos, uimm5:$width),
-                             "# BINS_pseudo $src, $pos, $width, $dst",
-                             [(set GPR:$dst,
-                               (int_v850_bins GPR:$dst_in, GPR:$src,
-                                             timm:$pos, timm:$width))]>;
+  // BINS pseudo instruction for CodeGen.
+  // Takes (dst, src, pos, width) where pos and width are immediates.
+  // Expanded to BINS0/1/2 in the AsmPrinter based on computed msb/lsb values.
+  let Predicates = [HasRH850G3M], hasSideEffects = 0, mayLoad = 0, mayStore = 0,
+      Constraints = "$dst = $dst_in" in def BINS_pseudo
+      : V850Pseudo<(outs GPR:$dst),
+                   (ins GPR:$dst_in, GPR:$src, uimm5:$pos, uimm5:$width),
+                   "# BINS_pseudo $src, $pos, $width, $dst",
+                   [(set GPR:$dst, (int_v850_bins GPR:$dst_in, GPR:$src,
+                                       timm:$pos, timm:$width))]>;
 
-//===----------------------------------------------------------------------===//
-// LD.DW - Load Double Word (RH850G3M+)
-// Format XIV (48-bit)
-// Opcode: 00000111101RRRRR wwwwwdddddd01001 DDDDDDDDDDDDDDDD
-// disp23 = {bits[47:32], bits[26:21], 0} (bit 0 always 0 for alignment)
-//===----------------------------------------------------------------------===//
+  //===----------------------------------------------------------------------===//
+  // LD.DW - Load Double Word (RH850G3M+)
+  // Format XIV (48-bit)
+  // Opcode: 00000111101RRRRR wwwwwdddddd01001 DDDDDDDDDDDDDDDD
+  // disp23 = {bits[47:32], bits[26:21], 0} (bit 0 always 0 for alignment)
+  //===----------------------------------------------------------------------===//
 
-let hasSideEffects = 0, mayLoad = 1, mayStore = 0 in
-def LD_DW : V850Inst48<(outs GPR:$reg3), (ins GPR:$reg1, simm23:$disp23),
-                       "ld.dw $disp23[$reg1], $reg3", []> {
-  bits<5> reg3;     // Destination register pair (even register)
-  bits<5> reg1;     // Base register
-  bits<23> disp23;  // 23-bit signed displacement
+  let hasSideEffects = 0, mayLoad = 1,
+      mayStore = 0 in def LD_DW
+      : V850Inst48<(outs GPR:$reg3), (ins GPR:$reg1, simm23:$disp23),
+                   "ld.dw $disp23[$reg1], $reg3", []> {
+    bits<5> reg3;    // Destination register pair (even register)
+    bits<5> reg1;    // Base register
+    bits<23> disp23; // 23-bit signed displacement
 
-  let Inst{15-11} = 0b00000;
-  let Inst{10-5}  = 0b111101;
-  let Inst{4-0}   = reg1;
-  let Inst{31-27} = reg3;
-  let Inst{26-21} = disp23{6-1};   // disp23[6:1]
-  let Inst{20-16} = 0b01001;
-  let Inst{47-32} = disp23{22-7};  // disp23[22:7]
-}
+    let Inst{15 -11} = 0b00000;
+    let Inst{10 -5} = 0b111101;
+    let Inst{4 -0} = reg1;
+    let Inst{31 -27} = reg3;
+    let Inst{26 -21} = disp23{6 -1}; // disp23[6:1]
+    let Inst{20 -16} = 0b01001;
+    let Inst{47 -32} = disp23{22 -7}; // disp23[22:7]
+  }
 
-//===----------------------------------------------------------------------===//
-// ST.DW - Store Double Word (RH850G3M+)
-// Format XIV (48-bit)
-// Opcode: 00000111101RRRRR wwwwwdddddd01111 DDDDDDDDDDDDDDDD
-// disp23 = {bits[47:32], bits[26:21], 0} (bit 0 always 0 for alignment)
-//===----------------------------------------------------------------------===//
+  //===----------------------------------------------------------------------===//
+  // ST.DW - Store Double Word (RH850G3M+)
+  // Format XIV (48-bit)
+  // Opcode: 00000111101RRRRR wwwwwdddddd01111 DDDDDDDDDDDDDDDD
+  // disp23 = {bits[47:32], bits[26:21], 0} (bit 0 always 0 for alignment)
+  //===----------------------------------------------------------------------===//
 
-let hasSideEffects = 0, mayLoad = 0, mayStore = 1 in
-def ST_DW : V850Inst48<(outs), (ins GPR:$reg3, GPR:$reg1, simm23:$disp23),
-                       "st.dw $reg3, $disp23[$reg1]", []> {
-  bits<5> reg3;     // Source register pair (even register)
-  bits<5> reg1;     // Base register
-  bits<23> disp23;  // 23-bit signed displacement
+  let hasSideEffects = 0, mayLoad = 0,
+      mayStore = 1 in def ST_DW
+      : V850Inst48<(outs), (ins GPR:$reg3, GPR:$reg1, simm23:$disp23),
+                   "st.dw $reg3, $disp23[$reg1]", []> {
+    bits<5> reg3;    // Source register pair (even register)
+    bits<5> reg1;    // Base register
+    bits<23> disp23; // 23-bit signed displacement
 
-  let Inst{15-11} = 0b00000;
-  let Inst{10-5}  = 0b111101;
-  let Inst{4-0}   = reg1;
-  let Inst{31-27} = reg3;
-  let Inst{26-21} = disp23{6-1};   // disp23[6:1]
-  let Inst{20-16} = 0b01111;
-  let Inst{47-32} = disp23{22-7};  // disp23[22:7]
-}
+    let Inst{15 -11} = 0b00000;
+    let Inst{10 -5} = 0b111101;
+    let Inst{4 -0} = reg1;
+    let Inst{31 -27} = reg3;
+    let Inst{26 -21} = disp23{6 -1}; // disp23[6:1]
+    let Inst{20 -16} = 0b01111;
+    let Inst{47 -32} = disp23{22 -7}; // disp23[22:7]
+  }
 
 } // Predicates = [HasRH850G3M], DecoderNamespace = "RH850G3M"
 
@@ -3410,11 +3385,11 @@ let Predicates = [HasRH850G3M] in {
   def : Pat<(int_v850_stc_w GPR:$addr, GPR:$val), (STC_W GPR:$val, GPR:$addr)>;
 
   // CACHE intrinsic (standalone pattern to avoid mayLoad/mayStore conflicts)
-  def : Pat<(int_v850_cache timm:$cacheop, GPR:$reg1),
-            (CACHE timm:$cacheop, GPR:$reg1)>;
+  def : Pat<(int_v850_cache timm:$cacheop, GPR:$reg1), (CACHE timm:$cacheop,
+                                                           GPR:$reg1)>;
 
   // PREF intrinsic (standalone pattern to avoid mayLoad/mayStore conflicts)
-  def : Pat<(int_v850_pref timm:$prefop, GPR:$reg1),
-            (PREF timm:$prefop, GPR:$reg1)>;
+  def : Pat<(int_v850_pref timm:$prefop, GPR:$reg1), (PREF timm:$prefop,
+                                                         GPR:$reg1)>;
 
 } // Predicates = [HasRH850G3M]

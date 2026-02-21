@@ -680,136 +680,132 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
     Value *Val = EmitScalarExpr(E->getArg(0));
     Value *RegID = EmitScalarExpr(E->getArg(1));
     Value *SelID = EmitScalarExpr(E->getArg(2));
-    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr_sel);
-    return Builder.CreateCall(F, {Val, RegID, SelID});
+    // Combine into 10-bit encoding: (selID << 5) | regID
+    Value *Enc = Builder.CreateOr(Builder.CreateShl(SelID, 5), RegID);
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Enc});
   }
   case V850::BI__builtin_v850_stsr_group: {
     Value *RegID = EmitScalarExpr(E->getArg(0));
     Value *SelID = EmitScalarExpr(E->getArg(1));
-    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr_sel);
-    return Builder.CreateCall(F, {RegID, SelID});
+    // Combine into 10-bit encoding: (selID << 5) | regID
+    Value *Enc = Builder.CreateOr(Builder.CreateShl(SelID, 5), RegID);
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Enc);
   }
 
   //===--------------------------------------------------------------------===//
   // Named G3M System Register Access (Groups 1-2)
+  // Encodings use unified 10-bit format: (selID << 5) | regID
   //===--------------------------------------------------------------------===//
 
-  // --- Group 1: Machine Configuration ---
+  // --- Group 1: Machine Configuration (selID=1) ---
 
-  // RBASE - Reset vector base (regID=2, selID=1)
+  // RBASE - Reset vector base (regID=2, selID=1, enc=34)
   case V850::BI__builtin_v850_read_rbase: {
-    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr_sel);
-    return Builder.CreateCall(F, {Builder.getInt32(2), Builder.getInt32(1)});
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((1 << 5) | 2));
   }
   case V850::BI__builtin_v850_write_rbase: {
     Value *Val = EmitScalarExpr(E->getArg(0));
-    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr_sel);
-    return Builder.CreateCall(F,
-                              {Val, Builder.getInt32(2), Builder.getInt32(1)});
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32((1 << 5) | 2)});
   }
 
-  // EBASE - Exception handler vector base (regID=3, selID=1)
+  // EBASE - Exception handler vector base (regID=3, selID=1, enc=35)
   case V850::BI__builtin_v850_read_ebase: {
-    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr_sel);
-    return Builder.CreateCall(F, {Builder.getInt32(3), Builder.getInt32(1)});
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((1 << 5) | 3));
   }
   case V850::BI__builtin_v850_write_ebase: {
     Value *Val = EmitScalarExpr(E->getArg(0));
-    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr_sel);
-    return Builder.CreateCall(F,
-                              {Val, Builder.getInt32(3), Builder.getInt32(1)});
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32((1 << 5) | 3)});
   }
 
-  // INTBP - Interrupt handler table base (regID=4, selID=1)
+  // INTBP - Interrupt handler table base (regID=4, selID=1, enc=36)
   case V850::BI__builtin_v850_read_intbp: {
-    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr_sel);
-    return Builder.CreateCall(F, {Builder.getInt32(4), Builder.getInt32(1)});
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((1 << 5) | 4));
   }
   case V850::BI__builtin_v850_write_intbp: {
     Value *Val = EmitScalarExpr(E->getArg(0));
-    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr_sel);
-    return Builder.CreateCall(F,
-                              {Val, Builder.getInt32(4), Builder.getInt32(1)});
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32((1 << 5) | 4)});
   }
 
-  // SCBP - SYSCALL base pointer (regID=12, selID=1)
+  // SCBP - SYSCALL base pointer (regID=12, selID=1, enc=44)
   case V850::BI__builtin_v850_read_scbp: {
-    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr_sel);
-    return Builder.CreateCall(F, {Builder.getInt32(12), Builder.getInt32(1)});
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((1 << 5) | 12));
   }
   case V850::BI__builtin_v850_write_scbp: {
     Value *Val = EmitScalarExpr(E->getArg(0));
-    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr_sel);
-    return Builder.CreateCall(F,
-                              {Val, Builder.getInt32(12), Builder.getInt32(1)});
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32((1 << 5) | 12)});
   }
 
-  // --- Group 2: Thread/Interrupt ---
+  // --- Group 2: Thread/Interrupt (selID=2) ---
 
-  // MEA - Memory error address (regID=6, selID=2)
+  // MEA - Memory error address (regID=6, selID=2, enc=70)
   case V850::BI__builtin_v850_read_mea: {
-    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr_sel);
-    return Builder.CreateCall(F, {Builder.getInt32(6), Builder.getInt32(2)});
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((2 << 5) | 6));
   }
   case V850::BI__builtin_v850_write_mea: {
     Value *Val = EmitScalarExpr(E->getArg(0));
-    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr_sel);
-    return Builder.CreateCall(F,
-                              {Val, Builder.getInt32(6), Builder.getInt32(2)});
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32((2 << 5) | 6)});
   }
 
-  // MEI - Memory error information (regID=8, selID=2)
+  // MEI - Memory error information (regID=8, selID=2, enc=72)
   case V850::BI__builtin_v850_read_mei: {
-    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr_sel);
-    return Builder.CreateCall(F, {Builder.getInt32(8), Builder.getInt32(2)});
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((2 << 5) | 8));
   }
   case V850::BI__builtin_v850_write_mei: {
     Value *Val = EmitScalarExpr(E->getArg(0));
-    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr_sel);
-    return Builder.CreateCall(F,
-                              {Val, Builder.getInt32(8), Builder.getInt32(2)});
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32((2 << 5) | 8)});
   }
 
-  // ISPR - Interrupt priority register (regID=10, selID=2)
+  // ISPR - Interrupt priority register (regID=10, selID=2, enc=74)
   case V850::BI__builtin_v850_read_ispr: {
-    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr_sel);
-    return Builder.CreateCall(F, {Builder.getInt32(10), Builder.getInt32(2)});
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((2 << 5) | 10));
   }
   case V850::BI__builtin_v850_write_ispr: {
     Value *Val = EmitScalarExpr(E->getArg(0));
-    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr_sel);
-    return Builder.CreateCall(F,
-                              {Val, Builder.getInt32(10), Builder.getInt32(2)});
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32((2 << 5) | 10)});
   }
 
-  // PMR - Interrupt priority masking (regID=11, selID=2)
+  // PMR - Interrupt priority masking (regID=11, selID=2, enc=75)
   case V850::BI__builtin_v850_read_pmr: {
-    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr_sel);
-    return Builder.CreateCall(F, {Builder.getInt32(11), Builder.getInt32(2)});
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((2 << 5) | 11));
   }
   case V850::BI__builtin_v850_write_pmr: {
     Value *Val = EmitScalarExpr(E->getArg(0));
-    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr_sel);
-    return Builder.CreateCall(F,
-                              {Val, Builder.getInt32(11), Builder.getInt32(2)});
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32((2 << 5) | 11)});
   }
 
-  // ICSR - Interrupt control status (regID=12, selID=2, read-only)
+  // ICSR - Interrupt control status (regID=12, selID=2, enc=76, read-only)
   case V850::BI__builtin_v850_read_icsr: {
-    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr_sel);
-    return Builder.CreateCall(F, {Builder.getInt32(12), Builder.getInt32(2)});
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((2 << 5) | 12));
   }
 
-  // INTCFG - Interrupt function setting (regID=13, selID=2)
+  // INTCFG - Interrupt function setting (regID=13, selID=2, enc=77)
   case V850::BI__builtin_v850_read_intcfg: {
-    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr_sel);
-    return Builder.CreateCall(F, {Builder.getInt32(13), Builder.getInt32(2)});
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((2 << 5) | 13));
   }
   case V850::BI__builtin_v850_write_intcfg: {
     Value *Val = EmitScalarExpr(E->getArg(0));
-    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr_sel);
-    return Builder.CreateCall(F,
-                              {Val, Builder.getInt32(13), Builder.getInt32(2)});
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32((2 << 5) | 13)});
   }
   }
 }

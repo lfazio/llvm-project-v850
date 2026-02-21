@@ -25,9 +25,10 @@
 using namespace llvm;
 
 // System register table entry - matches V850SystemOperands.td definition.
+// Encoding is 10-bit: (selID << 5) | regID.
 struct V850SysRegEntry {
   const char *Name;
-  uint8_t Encoding;
+  uint16_t Encoding;
   FeatureBitset FeaturesRequired;
 
   bool haveRequiredFeatures(const FeatureBitset &ActiveFeatures) const {
@@ -164,8 +165,9 @@ void V850InstPrinter::printDisp5EP(const MCInst *MI, unsigned OpNo,
 void V850InstPrinter::printSystemRegister(const MCInst *MI, unsigned OpNo,
                                           const MCSubtargetInfo &STI,
                                           raw_ostream &O) {
-  unsigned Imm = MI->getOperand(OpNo).getImm();
-  auto Range = lookupV850SysRegByEncoding(Imm);
+  // The operand is a 10-bit encoding: (selID << 5) | regID.
+  unsigned Enc = MI->getOperand(OpNo).getImm();
+  auto Range = lookupV850SysRegByEncoding(Enc);
   const V850SysRegEntry *Best = nullptr;
   for (const auto &Reg : Range) {
     if (Reg.haveRequiredFeatures(STI.getFeatureBits()))
@@ -173,12 +175,19 @@ void V850InstPrinter::printSystemRegister(const MCInst *MI, unsigned OpNo,
   }
   if (Best) {
     // When multiple registers share an encoding (e.g., FPEC and SCCFG at
-    // regID 11), the last matching entry wins. This prefers CPU-bank
-    // registers over FPU-bank registers since the CPU main bank (BSEL=0)
-    // is the default.
+    // regID 11 with selID=0), the last matching entry wins. This prefers
+    // CPU-bank registers over FPU-bank registers since the CPU main bank
+    // (BSEL=0) is the default.
     markup(O, Markup::Register) << Best->Name;
     return;
   }
-  // Fallback: print raw regID if no matching register name found
-  markup(O, Markup::Register) << Imm;
+  // Fallback: print raw encoding. For selID=0, print just regID.
+  // For selID!=0, print "regID, selID" format.
+  unsigned RegID = Enc & 0x1F;
+  unsigned SelID = (Enc >> 5) & 0x1F;
+  if (SelID == 0) {
+    markup(O, Markup::Register) << RegID;
+  } else {
+    markup(O, Markup::Register) << RegID << ", " << SelID;
+  }
 }
