@@ -18,6 +18,7 @@ and provides implementation steps for each.
 | **Clang Macros** | Complete | `__rh850__`, `__rh850g3m__`, `__rh850g3mh__` |
 | **Atomic Load/Store** | Complete | Custom lowering with SYNCP fences |
 | **Atomic CmpXchg** | Complete | Via CAXI (V850E2M path) |
+| **SysReg 10-bit Unified Encoding** | Complete | Unified LDSR/STSR with `(selID<<5)\|regID`, named banked regs, `ldsr r1, ebase` syntax |
 
 ### Missing Features
 
@@ -28,7 +29,8 @@ and provides implementation steps for each.
 | ~~**Builtins**~~ | ~~Medium~~ | ~~CACHE, PREF, BINS, ROTL~~ DONE |
 | ~~**System Registers**~~ | ~~Medium~~ | ~~G3M Groups 1-7~~ DONE (LDSR/STSR sel + named builtins) |
 | ~~**Frame Optimization**~~ | ~~Medium~~ | ~~PUSHSP/POPSP for prologue/epilogue~~ DONE |
-| **SysReg Refactoring** | Medium | Replace pseudo register class with immediate operands |
+| ~~**SysReg Refactoring**~~ | ~~Medium~~ | ~~Replace pseudo register class with immediate operands~~ DONE (10-bit unified encoding) |
+| **Double-Precision FPU CodeGen** | Medium | All f64 ops marked Expand→libcalls; no DREG register class; instructions exist in MC layer only |
 | **LOOP instruction** | Low | Hardware loop codegen |
 | **G3MH specifics** | Low | FPU precision changes, FPINT exception |
 | **Post-increment** | Low | LD/ST with [reg1]+ addressing (**G4MH only**, not G3M/G3MH) |
@@ -253,13 +255,17 @@ unsigned int __builtin_v850_rotl(unsigned int x, unsigned int count);
 
 ---
 
-## Phase 3: System Registers (Medium Priority)
+## Phase 3: System Registers [DONE]
 
 ### 3.1 G3M System Register Groups
 
+**Status:** Completed. G3M Groups 1 and 2 are implemented via the unified 10-bit
+encoding (see Phase 4b). Groups 4-8 (cache, MPU) can be added to
+`V850SystemOperands.td` without structural changes.
+
 The G3M uses a group-based system register addressing scheme where registers
-are identified by (regID, groupID) pairs. The current V850 backend only supports
-regID-based access (Group 0).
+are identified by (regID, groupID) pairs. The current V850 backend supports
+Group 0 (base) plus selected Group 1 and Group 2 registers.
 
 **Group 0 (Base - Already Implemented):**
 - EIPC(0,0), EIPSW(1,0), FEPC(2,0), FEPSW(3,0), PSW(5,0)
@@ -382,71 +388,160 @@ PUSHSP/POPSP supports contiguous register ranges.
 
 ---
 
-## Phase 4b: System Register Refactoring (Medium Priority)
+## Phase 4b: System Register Refactoring [DONE]
 
-### 4b.1 Replace Pseudo Register Class with Immediate Operands
+### 4b.1 Unified 10-bit Encoding for LDSR/STSR
 
-**Goal:** Migrate LDSR/STSR from using a `SysReg` pseudo register class to using
-immediate operands, matching the approach already used by `LDSR_sel`/`STSR_sel`.
+**Status:** Completed. See commit `[V850] Unify LDSR/STSR to 10-bit system register encoding`.
 
-**Current Problem:**
+**What was implemented:**
+- `Encoding = (selID << 5) | regID` — single 10-bit operand covers all banks
+- `FormatIX_SysReg` class with `isCodeGenOnly = 1` (avoids STSR/SUBFS decoder conflict)
+- `V850SystemOperands.td` extended: 10-bit `Encoding` field, G3M+ banked registers
+  (Group 1: rbase, ebase, intbp, scbp_g1; Group 2: mea, mei, ispr, pmr, icsr, intcfg)
+- AsmParser: named (`ldsr r1, ebase`), numeric (`ldsr r1, 3`), and
+  numeric-with-selID (`ldsr r1, 3, 1`) syntax all handled
+- InstPrinter: looks up 10-bit encoding — prints name if known, `regID` for selID=0
+  unnamed, `regID, selID` for selID≠0 unnamed
+- Disassembler: combines bits[4:0] (regID) and bits[20:16] (selID) into 10-bit imm
+- Removed `LDSR_sel`/`STSR_sel` instructions and `int_v850_ldsr_sel`/`int_v850_stsr_sel`
+- Clang builtins: `__builtin_v850_ldsr_group(val, regID, selID)` combines to 10-bit encoding
 
-The current implementation defines every system register as a pseudo `V850SysReg`
-register in `V850RegisterInfo.td`, then uses a non-allocatable `SysReg` register
-class as an operand for `LDSR`/`STSR`. This approach has several issues:
+**Remaining limitation:** `FormatIX_SysReg` keeps `isCodeGenOnly = 1` because the TableGen
+decoder emitter cannot disambiguate STSR (variable bits[20:16]) from SUBFS without it.
+Disassembly is handled by custom code. Remaining G3M register groups (MPU, cache tags)
+can be added to `V850SystemOperands.td` without further structural changes.
 
-1. **Scalability:** Every new system register (especially G3M groups 1-7 with
-   ~50+ registers) requires a new TableGen register definition and pattern.
-2. **regID collisions:** Registers with the same regID but different groups
-   clash (e.g., SCCFG and FPEC both at regID 11, different banks).
-3. **G3M selID already uses immediates:** `LDSR_sel`/`STSR_sel` use
-   `(ins GPR:$reg2, uimm5:$regID, uimm5:$selID)` — the cleaner approach.
-4. **Exhaustive patterns:** Each intrinsic-to-instruction mapping requires a
-   manual `Pat<>` for every regID value (lines 2907-2947 of V850InstrInfo.td).
+---
 
-**Target Design (modeled after RISC-V CSR handling):**
+## Phase 4c: Double-Precision FPU CodeGen (Medium Priority)
 
-1. **Use immediate operands for LDSR/STSR:**
-   ```tablegen
-   // Replace SysReg operand with immediate
-   def LDSR : FormatIX<..., (outs), (ins GPR:$reg2, uimm5:$regID),
-                        "ldsr\t$reg2, $regID", []>;
-   def STSR : FormatIX<..., (outs GPR:$reg2), (ins uimm5:$regID),
-                        "stsr\t$regID, $reg2", []>;
-   ```
+### 4c.1 Current State
 
-2. **Named register aliases in AsmParser:**
-   - AsmParser maps register names (e.g., "eipc", "psw") to immediate values
-   - This is how RISC-V handles CSR names → CSR addresses
-   - Assembly `ldsr r10, eipc` parses "eipc" as immediate 0
-   - Assembly `ldsr r10, 0` also works (raw regID)
+All double-precision FPU instructions are defined in the MC layer (assembler/disassembler)
+but **none generate code from LLVM IR**. The hardware has full support but the backend
+marks every `f64` operation as `Expand`, causing fallback to software library calls
+(`__adddf3`, `__muldf3`, etc.).
 
-3. **Unify LDSR/LDSR_sel:**
-   - Make selID default to 0 when not specified
-   - Single instruction definition handles both `ldsr r10, eipc` and
-     `ldsr r10, 3, 1` (EBASE in group 1)
+**Root causes:**
 
-4. **Keep V850SysReg definitions only for DWARF:**
-   - System registers with DWARF numbers (EIPC, PSW, etc.) keep their
-     definitions for debug info
-   - Remove them from the `SysReg` register class used by instructions
-   - Or keep SysReg class solely for debugger register tracking
+1. **No DREG register class:** Double-precision uses even/odd GPR pairs (r0+r1, r2+r3,
+   ..., r30+r31). There is no `DRegClass` / `GPRPair` register class in
+   `V850RegisterInfo.td`.
+2. **All f64 ops set to `Expand`** in `V850ISelLowering.cpp` (~line 259):
+   `FADD/FSUB/FMUL/FDIV/FABS/FNEG/FSQRT/FP_EXTEND` for MVT::f64 → Expand.
+3. **No ISel patterns:** All double-precision instructions have empty `[]` pattern
+   lists in `V850InstrInfo.td`.
+4. **Conversion instructions** (`CVTF.DS`, `CVTF.SD`, `CVTF.WD`, ...) all MC-only.
+5. **Rounding instructions** (`TRNCF.D*`, `CEILF.D*`, `FLOORF.D*`, `ROUNDF.D*`) all
+   MC-only. Only `TRNCF.SW` (single→int32) has an ISel pattern.
 
-5. **Simplify intrinsic patterns:**
-   - Generic `LDSR` with immediate operand directly matches
-     `int_v850_ldsr(GPR, imm)` without per-register patterns
-   - Named builtins lower to `LDSR` with the appropriate immediate
+**What is complete:**
+
+| Layer | Status |
+|-------|--------|
+| MC (assembler/disassembler) — all ~50 double instructions | ✅ Complete |
+| f32 (single-precision) CodeGen — register class, ISel patterns, tests | ✅ Complete |
+| Scheduling latencies (comments in V850SchedV850E2M.td) | ✅ Documented |
+| f64 CodeGen — register class, ISel patterns, type lowering | ❌ Missing |
+
+**Existing test files** (inline assembly only, not CodeGen):
+- `llvm/test/CodeGen/V850/insn/fpu-arith-d.ll` — uses `asm sideeffect`, not real codegen
+- `llvm/test/CodeGen/V850/insn/fpu-convert.ll`, `fpu-cmp.ll`, `fpu-round.ll` — same
+
+### 4c.2 Implementation Plan
+
+**Step 1 — Define GPR pair register class** (`V850RegisterInfo.td`):
+
+```tablegen
+// Sub-register indices for even/odd halves of a 64-bit pair
+def sub_lo : SubRegIndex<32, 0>;
+def sub_hi : SubRegIndex<32, 32>;
+
+// Double-precision register pairs: even register holds LSW, odd holds MSW
+// Pairs: (r0,r1), (r2,r3), (r4,r5), (r6,r7), (r8,r9), (r10,r11),
+//        (r12,r13), (r14,r15), (r16,r17), (r18,r19), (r20,r21),
+//        (r22,r23), (r24,r25), (r26,r27), (r28,r29), (r30,r31)
+def DPR : RegisterClass<"V850", [f64], 64, (add ...)> {
+  let SubRegClasses = [(FPR sub_lo), (FPR sub_hi)];
+}
+```
+
+Register pairs are the same physical GPRs used for `f32` (`FPR`) and `i32` (`GPR`),
+just paired. V850 hardware requires even-numbered register for the low word.
+
+**Step 2 — Mark f64 operations as Legal** (`V850ISelLowering.cpp`):
+
+```cpp
+if (STI.hasV850FPU()) {
+  addRegisterClass(MVT::f64, &V850::DPRRegClass);
+
+  setOperationAction(ISD::FADD,    MVT::f64, Legal);
+  setOperationAction(ISD::FSUB,    MVT::f64, Legal);
+  setOperationAction(ISD::FMUL,    MVT::f64, Legal);
+  setOperationAction(ISD::FDIV,    MVT::f64, Legal);
+  setOperationAction(ISD::FABS,    MVT::f64, Legal);
+  setOperationAction(ISD::FNEG,    MVT::f64, Legal);
+  setOperationAction(ISD::FSQRT,   MVT::f64, Legal);
+  setOperationAction(ISD::FMINNUM, MVT::f64, Legal);
+  setOperationAction(ISD::FMAXNUM, MVT::f64, Legal);
+  setOperationAction(ISD::FMA,     MVT::f64, Legal);
+  setOperationAction(ISD::FP_ROUND,   MVT::f32, Legal); // double→float
+  setOperationAction(ISD::FP_EXTEND,  MVT::f64, Legal); // float→double
+  setOperationAction(ISD::FP_TO_SINT, MVT::i32, Legal); // double→int
+  setOperationAction(ISD::SINT_TO_FP, MVT::f64, Legal); // int→double
+}
+```
+
+**Step 3 — Add ISel patterns** (`V850InstrInfo.td`):
+
+```tablegen
+let Predicates = [HasV850FPU] in {
+  def : Pat<(f64 (fadd DPR:$r2, DPR:$r1)), (ADDFD DPR:$r2, DPR:$r1)>;
+  def : Pat<(f64 (fsub DPR:$r2, DPR:$r1)), (SUBFD DPR:$r2, DPR:$r1)>;
+  def : Pat<(f64 (fmul DPR:$r2, DPR:$r1)), (MULFD DPR:$r2, DPR:$r1)>;
+  def : Pat<(f64 (fdiv DPR:$r2, DPR:$r1)), (DIVFD DPR:$r2, DPR:$r1)>;
+  def : Pat<(f64 (fabs DPR:$r2)),          (ABSFD DPR:$r2)>;
+  def : Pat<(f64 (fneg DPR:$r2)),          (NEGFD DPR:$r2)>;
+  def : Pat<(f64 (fsqrt DPR:$r2)),         (SQRTFD DPR:$r2)>;
+  def : Pat<(f64 (fmaxnum DPR:$r2, DPR:$r1)), (MAXFD DPR:$r2, DPR:$r1)>;
+  def : Pat<(f64 (fminnum DPR:$r2, DPR:$r1)), (MINFD DPR:$r2, DPR:$r1)>;
+  // Conversions
+  def : Pat<(f32 (fpround DPR:$r2)),        (CVTFDS DPR:$r2)>;  // double→float
+  def : Pat<(f64 (fpextend FPR:$r2)),       (CVTFSD FPR:$r2)>;  // float→double
+  def : Pat<(i32 (fp_to_sint DPR:$r2)),     (TRNCFDW DPR:$r2)>; // double→int32
+  def : Pat<(f64 (sint_to_fp GPR:$r2)),     (CVTFWD GPR:$r2)>;  // int32→double
+  // FMA
+  def : Pat<(f64 (fma DPR:$r1, DPR:$r2, DPR:$r3)),  (MADDFD DPR:$r1, DPR:$r2, DPR:$r3)>;
+  def : Pat<(f64 (fneg (fma DPR:$r1, DPR:$r2, DPR:$r3))), (NMADDFD DPR:$r1, DPR:$r2, DPR:$r3)>;
+}
+```
+
+**Step 4 — Add scheduling rules** for double-precision instructions in
+`V850SchedV850E2M.td` and `V850SchedRH850G3M.td`.
+
+**Step 5 — Add f64 calling convention** (`V850CallingConv.td`):
+- f64 return values: r10+r11 pair (low in r10, high in r11)
+- f64 arguments: r6+r7, r8+r9 pairs
+
+**Step 6 — Add tests:**
+- `llvm/test/CodeGen/V850/fpu-double-arith.ll` — verify ADDF.D, SUBF.D, etc. generated
+- `llvm/test/CodeGen/V850/fpu-double-convert.ll` — CVTF.DS, CVTF.SD, CVTF.WD
+- `llvm/test/CodeGen/V850/fpu-double-compare.ll` — CMPF.D + TRFSR sequences
+- `llvm/test/CodeGen/V850/fpu-double-calling-conv.ll` — register pair ABI
+
+**Complexity:** Medium-High (register pairs are non-trivial in LLVM)
 
 **Files:**
-- `llvm/lib/Target/V850/V850RegisterInfo.td` - Simplify SysReg definitions
-- `llvm/lib/Target/V850/V850InstrInfo.td` - Change LDSR/STSR operands, remove exhaustive patterns
-- `llvm/lib/Target/V850/AsmParser/V850AsmParser.cpp` - Add named sysreg → immediate mapping
-- `llvm/lib/Target/V850/MCTargetDesc/V850InstPrinter.cpp` - Print named sysreg from immediate
-- `llvm/lib/Target/V850/Disassembler/V850Disassembler.cpp` - Decode sysreg immediate
+- `llvm/lib/Target/V850/V850RegisterInfo.td` — DPR register class, sub_lo/sub_hi indices
+- `llvm/lib/Target/V850/V850ISelLowering.cpp` — f64 type actions, register class
+- `llvm/lib/Target/V850/V850InstrInfo.td` — ISel patterns for all double instructions
+- `llvm/lib/Target/V850/V850CallingConv.td` — f64 argument/return convention
+- `llvm/lib/Target/V850/V850SchedV850E2M.td` — scheduling rules
+- `llvm/lib/Target/V850/V850SchedRH850G3M.td` — G3M-specific scheduling rules
 
-**Complexity:** Medium (many files touched but each change is straightforward)
-
-**Reference:** RISC-V CSR handling in `llvm/lib/Target/RISCV/`
+**Reference:** ARM backend (`llvm/lib/Target/ARM/`) uses `DPR` register pairs for
+VFPv2 double-precision; MIPS uses `AFGR64` for similar even/odd FPR pairs.
 
 ---
 
@@ -594,16 +689,23 @@ Constraint: reg1 != reg3 (same register causes undefined behavior).
 ### Sprint 4: Frame Optimization [DONE]
 8. ~~[4.1] PUSHSP/POPSP frame optimization~~
 
-### Sprint 5: System Register Refactoring
-9. [4b.1] Replace SysReg pseudo register class with immediate operands
-10. Unify LDSR/LDSR_sel into single instruction with optional selID
+### Sprint 5: System Register Refactoring [DONE]
+9. ~~[4b.1] Replace SysReg pseudo register class with immediate operands~~
+10. ~~Unify LDSR/LDSR_sel into single instruction with 10-bit (selID<<5)|regID encoding~~
 
-### Sprint 6: LOOP and G3MH
-11. [7.1] LOOP instruction pass (if feasible)
-12. [5.1] G3MH FPU differences
+### Sprint 6: Double-Precision FPU CodeGen
+11. [4c.1] Define DPR register pair class (sub_lo, sub_hi indices, even/odd GPR pairs)
+12. [4c.1] Mark f64 operations Legal in ISelLowering, add DPR register class
+13. [4c.1] Add ISel patterns for all double-precision instructions
+14. [4c.1] Add f64 calling convention (r10+r11 return, r6+r7/r8+r9 args)
+15. [4c.1] Add scheduling rules for ADDF.D, MULF.D, DIVF.D, SQRTF.D etc.
 
-### Sprint 7: Post-Increment (G4MH Only)
-13. [6.1] Post-increment load/store instructions and ISel patterns (requires G4MH subtarget)
+### Sprint 7: LOOP and G3MH
+16. [7.1] LOOP instruction pass (if feasible)
+17. [5.1] G3MH FPU differences (FPEC deletion, FPINT exception)
+
+### Sprint 8: Post-Increment (G4MH Only)
+18. [6.1] Post-increment load/store instructions and ISel patterns (requires G4MH subtarget)
 
 ---
 
@@ -623,3 +725,4 @@ For each sprint:
 |------|---------|---------|
 | 2026-02-11 | 1.0 | Initial plan with comprehensive feature analysis |
 | 2026-02-11 | 1.1 | Sprints 1-4 complete; Added Phase 4b: SysReg refactoring (replace pseudo regs with immediates); Updated sprint order; Fixed LoadStoreOptimizer volatile crash |
+| 2026-02-21 | 1.2 | Sprint 5 complete: unified 10-bit encoding `(selID<<5)\|regID` for LDSR/STSR, named banked register syntax (ebase, intbp, mea, etc.), removed LDSR_sel/STSR_sel; Added Phase 4c: Double-Precision FPU CodeGen (all f64 ops currently fall back to libcalls — no DPR register class, no ISel patterns) |
