@@ -2584,8 +2584,9 @@ let Predicates = [HasV850FPU] in {
 
   // CVTF.UWS reg2, reg3 - Unsigned Word to Single (subop2=16, cat=0, type=2,
   // subop=1)
-  def CVTFUWS : FormatFPU_CVT<0b10000, 0b000, 0b10, 0b0001, (outs GPR:$reg3),
-                              (ins GPR:$reg2), "cvtf.uws\t$reg2, $reg3", []>;
+  def CVTFUWS : FormatFPU_CVT<0b10000, 0b000, 0b10, 0b0001, (outs FPR:$reg3),
+                              (ins GPR:$reg2), "cvtf.uws\t$reg2, $reg3",
+                              [(set FPR:$reg3, (uint_to_fp GPR:$reg2))]>;
 
   // CVTF.UWD reg2, reg3 - Unsigned Word to Double (subop2=16, cat=0, type=2,
   // subop=9)
@@ -2605,9 +2606,10 @@ let Predicates = [HasV850FPU] in {
   //--- Floating-point to unsigned integer conversions ---
 
   // CVTF.SUW reg2, reg3 - Single to Unsigned Word (subop2=20, cat=0, type=2,
-  // subop=0)
+  // subop=0) - Uses current FPU rounding mode; for C-style truncation use
+  // TRNCF.SUW instead.
   def CVTFSUW : FormatFPU_CVT<0b10100, 0b000, 0b10, 0b0000, (outs GPR:$reg3),
-                              (ins GPR:$reg2), "cvtf.suw\t$reg2, $reg3", []>;
+                              (ins FPR:$reg2), "cvtf.suw\t$reg2, $reg3", []>;
 
   // CVTF.DUW reg2, reg3 - Double to Unsigned Word (subop2=20, cat=0, type=2,
   // subop=8)
@@ -2655,9 +2657,10 @@ let Predicates = [HasV850FPU] in {
 
   // --- TRNCF (Truncate) - Unsigned ---
   // TRNCF.SUW reg2, reg3 - Truncate Single to Unsigned Word (subop2=17, cat=0,
-  // type=2, subop=0)
+  // type=2, subop=0) - Round toward zero; matches ISD::FP_TO_UINT.
   def TRNCFSUW : FormatFPU_CVT<0b10001, 0b000, 0b10, 0b0000, (outs GPR:$reg3),
-                               (ins GPR:$reg2), "trncf.suw\t$reg2, $reg3", []>;
+                               (ins FPR:$reg2), "trncf.suw\t$reg2, $reg3",
+                               [(set GPR:$reg3, (fp_to_uint FPR:$reg2))]>;
 
   // TRNCF.DUW reg2, reg3 - Truncate Double to Unsigned Word (subop2=17, cat=0,
   // type=2, subop=8)
