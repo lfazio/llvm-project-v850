@@ -7,43 +7,39 @@
 declare void @external()
 
 ; Simple function with call - tests PREPARE/DISPOSE path
+; PREPARE saves LP (r31) only. No local variables, no stack-passed args,
+; so no local stack allocation is needed. The call passes no arguments.
 define void @test_epilogue_cfi_prepare() {
 ; CHECK-LABEL: test_epilogue_cfi_prepare:
 ; CHECK:       .cfi_startproc
-; CHECK:       prepare
-; CHECK:       .cfi_def_cfa_offset 4
-; CHECK:       .cfi_offset r31, -4
-; Prologue stack adjustment
-; CHECK:       add
-; CHECK:       .cfi_def_cfa_offset
-; Call
+; CHECK:       prepare 2048, 0
+; CHECK-NEXT:  .cfi_def_cfa_offset 4
+; CHECK-NEXT:  .cfi_offset r31, -4
+; No prologue stack adjustment (no local frame)
+; CHECK-NOT:   add {{.*}}, r3
 ; CHECK:       jarl external
-; Epilogue stack adjustment
-; CHECK:       add
-; CHECK:       .cfi_def_cfa_offset 4
-; DISPOSE with return (note: no cfi_restore in epilogue per prologue-only philosophy)
+; No epilogue stack adjustment
+; DISPOSE with return
 ; CHECK:       dispose 0, 2048, [r31]
 ; CHECK:       .cfi_endproc
   call void @external()
   ret void
 }
 
-; Function with multiple CSRs
+; Function with multiple CSRs (LP + r21 + r20).
+; No local stack allocation needed: values kept in CSRs across the call.
 define void @test_epilogue_cfi_multi_csr(ptr %p) {
 ; CHECK-LABEL: test_epilogue_cfi_multi_csr:
 ; CHECK:       .cfi_startproc
-; CHECK:       prepare
-; CHECK:       .cfi_def_cfa_offset 12
-; CHECK:       .cfi_offset r31, -4
-; CHECK:       .cfi_offset r21, -8
-; CHECK:       .cfi_offset r20, -12
-; Prologue
-; CHECK:       add
-; CHECK:       .cfi_def_cfa_offset
+; CHECK:       prepare 2051, 0
+; CHECK-NEXT:  .cfi_def_cfa_offset 12
+; CHECK-NEXT:  .cfi_offset r31, -4
+; CHECK-NEXT:  .cfi_offset r21, -8
+; CHECK-NEXT:  .cfi_offset r20, -12
+; No prologue stack adjustment
+; CHECK-NOT:   add {{.*}}, r3
 ; CHECK:       jarl external
-; Epilogue
-; CHECK:       add
-; CHECK:       .cfi_def_cfa_offset 12
+; No epilogue stack adjustment
 ; DISPOSE with return
 ; CHECK:       dispose 0, 2051, [r31]
 ; CHECK:       .cfi_endproc

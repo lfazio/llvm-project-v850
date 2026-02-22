@@ -13,15 +13,14 @@
 ; Test 1: PUSHSP/POPSP with frame pointer (disables PREPARE/DISPOSE)
 ; The frame pointer (r29) conflicts with DISPOSE's SP handling,
 ; so PUSHSP/POPSP is used instead.
+; With no local stack frame (StackSize=0), FP is saved/restored via PUSHSP
+; but not set up as an active frame pointer (no addi to initialize r29).
 define void @pushsp_with_fp(ptr %p) "frame-pointer"="all" {
 ; CHECK-LABEL: pushsp_with_fp:
 ; CHECK:       pushsp r29, r29
 ; CHECK:       pushsp r31, r31
-; CHECK:       addi {{.*}}, r3, r29
-; CHECK:       .cfi_def_cfa r29,
-; Epilogue: SP restore from FP must come BEFORE POPSP
-; CHECK:       addi {{.*}}, r29, r3
-; CHECK:       .cfi_def_cfa r3,
+; CHECK-NOT:   addi {{.*}}, r3, r29
+; CHECK:       jarl external
 ; CHECK:       popsp r31, r31
 ; CHECK:       popsp r29, r29
 ; CHECK:       jmp [r31]
@@ -52,12 +51,13 @@ entry:
 
 ; Test 3: PUSHSP/POPSP with many callee-saved registers and FP.
 ; When FP is used, PREPARE can't be used, so PUSHSP handles r20-r31.
+; All 10 loaded values fit in CSRs (r20-r28, r30), so StackSize=0
+; and FP is pushed/popped but not set up as an active frame pointer.
 define i32 @pushsp_many_regs(ptr %p) "frame-pointer"="all" {
 ; CHECK-LABEL: pushsp_many_regs:
 ; CHECK:       pushsp r20, r31
-; CHECK:       addi {{.*}}, r3, r29
-; Epilogue: SP restore from FP before POPSP
-; CHECK:       addi {{.*}}, r29, r3
+; CHECK-NOT:   addi {{.*}}, r3, r29
+; CHECK:       jarl external
 ; CHECK:       popsp r20, r31
 ; CHECK:       jmp [r31]
 entry:

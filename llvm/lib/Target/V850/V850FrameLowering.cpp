@@ -344,6 +344,28 @@ void V850FrameLowering::emitEpilogue(MachineFunction &MF,
   }
 }
 
+bool V850FrameLowering::assignCalleeSavedSpillSlots(
+    MachineFunction &MF, const TargetRegisterInfo *TRI,
+    std::vector<CalleeSavedInfo> &CSI, unsigned &MinCSFrameIndex,
+    unsigned &MaxCSFrameIndex) const {
+  // When PREPARE or PUSHSP will handle the CSR saves/restores, do not create
+  // frame objects for the callee-saved registers. These instructions save
+  // registers outside the local stack frame (they adjust SP independently),
+  // so creating frame slots would cause emitPrologue to emit a redundant
+  // "add -N, r3" for space that PREPARE/PUSHSP already allocated.
+  //
+  // Returning true without creating frame slots means MFI.getStackSize()
+  // reflects only genuinely local frame allocations (locals, spills, call
+  // frame), not the CSR save area managed by PREPARE/PUSHSP.
+  if (canUsePrepareDispose(MF, CSI) || canUsePushspPopsp(MF, CSI))
+    return true;
+
+  // Fall back to generic implementation for targets/configurations that
+  // use individual load/store instructions for CSR saves.
+  return TargetFrameLowering::assignCalleeSavedSpillSlots(
+      MF, TRI, CSI, MinCSFrameIndex, MaxCSFrameIndex);
+}
+
 bool V850FrameLowering::spillCalleeSavedRegisters(
     MachineBasicBlock &MBB, MachineBasicBlock::iterator MI,
     ArrayRef<CalleeSavedInfo> CSI, const TargetRegisterInfo *TRI) const {

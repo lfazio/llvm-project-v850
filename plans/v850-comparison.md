@@ -219,13 +219,56 @@ python scripts/compare_encodings.py test_ccrh.s test_llvm.s
 
 ### 5.3 Learning from CCRH
 
-Document interesting patterns and techniques from CCRH:
+Findings from CCRH vs LLVM assembly comparison on `arithmetic.c`:
 
-| Pattern | CCRH Approach | Potential LLVM Improvement |
-|---------|---------------|---------------------------|
-| Loop optimization | ... | ... |
-| Constant loading | ... | ... |
-| Function calls | ... | ... |
+#### 5.3.1 64-bit Integer Operations
+
+**`div_i64(long long a, long long b)`** — calls `__divdi3` / `__COM_div64`:
+
+| Aspect | CCRH | LLVM (before fix) | LLVM (after fix) |
+|--------|------|------------------|-----------------|
+| PREPARE syntax | `prepare 0x00000001, 0x00000000` | `prepare 2048, 0` | `prepare 2048, 0` |
+| Local stack alloc | none | `add -4, r3` + `add 4, r3` | none |
+| Instructions | 3 | 5 | 3 |
+
+**Root cause of LLVM extra stack allocation (FIXED):**
+- `PrologEpilogInserter::assignCalleeSavedSpillSlots()` created a 4-byte frame slot for LP (r31) before calling `spillCalleeSavedRegisters()`
+- `spillCalleeSavedRegisters()` then emitted PREPARE (which saves LP outside the local frame) and returned `true`, but the 4-byte frame slot was already counted in `MFI.getStackSize()` = 4
+- `emitPrologue()` saw StackSize=4 and emitted `add -4, r3` / `add 4, r3` for space that PREPARE already allocated
+- **Fix**: Override `assignCalleeSavedSpillSlots()` in `V850FrameLowering` to return `true` without creating frame slots when PREPARE or PUSHSP will handle the saves (commit: fixes redundant stack allocation in functions that only need LP saved)
+
+**PREPARE operand encoding** (cosmetic difference, not a bug):
+- CCRH: `prepare 0x00000001, 0x00000000` — LP bit in position 0 (bit0=LP convention)
+- LLVM: `prepare 2048, 0` — LP bit in position 11 (2048 = bit11, hardware-register offset from r20)
+- Both generate identical machine code; the assembler accepts either convention
+
+---
+
+**`sub_i64(long long a, long long b)`** — 64-bit subtraction:
+
+| Aspect | CCRH | LLVM (before fix) | LLVM (after fix) |
+|--------|------|------------------|-----------------|
+| SBF operands | `sbf 0x00000001, r9, r7, r11` | `sbf c, r7, r9, r11` | `sbf c, r9, r7, r11` |
+| Result | r7 - r9 - C = a_hi - b_hi - C ✓ | r9 - r7 - C = b_hi - a_hi - C ✗ | r7 - r9 - C = a_hi - b_hi - C ✓ |
+
+**Root cause of LLVM wrong SBF operands (FIXED):**
+- SBF instruction semantics: `SBF cond, reg1, reg2, reg3` → `reg3 = reg2 - reg1 - cond`
+- `sube(op0=a_hi, op1=b_hi)` semantics: `result = op0 - op1 - borrow = a_hi - b_hi - C`
+- Old ISel pattern: `(sube GPR:$reg1, GPR:$reg2)` → `(SBF 1, GPR:$reg1, GPR:$reg2)` computed `$reg2 - $reg1 - C = b_hi - a_hi - C` (WRONG)
+- **Fix**: Changed to `(SBF 1, GPR:$reg2, GPR:$reg1)` which computes `$reg1 - $reg2 - C = a_hi - b_hi - C` (CORRECT)
+- This was a **code generation correctness bug** — all 64-bit subtractions produced wrong high-word results
+
+---
+
+**`add_i64(long long a, long long b)`** — 64-bit addition:
+
+| Aspect | CCRH | LLVM |
+|--------|------|------|
+| ADF operands | `adf 0x00000001, r7, r9, r11` | `adf c, r9, r7, r11` |
+| Result | r9 + r7 + C ✓ | r9 + r7 + C ✓ |
+
+- Both are correct — ADF is commutative, operand order doesn't affect the result
+- No bug here; difference is only in which operand order the compiler prefers
 
 ---
 
@@ -308,11 +351,13 @@ Track discovered issues in categories:
   - state_machine.c - State machine patterns (table-driven, switch, function pointer)
   - embedded.c - Embedded patterns (ring buffer, CAN, PID, timers)
 
-### Phase 5: Validation
+### Phase 5: Validation [PARTIAL]
 - [ ] Set up simulator/emulator testing
-- [ ] Verify correctness of generated code
-- [ ] Complete encoding verification against CCRH
-- [ ] Document optimization opportunities learned from CCRH
+- [x] Verify correctness via CCRH comparison — found and fixed 2 bugs:
+  - **SBF wrong operands**: 64-bit subtraction produced b_hi - a_hi instead of a_hi - b_hi (V850InstrInfo.td sube pattern)
+  - **Extra stack allocation**: Functions calling __divdi3 emitted redundant `add -4/+4, r3` (assignCalleeSavedSpillSlots override)
+- [ ] Complete encoding verification against CCRH for remaining functions
+- [x] Document optimization opportunities learned from CCRH (see §5.3)
 
 ### Phase 6: Reporting and Improvement
 - [ ] Generate comprehensive comparison report
@@ -365,3 +410,23 @@ Track discovered issues in categories:
 - [V850 Cycle Timings](V850CycleTimings.md)
 - [CCRH User Manual](https://www.renesas.com/documentation)
 - [V850 ABI Specification](https://www.renesas.com/documentation)
+
+---
+
+## 11. Bugs Found and Fixed via CCRH Comparison
+
+| # | Bug | Severity | File | Fix |
+|---|-----|----------|------|-----|
+| 1 | SBF wrong operand order in `sube` pattern — 64-bit subtraction high word wrong | **Correctness** | `V850InstrInfo.td:1729` | Swapped $reg1/$reg2 in `(SBF 1, GPR:$reg2, GPR:$reg1)` |
+| 2 | Redundant `add -4/+4, r3` in functions that only need LP saved via PREPARE | Size/Performance | `V850FrameLowering.cpp` | Override `assignCalleeSavedSpillSlots()` to skip frame slots when PREPARE/PUSHSP handles saves |
+
+**Detection method**: Direct assembly comparison between CCRH `-Xcpu=g3m -Ospeed` and LLVM `-mcpu=g3m -O2` output for `arithmetic.c` benchmarks. CCRH output used as reference for correct semantics.
+
+---
+
+## Revision History
+
+| Date | Version | Changes |
+|------|---------|---------|
+| 2026-02-22 | 1.0 | Initial plan with full CCRH comparison infrastructure |
+| 2026-02-22 | 1.1 | CCRH vs LLVM analysis for div_i64/sub_i64/add_i64: found SBF correctness bug and PREPARE redundant stack allocation bug; both fixed; §5.3 and §11 added |

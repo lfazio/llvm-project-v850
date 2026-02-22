@@ -1726,7 +1726,10 @@ let Predicates = [HasV850E2] in {
   // subc: subtract with borrow output (low part of 64-bit sub)
   // sube: subtract with borrow in/out (high part of 64-bit sub)
   def : Pat<(subc GPR:$rs, GPR:$reg1), (SUB GPR:$rs, GPR:$reg1)>;
-  def : Pat<(sube GPR:$reg1, GPR:$reg2), (SBF 1, GPR:$reg1, GPR:$reg2)>;
+  // SBF semantics: reg3 = reg2 - reg1 - cond
+  // sube semantics: result = op0 - op1 - borrow = $reg1 - $reg2 - C
+  // So SBF reg1=subtractor=$reg2, reg2=minuend=$reg1
+  def : Pat<(sube GPR:$reg1, GPR:$reg2), (SBF 1, GPR:$reg2, GPR:$reg1)>;
 
   // MAC reg1, reg2, reg3, reg4 - Multiply-accumulate signed
   // (reg3:reg4) = (reg3:reg4) + sext(reg1) * sext(reg2)
