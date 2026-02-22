@@ -327,43 +327,68 @@ DecodeStatus V850Disassembler::getInstruction32(MCInst &MI, uint64_t &Size,
 
   bool HasRH850G3M = STI.hasFeature(V850::FeatureRH850G3M);
   bool HasV850E2M = STI.hasFeature(V850::FeatureV850E2M);
+  bool HasFPU = STI.hasFeature(V850::FeatureV850FPU);
 
-  // Manually decode LDSR/STSR since they use FormatIX_SysReg (isCodeGenOnly)
-  // which encodes selID in bits[20:16]. This custom decode handles both
-  // selID=0 (base V850) and selID!=0 (RH850G3M+) cases uniformly.
-  // Bit pattern: bits[10:5]=111111, bits[31:27]=0, bits[26:21]=100000/100100
-  {
-    unsigned Opcode6 = (Insn32 >> 5) & 0x3F; // bits[10:5]
-    unsigned RFU = (Insn32 >> 27) & 0x1F;    // bits[31:27]
-    unsigned SubOp = (Insn32 >> 21) & 0x3F;  // bits[26:21]
-    if (Opcode6 == 0b111111 && RFU == 0 &&
-        (SubOp == 0b100000 || SubOp == 0b100100)) {
-      unsigned Reg2 = (Insn32 >> 11) & 0x1F;  // bits[15:11]
-      unsigned RegID = Insn32 & 0x1F;         // bits[4:0]
-      unsigned SelID = (Insn32 >> 16) & 0x1F; // bits[20:16]
-      unsigned SysReg = (SelID << 5) | RegID; // 10-bit unified encoding
-      MI.clear();
-      if (SubOp == 0b100000) {
-        // LDSR reg2, sysreg
-        MI.setOpcode(V850::LDSR);
-        if (DecodeGPRRegisterClass(MI, Reg2, Address, this) ==
-            MCDisassembler::Fail)
-          return MCDisassembler::Fail;
-        MI.addOperand(MCOperand::createImm(SysReg));
-      } else {
-        // STSR sysreg, reg2
-        MI.setOpcode(V850::STSR);
-        if (DecodeGPRRegisterClass(MI, Reg2, Address, this) ==
-            MCDisassembler::Fail)
-          return MCDisassembler::Fail;
-        MI.addOperand(MCOperand::createImm(SysReg));
+  // Bit fields used by LDSR/STSR/TRFSR pattern checks below.
+  unsigned Opcode6Sysreg = (Insn32 >> 5) & 0x3F; // bits[10:5]
+  unsigned RFUSysreg = (Insn32 >> 27) & 0x1F;    // bits[31:27]
+  unsigned SubOpSysreg = (Insn32 >> 21) & 0x3F;  // bits[26:21]
+
+  // LDSR/STSR/TRFSR all share opcode=0x3F, RFU=0 and specific SubOp values.
+  // These patterns MUST be checked before the auto-generated decoders because:
+  //   1. LDHU (opcode=0x3F, FormatVII) is in DecoderTable32 and its 16-bit
+  //      displacement field can produce bit patterns identical to LDSR/STSR.
+  //   2. TRFSR (FPU) shares its exact encoding with LDSR r0, <sysreg> for
+  //      specific register combinations (reg2=0, regID=0).
+  // Processing order within this block:
+  //   a) TRFSR (when HasFPU): detected by reg2=0, regID=0, bit[20]=0, bit[16]=0
+  //   b) LDSR/STSR: all remaining SubOp=100000/100100 patterns
+  if (Opcode6Sysreg == 0b111111 && RFUSysreg == 0 &&
+      (SubOpSysreg == 0b100000 || SubOpSysreg == 0b100100)) {
+    unsigned Reg2 = (Insn32 >> 11) & 0x1F;  // bits[15:11]
+    unsigned RegID = Insn32 & 0x1F;         // bits[4:0]
+    unsigned SelID = (Insn32 >> 16) & 0x1F; // bits[20:16]
+
+    // Check for TRFSR: LDSR SubOp with reg2=0, regID=0, bit[20]=0, bit[16]=0.
+    // These are the conditions that distinguish TRFSR from LDSR r0, <sysreg>
+    // for specific (selID even, selID<16) combinations.  When FPU is present,
+    // these encodings belong to TRFSR; the fcbit is in bits[19:17].
+    if (HasFPU && SubOpSysreg == 0b100000) {
+      unsigned Bit20 = (Insn32 >> 20) & 1;
+      unsigned Bit16 = (Insn32 >> 16) & 1;
+      if (Reg2 == 0 && RegID == 0 && Bit20 == 0 && Bit16 == 0) {
+        unsigned FCBit = (Insn32 >> 17) & 0x7;
+        MI.clear();
+        MI.setOpcode(V850::TRFSR);
+        MI.addOperand(MCOperand::createImm(FCBit));
+        Size = 4;
+        return MCDisassembler::Success;
       }
-      Size = 4;
-      return MCDisassembler::Success;
     }
+
+    // Decode LDSR / STSR using the unified 10-bit sysreg encoding.
+    unsigned SysReg = (SelID << 5) | RegID;
+    MI.clear();
+    if (SubOpSysreg == 0b100000) {
+      // LDSR reg2, sysreg
+      MI.setOpcode(V850::LDSR);
+      if (DecodeGPRRegisterClass(MI, Reg2, Address, this) ==
+          MCDisassembler::Fail)
+        return MCDisassembler::Fail;
+      MI.addOperand(MCOperand::createImm(SysReg));
+    } else {
+      // STSR sysreg, reg2
+      MI.setOpcode(V850::STSR);
+      if (DecodeGPRRegisterClass(MI, Reg2, Address, this) ==
+          MCDisassembler::Fail)
+        return MCDisassembler::Fail;
+      MI.addOperand(MCOperand::createImm(SysReg));
+    }
+    Size = 4;
+    return MCDisassembler::Success;
   }
 
-  // Try RH850G3M-specific instructions first (superset of V850E2M)
+  // Try RH850G3M-specific instructions (superset of V850E2M)
   if (HasRH850G3M) {
     MI.clear();
     DecodeStatus Result = decodeInstruction(DecoderTableRH850G3M32, MI, Insn32,
