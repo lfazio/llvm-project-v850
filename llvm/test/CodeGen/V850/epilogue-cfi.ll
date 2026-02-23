@@ -12,7 +12,7 @@ declare void @external()
 define void @test_epilogue_cfi_prepare() {
 ; CHECK-LABEL: test_epilogue_cfi_prepare:
 ; CHECK:       .cfi_startproc
-; CHECK:       prepare 2048, 0
+; CHECK:       prepare 2, 0
 ; CHECK-NEXT:  .cfi_def_cfa_offset 4
 ; CHECK-NEXT:  .cfi_offset r31, -4
 ; No prologue stack adjustment (no local frame)
@@ -20,7 +20,7 @@ define void @test_epilogue_cfi_prepare() {
 ; CHECK:       jarl external
 ; No epilogue stack adjustment
 ; DISPOSE with return
-; CHECK:       dispose 0, 2048, [r31]
+; CHECK:       dispose 0, 2, [r31]
 ; CHECK:       .cfi_endproc
   call void @external()
   ret void
@@ -31,7 +31,7 @@ define void @test_epilogue_cfi_prepare() {
 define void @test_epilogue_cfi_multi_csr(ptr %p) {
 ; CHECK-LABEL: test_epilogue_cfi_multi_csr:
 ; CHECK:       .cfi_startproc
-; CHECK:       prepare 2051, 0
+; CHECK:       prepare 194, 0
 ; CHECK-NEXT:  .cfi_def_cfa_offset 12
 ; CHECK-NEXT:  .cfi_offset r31, -4
 ; CHECK-NEXT:  .cfi_offset r21, -8
@@ -41,7 +41,7 @@ define void @test_epilogue_cfi_multi_csr(ptr %p) {
 ; CHECK:       jarl external
 ; No epilogue stack adjustment
 ; DISPOSE with return
-; CHECK:       dispose 0, 2051, [r31]
+; CHECK:       dispose 0, 194, [r31]
 ; CHECK:       .cfi_endproc
   %x = load volatile i32, ptr %p
   call void @external()

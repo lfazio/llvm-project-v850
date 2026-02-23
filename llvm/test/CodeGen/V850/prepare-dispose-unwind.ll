@@ -15,9 +15,9 @@
 ;===----------------------------------------------------------------------===;
 
 ;===----------------------------------------------------------------------===;
-; Test 1: PREPARE with LP only (bit 11 = 2048)
+; Test 1: PREPARE with LP only (bit 1 = 2)
 ;
-; list12 = 2048 (0x800) -> only LP saved
+; list12 = 2 (0x002) -> only LP saved
 ; Stack layout after PREPARE:
 ;   CFA-4: LP (r31)
 ;   SP = CFA-4
@@ -25,10 +25,10 @@
 
 ; CHECK-LABEL: test_prepare_lp_only:
 ; CHECK:       .cfi_startproc
-; CHECK:       prepare 2048, 0
+; CHECK:       prepare 2, 0
 ; CHECK-NEXT:  .cfi_def_cfa_offset 4
 ; CHECK-NEXT:  .cfi_offset r31, -4
-; CHECK:       dispose 0, 2048
+; CHECK:       dispose 0, 2
 define i32 @test_prepare_lp_only(i32 %a) {
 entry:
   %result = call i32 @external(i32 %a)
@@ -36,9 +36,9 @@ entry:
 }
 
 ;===----------------------------------------------------------------------===;
-; Test 2: PREPARE with LP and r20 (bits 11,0 = 2049)
+; Test 2: PREPARE with LP and r20 (bits 1,7 = 130)
 ;
-; list12 = 2049 (0x801) -> LP and r20 saved
+; list12 = 130 (0x082) -> LP and r20 saved
 ; Stack layout after PREPARE:
 ;   CFA-4: LP (r31)
 ;   CFA-8: r20
@@ -47,11 +47,11 @@ entry:
 
 ; CHECK-LABEL: test_prepare_lp_r20:
 ; CHECK:       .cfi_startproc
-; CHECK:       prepare 2049, 0
+; CHECK:       prepare 130, 0
 ; CHECK-NEXT:  .cfi_def_cfa_offset 8
 ; CHECK-NEXT:  .cfi_offset r31, -4
 ; CHECK-NEXT:  .cfi_offset r20, -8
-; CHECK:       dispose 0, 2049
+; CHECK:       dispose 0, 130
 define i32 @test_prepare_lp_r20(i32 %a) {
 entry:
   %local = alloca i32
@@ -63,9 +63,9 @@ entry:
 }
 
 ;===----------------------------------------------------------------------===;
-; Test 3: PREPARE with LP, r21, and r20 (bits 11,1,0 = 2051)
+; Test 3: PREPARE with LP, r21, and r20 (bits 1,6,7 = 194)
 ;
-; list12 = 2051 (0x803) -> LP, r21, r20 saved
+; list12 = 194 (0x0C2) -> LP, r21, r20 saved
 ; Stack layout after PREPARE (registers in push order):
 ;   CFA-4:  LP (r31)
 ;   CFA-8:  r21
@@ -75,12 +75,12 @@ entry:
 
 ; CHECK-LABEL: test_prepare_lp_r21_r20:
 ; CHECK:       .cfi_startproc
-; CHECK:       prepare 2051, 0
+; CHECK:       prepare 194, 0
 ; CHECK-NEXT:  .cfi_def_cfa_offset 12
 ; CHECK-NEXT:  .cfi_offset r31, -4
 ; CHECK-NEXT:  .cfi_offset r21, -8
 ; CHECK-NEXT:  .cfi_offset r20, -12
-; CHECK:       dispose 0, 2051
+; CHECK:       dispose 0, 194
 define i32 @test_prepare_lp_r21_r20(i32 %a, i32 %b) {
 entry:
   %local1 = alloca i32
@@ -182,11 +182,11 @@ entry:
 
 ; CHECK-LABEL: test_disposer:
 ; CHECK:       .cfi_startproc
-; CHECK:       prepare 2048, 0
+; CHECK:       prepare 2, 0
 ; CHECK:       .cfi_def_cfa_offset 4
 ; CHECK:       .cfi_offset r31, -4
 ; DISPOSEr should be used when immediately followed by return
-; CHECK:       dispose 0, 2048, [r31]
+; CHECK:       dispose 0, 2, [r31]
 ; CHECK:       .cfi_endproc
 define i32 @test_disposer(i32 %a) {
 entry:

@@ -366,6 +366,40 @@ bool V850FrameLowering::assignCalleeSavedSpillSlots(
       MF, TRI, CSI, MinCSFrameIndex, MaxCSFrameIndex);
 }
 
+/// Return the list12 bit mask for a single hardware register, or 0 if the
+/// register is not part of the PREPARE/DISPOSE save list.
+///
+/// The PREPARE/DISPOSE instruction (Format XIII) encodes the 12-bit list12
+/// operand into instruction bits as list12{11:1}→Inst{31:21}, list12{0}→Inst{0}.
+/// Per the V850 spec the instruction bits map to registers as:
+///   Inst{31}=r24, Inst{30}=r25, Inst{29}=r26, Inst{28}=r27,
+///   Inst{27}=r20, Inst{26}=r21, Inst{25}=r22, Inst{24}=r23,
+///   Inst{23}=r28, Inst{22}=r29, Inst{21}=r31(LP), Inst{0}=r30(EP)
+///
+/// Translating through the list12{N}→Inst mapping gives:
+///   r20→bit7, r21→bit6, r22→bit5, r23→bit4,
+///   r24→bit11, r25→bit10, r26→bit9, r27→bit8,
+///   r28→bit3, r29→bit2, r30(EP)→bit0, r31(LP)→bit1
+static unsigned getList12BitForHWReg(unsigned HWReg) {
+  static const unsigned HWRegToList12Bit[12] = {
+      7,  // r20 → bit 7  (value  128, Inst{27})
+      6,  // r21 → bit 6  (value   64, Inst{26})
+      5,  // r22 → bit 5  (value   32, Inst{25})
+      4,  // r23 → bit 4  (value   16, Inst{24})
+      11, // r24 → bit 11 (value 2048, Inst{31})
+      10, // r25 → bit 10 (value 1024, Inst{30})
+      9,  // r26 → bit 9  (value  512, Inst{29})
+      8,  // r27 → bit 8  (value  256, Inst{28})
+      3,  // r28 → bit 3  (value    8, Inst{23})
+      2,  // r29 → bit 2  (value    4, Inst{22})
+      0,  // r30/EP → bit 0 (value  1, Inst{0})
+      1,  // r31/LP → bit 1 (value  2, Inst{21})
+  };
+  if (HWReg < 20 || HWReg > 31)
+    return 0;
+  return 1u << HWRegToList12Bit[HWReg - 20];
+}
+
 bool V850FrameLowering::spillCalleeSavedRegisters(
     MachineBasicBlock &MBB, MachineBasicBlock::iterator MI,
     ArrayRef<CalleeSavedInfo> CSI, const TargetRegisterInfo *TRI) const {
@@ -445,7 +479,7 @@ bool V850FrameLowering::spillCalleeSavedRegisters(
         V850::LP,  V850::EP,  V850::R29, V850::R28, V850::R27, V850::R26,
         V850::R25, V850::R24, V850::R23, V850::R22, V850::R21, V850::R20};
     for (unsigned Reg : PrepareOrder) {
-      if (List12 & (1 << (this->TRI->getEncodingValue(Reg) - 20))) {
+      if (List12 & getList12BitForHWReg(this->TRI->getEncodingValue(Reg))) {
         CFIBuilder.buildOffset(Reg, Offset);
         Offset -= 4;
       }
@@ -736,18 +770,10 @@ bool V850FrameLowering::canUsePrepareDispose(
 unsigned
 V850FrameLowering::buildList12Mask(ArrayRef<CalleeSavedInfo> CSI) const {
   unsigned List12 = 0;
-
   for (const CalleeSavedInfo &I : CSI) {
-    Register Reg = I.getReg();
-    unsigned HWReg = TRI->getEncodingValue(Reg);
-    // list12 bit N corresponds to register r(20+N)
-    // bit 0 = r20, bit 1 = r21, ..., bit 9 = r29, bit 10 = r30(EP), bit 11 =
-    // r31(LP)
-    if (HWReg >= 20 && HWReg <= 31) {
-      List12 |= (1 << (HWReg - 20));
-    }
+    unsigned HWReg = TRI->getEncodingValue(I.getReg());
+    List12 |= getList12BitForHWReg(HWReg);
   }
-
   return List12;
 }
 

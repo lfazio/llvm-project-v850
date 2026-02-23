@@ -27,12 +27,12 @@ define i32 @simple_func(i32 %a, i32 %b) {
 ; passes its single argument via register (r6) and hasReservedCallFrame=true.
 ; CHECK-LABEL: func_with_call:
 ; CHECK:       .cfi_startproc
-; CHECK:       prepare 2048, 0
+; CHECK:       prepare 2, 0
 ; CHECK-NEXT:  .cfi_def_cfa_offset 4
 ; CHECK-NEXT:  .cfi_offset r31, -4
 ; CHECK-NOT:   add -4, r3
 ; CHECK:       jarl external_func, r31
-; CHECK:       dispose 0, 2048, [r31]
+; CHECK:       dispose 0, 2, [r31]
 ; CHECK:       .cfi_endproc
 define i32 @func_with_call(i32 %a) {
   %result = call i32 @external_func(i32 %a)

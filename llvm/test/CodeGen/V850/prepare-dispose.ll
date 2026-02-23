@@ -9,9 +9,9 @@ declare void @external()
 ; Non-leaf function - V850E1+ should use PREPARE/DISPOSE, base V850 uses st.w/ld.w
 define void @test_save_lp() {
 ; V850E1-LABEL: test_save_lp:
-; V850E1: prepare 2048, 0
+; V850E1: prepare 2, 0
 ; V850E1: jarl external, r31
-; V850E1: dispose 0, 2048, [r31]
+; V850E1: dispose 0, 2, [r31]
 
 ; V850-LABEL: test_save_lp:
 ; V850: st.w r31

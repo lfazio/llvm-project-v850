@@ -225,22 +225,34 @@ Findings from CCRH vs LLVM assembly comparison on `arithmetic.c`:
 
 **`div_i64(long long a, long long b)`** — calls `__divdi3` / `__COM_div64`:
 
-| Aspect | CCRH | LLVM (before fix) | LLVM (after fix) |
-|--------|------|------------------|-----------------|
-| PREPARE syntax | `prepare 0x00000001, 0x00000000` | `prepare 2048, 0` | `prepare 2048, 0` |
-| Local stack alloc | none | `add -4, r3` + `add 4, r3` | none |
-| Instructions | 3 | 5 | 3 |
+| Aspect | CCRH | LLVM (before fix 1) | LLVM (before fix 2) | LLVM (after both fixes) |
+|--------|------|--------------------|--------------------|------------------------|
+| PREPARE syntax | `prepare 0x00000001, 0x00000000` | `prepare 2048, 0` | `prepare 2, 0` | `prepare 2, 0` |
+| Machine code | Inst{21}=1 → LP ✓ | Inst{31}=1 → r24 ✗ | Inst{21}=1 → LP ✓ | Inst{21}=1 → LP ✓ |
+| Local stack alloc | none | `add -4, r3` + `add 4, r3` | `add -4, r3` + `add 4, r3` | none |
+| Instructions | 3 | 5 | 5 | 3 |
 
-**Root cause of LLVM extra stack allocation (FIXED):**
+**Root cause of LLVM wrong list12 encoding (FIXED — `buildList12Mask` bug):**
+- `buildList12Mask()` used `1 << (HWReg - 20)` to compute the list12 bit for each register
+- For LP (r31, HWReg=31): `1 << (31-20) = 1 << 11 = 2048`
+- In FormatXIII: list12 bit11 → Inst{31} → r24. So the code was requesting r24 to be saved, **not LP**
+- The correct list12 encoding for LP is bit 1 (value 2), which places 1 at Inst{21} → LP per V850 spec
+- **Fix**: Replaced the formula with a static lookup table `getList12BitForHWReg()` implementing the correct
+  FormatXIII mapping: r20→bit7, r21→bit6, r22→bit5, r23→bit4, r24→bit11, r25→bit10, r26→bit9, r27→bit8,
+  r28→bit3, r29→bit2, r30(EP)→bit0, r31(LP)→bit1
+- Same table was applied to the CFI emission check in `spillCalleeSavedRegisters` which had the same bug
+
+**Root cause of LLVM extra stack allocation (FIXED — `assignCalleeSavedSpillSlots` override):**
 - `PrologEpilogInserter::assignCalleeSavedSpillSlots()` created a 4-byte frame slot for LP (r31) before calling `spillCalleeSavedRegisters()`
 - `spillCalleeSavedRegisters()` then emitted PREPARE (which saves LP outside the local frame) and returned `true`, but the 4-byte frame slot was already counted in `MFI.getStackSize()` = 4
 - `emitPrologue()` saw StackSize=4 and emitted `add -4, r3` / `add 4, r3` for space that PREPARE already allocated
-- **Fix**: Override `assignCalleeSavedSpillSlots()` in `V850FrameLowering` to return `true` without creating frame slots when PREPARE or PUSHSP will handle the saves (commit: fixes redundant stack allocation in functions that only need LP saved)
+- **Fix**: Override `assignCalleeSavedSpillSlots()` in `V850FrameLowering` to return `true` without creating frame slots when PREPARE or PUSHSP will handle the saves
 
-**PREPARE operand encoding** (cosmetic difference, not a bug):
-- CCRH: `prepare 0x00000001, 0x00000000` — LP bit in position 0 (bit0=LP convention)
-- LLVM: `prepare 2048, 0` — LP bit in position 11 (2048 = bit11, hardware-register offset from r20)
-- Both generate identical machine code; the assembler accepts either convention
+**PREPARE operand encoding conventions:**
+- CCRH: `prepare 0x00000001` — LP bit in position 0 of their convention (bit0=LP), produces Inst{21}=1 ✓
+- LLVM (fixed): `prepare 2, 0` — LP bit in position 1 of list12 (bit1=LP per FormatXIII), produces Inst{21}=1 ✓
+- Both produce identical machine code despite different numeric operand values
+- LLVM (buggy): `prepare 2048, 0` — LP bit in position 11 (wrong!), produced Inst{31}=1 = r24 saved ✗
 
 ---
 
@@ -419,8 +431,9 @@ Track discovered issues in categories:
 |---|-----|----------|------|-----|
 | 1 | SBF wrong operand order in `sube` pattern — 64-bit subtraction high word wrong | **Correctness** | `V850InstrInfo.td:1729` | Swapped $reg1/$reg2 in `(SBF 1, GPR:$reg2, GPR:$reg1)` |
 | 2 | Redundant `add -4/+4, r3` in functions that only need LP saved via PREPARE | Size/Performance | `V850FrameLowering.cpp` | Override `assignCalleeSavedSpillSlots()` to skip frame slots when PREPARE/PUSHSP handles saves |
+| 3 | `buildList12Mask()` used wrong formula `1 << (HWReg-20)` — LP(r31) mapped to bit11(r24) instead of bit1(LP) | **Correctness** | `V850FrameLowering.cpp` | Replaced formula with static `getList12BitForHWReg()` lookup table implementing correct FormatXIII register-to-bit mapping; same fix applied to CFI emission check in `spillCalleeSavedRegisters` |
 
-**Detection method**: Direct assembly comparison between CCRH `-Xcpu=g3m -Ospeed` and LLVM `-mcpu=g3m -O2` output for `arithmetic.c` benchmarks. CCRH output used as reference for correct semantics.
+**Detection method**: Direct assembly comparison between CCRH `-Xcpu=g3m -Ospeed` and LLVM `-mcpu=g3m -O2` output for `arithmetic.c` benchmarks. CCRH output used as reference for correct semantics. Bug 3 detected by noticing CCRH emits `prepare 0x00000001` (LP) while LLVM emitted `prepare 2048` (wrong encoding for r24) — the difference was initially dismissed as a convention difference but was in fact a correctness bug producing wrong machine code.
 
 ---
 
@@ -430,3 +443,4 @@ Track discovered issues in categories:
 |------|---------|---------|
 | 2026-02-22 | 1.0 | Initial plan with full CCRH comparison infrastructure |
 | 2026-02-22 | 1.1 | CCRH vs LLVM analysis for div_i64/sub_i64/add_i64: found SBF correctness bug and PREPARE redundant stack allocation bug; both fixed; §5.3 and §11 added |
+| 2026-02-23 | 1.2 | Found and fixed `buildList12Mask` correctness bug: `1 << (HWReg-20)` formula mapped LP(r31) to bit11→r24 instead of bit1→LP, producing wrong machine code. Replaced with `getList12BitForHWReg()` lookup table. Also fixed CFI emission check using same wrong formula. §5.3.1 table updated, §11 bug 3 added. |
