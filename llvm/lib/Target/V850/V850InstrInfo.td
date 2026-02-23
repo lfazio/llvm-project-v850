@@ -1828,6 +1828,16 @@ let Predicates = [HasV850E2] in {
       : FormatXI<0b111111, 0b000110, 0b00010, (outs GPR:$reg3),
                  (ins GPR:$reg2, GPR:$reg1), "shl\t$reg1, $reg2, $reg3", []>;
 
+  // 3-operand shift ISel patterns — preferred over 2-operand destructive forms
+  // on V850E2+. The 2-operand forms use Constraints="$rs=$reg2" which forces
+  // a register copy when source and destination differ. The 3-operand forms
+  // write to a separate reg3, eliminating that copy.
+  let AddedComplexity = 1 in {
+    def : Pat<(srl GPR:$reg2, GPR:$reg1), (SHR_3 GPR:$reg2, GPR:$reg1)>;
+    def : Pat<(sra GPR:$reg2, GPR:$reg1), (SAR_3 GPR:$reg2, GPR:$reg1)>;
+    def : Pat<(shl GPR:$reg2, GPR:$reg1), (SHL_3 GPR:$reg2, GPR:$reg1)>;
+  }
+
   //===----------------------------------------------------------------------===//
   // 3-operand Saturated Arithmetic Instructions (V850E2)
   //===----------------------------------------------------------------------===//
