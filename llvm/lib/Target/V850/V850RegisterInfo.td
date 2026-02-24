@@ -149,6 +149,47 @@ def GPR : RegisterClass<"V850", [i32], 32,
 def GPRnoR0 : RegisterClass<"V850", [i32], 32,
     (sub GPR, R0)>;
 
+//===----------------------------------------------------------------------===//
+// Sub-register indices for 64-bit register pairs (double-precision FP)
+//
+// V850 double-precision FP uses even/odd GPR pairs:
+//   - Even register (sub_lo): holds low 32 bits
+//   - Odd register (sub_hi):  holds high 32 bits
+//===----------------------------------------------------------------------===//
+
+def sub_lo : SubRegIndex<32, 0>;   // bits [31:0]  — even register
+def sub_hi : SubRegIndex<32, 32>;  // bits [63:32] — odd register
+
+// V850 double-precision register pair: {even, odd} = {low, high}
+// HWEncoding = even register number (0, 2, 4, ..., 30)
+// Instructions encode only the even register; hardware implicitly uses reg+1.
+class V850RegPair<bits<5> Enc, string n, list<Register> subregs>
+    : RegisterWithSubRegs<n, subregs> {
+  let HWEncoding{4-0} = Enc;
+  let Namespace = "V850";
+  let SubRegIndices = [sub_lo, sub_hi];
+  let CoveredBySubRegs = 1;
+}
+
+// Double-precision register pairs named after the even (low) register.
+// D0/D2/D4/D30 include reserved GPRs; they exist for MC but are not allocatable.
+def D0  : V850RegPair<0,  "r0",  [R0,  R1]>;  // R0 = zero register
+def D2  : V850RegPair<2,  "r2",  [R2,  SP]>;  // SP is stack pointer
+def D4  : V850RegPair<4,  "r4",  [GP,  TP]>;  // GP/TP are reserved pointers
+def D6  : V850RegPair<6,  "r6",  [R6,  R7]>;
+def D8  : V850RegPair<8,  "r8",  [R8,  R9]>;
+def D10 : V850RegPair<10, "r10", [R10, R11]>;
+def D12 : V850RegPair<12, "r12", [R12, R13]>;
+def D14 : V850RegPair<14, "r14", [R14, R15]>;
+def D16 : V850RegPair<16, "r16", [R16, R17]>;
+def D18 : V850RegPair<18, "r18", [R18, R19]>;
+def D20 : V850RegPair<20, "r20", [R20, R21]>;
+def D22 : V850RegPair<22, "r22", [R22, R23]>;
+def D24 : V850RegPair<24, "r24", [R24, R25]>;
+def D26 : V850RegPair<26, "r26", [R26, R27]>;
+def D28 : V850RegPair<28, "r28", [R28, R29]>;
+def D30 : V850RegPair<30, "r30", [EP,  LP]>;  // EP=element ptr, LP=link ptr
+
 // FPR - Floating-point register class (uses same physical registers as GPR)
 // V850 uses GPRs for single-precision FP operations
 def FPR : RegisterClass<"V850", [f32], 32,
@@ -163,6 +204,21 @@ def FPR : RegisterClass<"V850", [f32], 32,
      R1, R2, EP, LP, SP, GP, TP,
      // Zero register
      R0
+    )>;
+
+// DPR - Double-precision floating-point register class (f64, 64-bit pairs)
+// V850 double-precision FP uses even/odd GPR pairs.
+// Only D6-D28 are allocatable (D0/D2/D4 contain reserved GPRs; D30 has EP/LP).
+// Allocation order: caller-saved temporaries first, then arg regs, then
+// callee-saved. This matches the GPR/FPR preference order.
+def DPR : RegisterClass<"V850", [f64], 64,
+    (add
+     // Caller-saved temporaries (preferred for allocation)
+     D10, D12, D14, D16, D18,
+     // Argument registers
+     D6, D8,
+     // Callee-saved registers
+     D20, D22, D24, D26, D28
     )>;
 
 //===----------------------------------------------------------------------===//

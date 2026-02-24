@@ -47,15 +47,20 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
   // Set up the register classes
   addRegisterClass(MVT::i32, &V850::GPRRegClass);
 
-  // V850 FPU feature - use FPR class for floating-point
-  // (FPR uses same physical registers as GPR but for f32 type)
+  // V850 FPU feature - use FPR class for f32 and DPR class for f64
+  // FPR uses same physical registers as GPR but typed as f32.
+  // DPR uses even/odd GPR pairs (D6=(R6,R7), D8=(R8,R9), etc.) typed as f64.
   if (STI.hasV850FPU()) {
     addRegisterClass(MVT::f32, &V850::FPRRegClass);
-    // f64 uses register pairs, will be expanded to library calls
+    addRegisterClass(MVT::f64, &V850::DPRRegClass);
+    LLVM_DEBUG(dbgs() << "V850: addRegisterClass f64 DPR done, RegClass="
+                      << (void *)getRegClassFor(MVT::f64) << "\n");
   }
 
   // Compute derived properties from the register classes
   computeRegisterProperties(STI.getRegisterInfo());
+  LLVM_DEBUG(dbgs() << "V850: after computeRegisterProperties, f64 isTypeLegal="
+                    << isTypeLegal(MVT::f64) << "\n");
 
   // Set scheduling preference
   setSchedulingPreference(Sched::RegPressure);
@@ -254,17 +259,32 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::SELECT, MVT::f32, Expand);
     setOperationAction(ISD::BR_CC, MVT::f32, Custom);
 
-    // Double-precision - expand to library calls for now
-    // (would need register pair handling for hardware support)
-    setOperationAction(ISD::FADD, MVT::f64, Expand);
-    setOperationAction(ISD::FSUB, MVT::f64, Expand);
-    setOperationAction(ISD::FMUL, MVT::f64, Expand);
-    setOperationAction(ISD::FDIV, MVT::f64, Expand);
-    setOperationAction(ISD::FABS, MVT::f64, Expand);
-    setOperationAction(ISD::FNEG, MVT::f64, Expand);
-    setOperationAction(ISD::FSQRT, MVT::f64, Expand);
-    setOperationAction(ISD::FP_EXTEND, MVT::f64, Expand);
-    setOperationAction(ISD::FP_ROUND, MVT::f32, Expand);
+    // Double-precision operations - Legal via hardware ADDF.D, SUBF.D, etc.
+    setOperationAction(ISD::FADD, MVT::f64, Legal);
+    setOperationAction(ISD::FSUB, MVT::f64, Legal);
+    setOperationAction(ISD::FMUL, MVT::f64, Legal);
+    setOperationAction(ISD::FDIV, MVT::f64, Legal);
+    setOperationAction(ISD::FABS, MVT::f64, Legal);
+    setOperationAction(ISD::FNEG, MVT::f64, Legal);
+    setOperationAction(ISD::FSQRT, MVT::f64, Legal);
+    setOperationAction(ISD::FMINNUM, MVT::f64, Legal);
+    setOperationAction(ISD::FMAXNUM, MVT::f64, Legal);
+
+    // f32 <-> f64 conversions - Legal via CVTF.DS / CVTF.SD
+    setOperationAction(ISD::FP_EXTEND, MVT::f64, Legal);
+    setOperationAction(ISD::FP_ROUND, MVT::f32, Legal);
+
+    // f64 <-> i32 conversions - Legal via TRNCF.DW / CVTF.WD
+    setOperationAction(ISD::FP_TO_SINT, MVT::f64, Legal);
+    setOperationAction(ISD::FP_TO_UINT, MVT::f64, Legal);
+    setOperationAction(ISD::SINT_TO_FP, MVT::f64, Legal);
+    setOperationAction(ISD::UINT_TO_FP, MVT::f64, Legal);
+
+    // f64 comparisons - CMPF.D + TRFSR + SETF/CMOV/BR
+    setOperationAction(ISD::SETCC, MVT::f64, Legal);
+    setOperationAction(ISD::SELECT_CC, MVT::f64, Custom);
+    setOperationAction(ISD::SELECT, MVT::f64, Expand);
+    setOperationAction(ISD::BR_CC, MVT::f64, Custom);
 
     // Bitcast between i32 and f32
     setOperationAction(ISD::BITCAST, MVT::i32, Legal);
@@ -544,8 +564,9 @@ SDValue V850TargetLowering::LowerBR_CC(SDValue Op, SelectionDAG &DAG) const {
   SDValue Cmp;
   ISD::CondCode BrCC = CC;
 
-  if (LHS.getValueType() == MVT::f32) {
-    // Floating-point comparison: CMPF.S + TRFSR → PSW.Z
+  EVT LVT = LHS.getValueType();
+  if (LVT == MVT::f32 || LVT == MVT::f64) {
+    // Floating-point comparison: CMPF.S/D + TRFSR → PSW.Z
     FPCondResult FPC = getFPCondCode(CC);
     if (FPC.NeedSwap)
       std::swap(LHS, RHS);
@@ -576,8 +597,9 @@ SDValue V850TargetLowering::LowerSELECT_CC(SDValue Op,
   SDValue Cmp;
   ISD::CondCode SelCC = CC;
 
-  if (LHS.getValueType() == MVT::f32) {
-    // Floating-point comparison: CMPF.S + TRFSR → PSW.Z
+  EVT LVTS = LHS.getValueType();
+  if (LVTS == MVT::f32 || LVTS == MVT::f64) {
+    // Floating-point comparison: CMPF.S/D + TRFSR → PSW.Z
     FPCondResult FPC = getFPCondCode(CC);
     if (FPC.NeedSwap)
       std::swap(LHS, RHS);
@@ -909,7 +931,14 @@ SDValue V850TargetLowering::LowerFormalArguments(
     if (VA.isRegLoc()) {
       // Argument passed in register
       EVT RegVT = VA.getLocVT();
-      Register VReg = RegInfo.createVirtualRegister(&V850::GPRRegClass);
+      const TargetRegisterClass *RC;
+      if (RegVT == MVT::f64)
+        RC = &V850::DPRRegClass;
+      else if (RegVT == MVT::f32)
+        RC = &V850::FPRRegClass;
+      else
+        RC = &V850::GPRRegClass;
+      Register VReg = RegInfo.createVirtualRegister(RC);
       RegInfo.addLiveIn(VA.getLocReg(), VReg);
       ArgValue = DAG.getCopyFromReg(Chain, dl, VReg, RegVT);
 

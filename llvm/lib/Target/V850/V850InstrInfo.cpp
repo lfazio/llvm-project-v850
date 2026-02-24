@@ -44,6 +44,22 @@ void V850InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
     return;
   }
 
+  // DPR (f64) register pair copy: emit two 32-bit MOV instructions for
+  // the even (sub_lo) and odd (sub_hi) sub-registers.
+  if (V850::DPRRegClass.contains(DestReg, SrcReg)) {
+    const TargetRegisterInfo &TRI = getRegisterInfo();
+    Register SrcLo = TRI.getSubReg(SrcReg, llvm::sub_lo);
+    Register SrcHi = TRI.getSubReg(SrcReg, llvm::sub_hi);
+    Register DestLo = TRI.getSubReg(DestReg, llvm::sub_lo);
+    Register DestHi = TRI.getSubReg(DestReg, llvm::sub_hi);
+    // Copy low (even) sub-register first, then high (odd) sub-register.
+    BuildMI(MBB, I, DL, get(V850::MOV), DestLo)
+        .addReg(SrcLo, getKillRegState(KillSrc));
+    BuildMI(MBB, I, DL, get(V850::MOV), DestHi)
+        .addReg(SrcHi, getKillRegState(KillSrc));
+    return;
+  }
+
   llvm_unreachable("Impossible reg-to-reg copy");
 }
 
@@ -63,12 +79,31 @@ void V850InstrInfo::storeRegToStackSlot(
       MachineMemOperand::MOStore, MFI.getObjectSize(FrameIdx),
       MFI.getObjectAlign(FrameIdx));
 
-  if (RC == &V850::GPRRegClass) {
+  if (RC == &V850::GPRRegClass || RC == &V850::GPRnoR0RegClass ||
+      RC == &V850::FPRRegClass) {
     BuildMI(MBB, MI, DL, get(V850::STW))
         .addReg(SrcReg, getKillRegState(isKill))
         .addFrameIndex(FrameIdx)
         .addImm(0)
         .addMemOperand(MMO);
+  } else if (RC == &V850::DPRRegClass) {
+    // Spill f64 DPR pair: store low (even) word then high (odd) word.
+    const TargetRegisterInfo *TRI = MF.getSubtarget().getRegisterInfo();
+    Register SrcLo = TRI->getSubReg(SrcReg, llvm::sub_lo);
+    Register SrcHi = TRI->getSubReg(SrcReg, llvm::sub_hi);
+    MachineMemOperand *MMOHi = MF.getMachineMemOperand(
+        MachinePointerInfo::getFixedStack(MF, FrameIdx, 4),
+        MachineMemOperand::MOStore, 4, MFI.getObjectAlign(FrameIdx));
+    BuildMI(MBB, MI, DL, get(V850::STW))
+        .addReg(SrcLo, getKillRegState(isKill))
+        .addFrameIndex(FrameIdx)
+        .addImm(0)
+        .addMemOperand(MMO);
+    BuildMI(MBB, MI, DL, get(V850::STW))
+        .addReg(SrcHi, getKillRegState(isKill))
+        .addFrameIndex(FrameIdx)
+        .addImm(4)
+        .addMemOperand(MMOHi);
   } else {
     llvm_unreachable("Cannot store this register to stack slot!");
   }
@@ -89,12 +124,31 @@ void V850InstrInfo::loadRegFromStackSlot(
       MachineMemOperand::MOLoad, MFI.getObjectSize(FrameIdx),
       MFI.getObjectAlign(FrameIdx));
 
-  if (RC == &V850::GPRRegClass) {
+  if (RC == &V850::GPRRegClass || RC == &V850::GPRnoR0RegClass ||
+      RC == &V850::FPRRegClass) {
     BuildMI(MBB, MI, DL, get(V850::LDW))
         .addReg(DestReg, getDefRegState(true))
         .addFrameIndex(FrameIdx)
         .addImm(0)
         .addMemOperand(MMO);
+  } else if (RC == &V850::DPRRegClass) {
+    // Reload f64 DPR pair: load low (even) word then high (odd) word.
+    const TargetRegisterInfo *TRI = MF.getSubtarget().getRegisterInfo();
+    Register DestLo = TRI->getSubReg(DestReg, llvm::sub_lo);
+    Register DestHi = TRI->getSubReg(DestReg, llvm::sub_hi);
+    MachineMemOperand *MMOHi = MF.getMachineMemOperand(
+        MachinePointerInfo::getFixedStack(MF, FrameIdx, 4),
+        MachineMemOperand::MOLoad, 4, MFI.getObjectAlign(FrameIdx));
+    BuildMI(MBB, MI, DL, get(V850::LDW))
+        .addReg(DestLo, getDefRegState(true))
+        .addFrameIndex(FrameIdx)
+        .addImm(0)
+        .addMemOperand(MMO);
+    BuildMI(MBB, MI, DL, get(V850::LDW))
+        .addReg(DestHi, getDefRegState(true))
+        .addFrameIndex(FrameIdx)
+        .addImm(4)
+        .addMemOperand(MMOHi);
   } else {
     llvm_unreachable("Cannot load this register from stack slot!");
   }

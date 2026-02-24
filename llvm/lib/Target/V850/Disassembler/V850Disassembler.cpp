@@ -98,6 +98,26 @@ static DecodeStatus DecodeFPRRegisterClass(MCInst &Inst, uint32_t RegNo,
   return MCDisassembler::Success;
 }
 
+// DPR uses even/odd GPR pairs: D0=(R0,R1), D2=(R2,SP), ..., D30=(EP,LP)
+// RegNo is the even GPR number (0, 2, 4, ..., 30).
+static const MCPhysReg DPRDecoderTable[] = {
+    V850::D0,  V850::D2,  V850::D4,  V850::D6,  V850::D8,  V850::D10,
+    V850::D12, V850::D14, V850::D16, V850::D18, V850::D20, V850::D22,
+    V850::D24, V850::D26, V850::D28, V850::D30,
+};
+
+static DecodeStatus DecodeDPRRegisterClass(MCInst &Inst, uint32_t RegNo,
+                                           uint64_t Address,
+                                           const MCDisassembler *Decoder) {
+  // Only even register numbers are valid for double-precision pairs.
+  if (RegNo >= 32 || (RegNo & 1) != 0)
+    return MCDisassembler::Fail;
+
+  MCRegister Reg = DPRDecoderTable[RegNo >> 1];
+  Inst.addOperand(MCOperand::createReg(Reg));
+  return MCDisassembler::Success;
+}
+
 static DecodeStatus decodeSystemRegister(MCInst &Inst, uint32_t Enc,
                                          int64_t Address,
                                          const MCDisassembler *Decoder) {

@@ -2209,7 +2209,7 @@ let Predicates = [HasV850FPU] in {
   // ADDF.D reg1, reg2, reg3 - Double-precision floating-point add
   // reg3 = reg2 + reg1 (uses register pairs)
   // Encoding: rrrr0111111RRRR0 wwww01000111000 0
-  def ADDFD : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2, GPR:$reg1),
+  def ADDFD : V850Inst32<(outs DPR:$reg3), (ins DPR:$reg2, DPR:$reg1),
                          "addf.d\t$reg1, $reg2, $reg3", []> {
     bits<5> reg1;
     bits<5> reg2;
@@ -2231,7 +2231,7 @@ let Predicates = [HasV850FPU] in {
 
   // SUBF.D reg1, reg2, reg3 - Double-precision floating-point subtract
   // reg3 = reg2 - reg1
-  def SUBFD : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2, GPR:$reg1),
+  def SUBFD : V850Inst32<(outs DPR:$reg3), (ins DPR:$reg2, DPR:$reg1),
                          "subf.d\t$reg1, $reg2, $reg3", []> {
     bits<5> reg1;
     bits<5> reg2;
@@ -2253,7 +2253,7 @@ let Predicates = [HasV850FPU] in {
 
   // MULF.D reg1, reg2, reg3 - Double-precision floating-point multiply
   // reg3 = reg2 * reg1
-  def MULFD : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2, GPR:$reg1),
+  def MULFD : V850Inst32<(outs DPR:$reg3), (ins DPR:$reg2, DPR:$reg1),
                          "mulf.d\t$reg1, $reg2, $reg3", []> {
     bits<5> reg1;
     bits<5> reg2;
@@ -2275,7 +2275,7 @@ let Predicates = [HasV850FPU] in {
 
   // DIVF.D reg1, reg2, reg3 - Double-precision floating-point divide
   // reg3 = reg2 / reg1
-  def DIVFD : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2, GPR:$reg1),
+  def DIVFD : V850Inst32<(outs DPR:$reg3), (ins DPR:$reg2, DPR:$reg1),
                          "divf.d\t$reg1, $reg2, $reg3", []> {
     bits<5> reg1;
     bits<5> reg2;
@@ -2297,7 +2297,7 @@ let Predicates = [HasV850FPU] in {
 
   // MAXF.D reg1, reg2, reg3 - Double-precision floating-point maximum
   // reg3 = max(reg2, reg1)
-  def MAXFD : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2, GPR:$reg1),
+  def MAXFD : V850Inst32<(outs DPR:$reg3), (ins DPR:$reg2, DPR:$reg1),
                          "maxf.d\t$reg1, $reg2, $reg3", []> {
     bits<5> reg1;
     bits<5> reg2;
@@ -2319,7 +2319,7 @@ let Predicates = [HasV850FPU] in {
 
   // MINF.D reg1, reg2, reg3 - Double-precision floating-point minimum
   // reg3 = min(reg2, reg1)
-  def MINFD : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2, GPR:$reg1),
+  def MINFD : V850Inst32<(outs DPR:$reg3), (ins DPR:$reg2, DPR:$reg1),
                          "minf.d\t$reg1, $reg2, $reg3", []> {
     bits<5> reg1;
     bits<5> reg2;
@@ -2345,7 +2345,7 @@ let Predicates = [HasV850FPU] in {
 
   // ABSF.D reg2, reg3 - Double-precision floating-point absolute value
   // reg3 = |reg2|
-  def ABSFD : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2),
+  def ABSFD : V850Inst32<(outs DPR:$reg3), (ins DPR:$reg2),
                          "absf.d\t$reg2, $reg3", []> {
     bits<5> reg2;
     bits<5> reg3;
@@ -2365,7 +2365,7 @@ let Predicates = [HasV850FPU] in {
 
   // NEGF.D reg2, reg3 - Double-precision floating-point negate
   // reg3 = -reg2
-  def NEGFD : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2),
+  def NEGFD : V850Inst32<(outs DPR:$reg3), (ins DPR:$reg2),
                          "negf.d\t$reg2, $reg3", []> {
     bits<5> reg2;
     bits<5> reg3;
@@ -2385,7 +2385,7 @@ let Predicates = [HasV850FPU] in {
 
   // SQRTF.D reg2, reg3 - Double-precision floating-point square root
   // reg3 = sqrt(reg2)
-  def SQRTFD : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2),
+  def SQRTFD : V850Inst32<(outs DPR:$reg3), (ins DPR:$reg2),
                           "sqrtf.d\t$reg2, $reg3", []> {
     bits<5> reg2;
     bits<5> reg3;
@@ -2406,7 +2406,7 @@ let Predicates = [HasV850FPU] in {
   // RECIPF.D reg2, reg3 - Double-precision floating-point reciprocal
   // reg3 = 1 / reg2
   let Defs = [FPSR] in def RECIPFD
-      : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2),
+      : V850Inst32<(outs DPR:$reg3), (ins DPR:$reg2),
                    "recipf.d\t$reg2, $reg3", []> {
     bits<5> reg2;
     bits<5> reg3;
@@ -2427,7 +2427,7 @@ let Predicates = [HasV850FPU] in {
   // RSQRTF.D reg2, reg3 - Double-precision reciprocal square root
   // reg3 = 1 / sqrt(reg2)
   let Defs = [FPSR] in def RSQRTFD
-      : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2),
+      : V850Inst32<(outs DPR:$reg3), (ins DPR:$reg2),
                    "rsqrtf.d\t$reg2, $reg3", []> {
     bits<5> reg2;
     bits<5> reg3;
@@ -2527,7 +2527,7 @@ let Predicates = [HasV850FPU] in {
   // Note: reg1 and reg2 must be even registers (specify lower register of pair)
   let Defs = [FPCC] in def CMPFD
       : FormatFPU_CMP<1, (outs),
-                      (ins uimm4:$fcond, GPR:$reg1, GPR:$reg2, uimm3:$fcbit),
+                      (ins uimm4:$fcond, DPR:$reg1, DPR:$reg2, uimm3:$fcbit),
                       "cmpf.d\t$fcond, $reg1, $reg2, $fcbit", []>;
 
   //===----------------------------------------------------------------------===//
@@ -2544,12 +2544,12 @@ let Predicates = [HasV850FPU] in {
   //--- Floating-point to floating-point conversions ---
 
   // CVTF.DS reg2, reg3 - Double to Single (subop2=3, cat=0, type=2, subop=9)
-  def CVTFDS : FormatFPU_CVT<0b00011, 0b000, 0b10, 0b1001, (outs GPR:$reg3),
-                             (ins GPR:$reg2), "cvtf.ds\t$reg2, $reg3", []>;
+  def CVTFDS : FormatFPU_CVT<0b00011, 0b000, 0b10, 0b1001, (outs FPR:$reg3),
+                             (ins DPR:$reg2), "cvtf.ds\t$reg2, $reg3", []>;
 
   // CVTF.SD reg2, reg3 - Single to Double (subop2=2, cat=0, type=2, subop=9)
-  def CVTFSD : FormatFPU_CVT<0b00010, 0b000, 0b10, 0b1001, (outs GPR:$reg3),
-                             (ins GPR:$reg2), "cvtf.sd\t$reg2, $reg3", []>;
+  def CVTFSD : FormatFPU_CVT<0b00010, 0b000, 0b10, 0b1001, (outs DPR:$reg3),
+                             (ins FPR:$reg2), "cvtf.sd\t$reg2, $reg3", []>;
 
   //--- Signed integer to floating-point conversions ---
 
@@ -2562,7 +2562,7 @@ let Predicates = [HasV850FPU] in {
 
   // CVTF.WD reg2, reg3 - Word (int32) to Double (subop2=0, cat=0, type=2,
   // subop=9)
-  def CVTFWD : FormatFPU_CVT<0b00000, 0b000, 0b10, 0b1001, (outs GPR:$reg3),
+  def CVTFWD : FormatFPU_CVT<0b00000, 0b000, 0b10, 0b1001, (outs DPR:$reg3),
                              (ins GPR:$reg2), "cvtf.wd\t$reg2, $reg3", []>;
 
   // CVTF.LS reg2, reg3 - Long (int64) to Single (subop2=1, cat=0, type=2,
@@ -2583,7 +2583,7 @@ let Predicates = [HasV850FPU] in {
 
   // CVTF.DW reg2, reg3 - Double to Word (subop2=4, cat=0, type=2, subop=8)
   def CVTFDW : FormatFPU_CVT<0b00100, 0b000, 0b10, 0b1000, (outs GPR:$reg3),
-                             (ins GPR:$reg2), "cvtf.dw\t$reg2, $reg3", []>;
+                             (ins DPR:$reg2), "cvtf.dw\t$reg2, $reg3", []>;
 
   // CVTF.SL reg2, reg3 - Single to Long (subop2=4, cat=0, type=2, subop=2)
   def CVTFSL : FormatFPU_CVT<0b00100, 0b000, 0b10, 0b0010, (outs GPR:$reg3),
@@ -2591,7 +2591,7 @@ let Predicates = [HasV850FPU] in {
 
   // CVTF.DL reg2, reg3 - Double to Long (subop2=4, cat=0, type=2, subop=10)
   def CVTFDL : FormatFPU_CVT<0b00100, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
-                             (ins GPR:$reg2), "cvtf.dl\t$reg2, $reg3", []>;
+                             (ins DPR:$reg2), "cvtf.dl	$reg2, $reg3", []>;
 
   //--- Unsigned integer to floating-point conversions ---
 
@@ -2603,7 +2603,7 @@ let Predicates = [HasV850FPU] in {
 
   // CVTF.UWD reg2, reg3 - Unsigned Word to Double (subop2=16, cat=0, type=2,
   // subop=9)
-  def CVTFUWD : FormatFPU_CVT<0b10000, 0b000, 0b10, 0b1001, (outs GPR:$reg3),
+  def CVTFUWD : FormatFPU_CVT<0b10000, 0b000, 0b10, 0b1001, (outs DPR:$reg3),
                               (ins GPR:$reg2), "cvtf.uwd\t$reg2, $reg3", []>;
 
   // CVTF.ULS reg2, reg3 - Unsigned Long to Single (subop2=17, cat=0, type=2,
@@ -2627,7 +2627,7 @@ let Predicates = [HasV850FPU] in {
   // CVTF.DUW reg2, reg3 - Double to Unsigned Word (subop2=20, cat=0, type=2,
   // subop=8)
   def CVTFDUW : FormatFPU_CVT<0b10100, 0b000, 0b10, 0b1000, (outs GPR:$reg3),
-                              (ins GPR:$reg2), "cvtf.duw\t$reg2, $reg3", []>;
+                              (ins DPR:$reg2), "cvtf.duw\t$reg2, $reg3", []>;
 
   // CVTF.SUL reg2, reg3 - Single to Unsigned Long (subop2=20, cat=0, type=2,
   // subop=2)
@@ -2637,7 +2637,7 @@ let Predicates = [HasV850FPU] in {
   // CVTF.DUL reg2, reg3 - Double to Unsigned Long (subop2=20, cat=0, type=2,
   // subop=10)
   def CVTFDUL : FormatFPU_CVT<0b10100, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
-                              (ins GPR:$reg2), "cvtf.dul\t$reg2, $reg3", []>;
+                              (ins DPR:$reg2), "cvtf.dul	$reg2, $reg3", []>;
 
   //===----------------------------------------------------------------------===//
   // FPU Rounding Instructions - V850E2M
@@ -2656,7 +2656,7 @@ let Predicates = [HasV850FPU] in {
   // TRNCF.DW reg2, reg3 - Truncate Double to Word (subop2=1, cat=0, type=2,
   // subop=8)
   def TRNCFDW : FormatFPU_CVT<0b00001, 0b000, 0b10, 0b1000, (outs GPR:$reg3),
-                              (ins GPR:$reg2), "trncf.dw\t$reg2, $reg3", []>;
+                              (ins DPR:$reg2), "trncf.dw\t$reg2, $reg3", []>;
 
   // TRNCF.SL reg2, reg3 - Truncate Single to Long (subop2=1, cat=0, type=2,
   // subop=2)
@@ -2666,7 +2666,7 @@ let Predicates = [HasV850FPU] in {
   // TRNCF.DL reg2, reg3 - Truncate Double to Long (subop2=1, cat=0, type=2,
   // subop=10)
   def TRNCFDL : FormatFPU_CVT<0b00001, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
-                              (ins GPR:$reg2), "trncf.dl\t$reg2, $reg3", []>;
+                              (ins DPR:$reg2), "trncf.dl	$reg2, $reg3", []>;
 
   // --- TRNCF (Truncate) - Unsigned ---
   // TRNCF.SUW reg2, reg3 - Truncate Single to Unsigned Word (subop2=17, cat=0,
@@ -2678,7 +2678,7 @@ let Predicates = [HasV850FPU] in {
   // TRNCF.DUW reg2, reg3 - Truncate Double to Unsigned Word (subop2=17, cat=0,
   // type=2, subop=8)
   def TRNCFDUW : FormatFPU_CVT<0b10001, 0b000, 0b10, 0b1000, (outs GPR:$reg3),
-                               (ins GPR:$reg2), "trncf.duw\t$reg2, $reg3", []>;
+                               (ins DPR:$reg2), "trncf.duw\t$reg2, $reg3", []>;
 
   // TRNCF.SUL reg2, reg3 - Truncate Single to Unsigned Long (subop2=17, cat=0,
   // type=2, subop=2)
@@ -2688,7 +2688,7 @@ let Predicates = [HasV850FPU] in {
   // TRNCF.DUL reg2, reg3 - Truncate Double to Unsigned Long (subop2=17, cat=0,
   // type=2, subop=10)
   def TRNCFDUL : FormatFPU_CVT<0b10001, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
-                               (ins GPR:$reg2), "trncf.dul\t$reg2, $reg3", []>;
+                               (ins DPR:$reg2), "trncf.dul	$reg2, $reg3", []>;
 
   // --- CEILF (Ceiling) - Signed ---
   // CEILF.SW reg2, reg3 - Ceiling Single to Word (subop2=2, cat=0, type=2,
@@ -2699,7 +2699,7 @@ let Predicates = [HasV850FPU] in {
   // CEILF.DW reg2, reg3 - Ceiling Double to Word (subop2=2, cat=0, type=2,
   // subop=8)
   def CEILFDW : FormatFPU_CVT<0b00010, 0b000, 0b10, 0b1000, (outs GPR:$reg3),
-                              (ins GPR:$reg2), "ceilf.dw\t$reg2, $reg3", []>;
+                              (ins DPR:$reg2), "ceilf.dw	$reg2, $reg3", []>;
 
   // CEILF.SL reg2, reg3 - Ceiling Single to Long (subop2=2, cat=0, type=2,
   // subop=2)
@@ -2709,7 +2709,7 @@ let Predicates = [HasV850FPU] in {
   // CEILF.DL reg2, reg3 - Ceiling Double to Long (subop2=2, cat=0, type=2,
   // subop=10)
   def CEILFDL : FormatFPU_CVT<0b00010, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
-                              (ins GPR:$reg2), "ceilf.dl\t$reg2, $reg3", []>;
+                              (ins DPR:$reg2), "ceilf.dl	$reg2, $reg3", []>;
 
   // --- CEILF (Ceiling) - Unsigned ---
   // CEILF.SUW reg2, reg3 - Ceiling Single to Unsigned Word (subop2=18, cat=0,
@@ -2720,7 +2720,7 @@ let Predicates = [HasV850FPU] in {
   // CEILF.DUW reg2, reg3 - Ceiling Double to Unsigned Word (subop2=18, cat=0,
   // type=2, subop=8)
   def CEILFDUW : FormatFPU_CVT<0b10010, 0b000, 0b10, 0b1000, (outs GPR:$reg3),
-                               (ins GPR:$reg2), "ceilf.duw\t$reg2, $reg3", []>;
+                               (ins DPR:$reg2), "ceilf.duw	$reg2, $reg3", []>;
 
   // CEILF.SUL reg2, reg3 - Ceiling Single to Unsigned Long (subop2=18, cat=0,
   // type=2, subop=2)
@@ -2730,7 +2730,7 @@ let Predicates = [HasV850FPU] in {
   // CEILF.DUL reg2, reg3 - Ceiling Double to Unsigned Long (subop2=18, cat=0,
   // type=2, subop=10)
   def CELIFDUL : FormatFPU_CVT<0b10010, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
-                               (ins GPR:$reg2), "ceilf.dul\t$reg2, $reg3", []>;
+                               (ins DPR:$reg2), "ceilf.dul	$reg2, $reg3", []>;
 
   // --- FLOORF (Floor) - Signed ---
   // FLOORF.SW reg2, reg3 - Floor Single to Word (subop2=3, cat=0, type=2,
@@ -2741,7 +2741,7 @@ let Predicates = [HasV850FPU] in {
   // FLOORF.DW reg2, reg3 - Floor Double to Word (subop2=3, cat=0, type=2,
   // subop=8)
   def FLOORFDW : FormatFPU_CVT<0b00011, 0b000, 0b10, 0b1000, (outs GPR:$reg3),
-                               (ins GPR:$reg2), "floorf.dw\t$reg2, $reg3", []>;
+                               (ins DPR:$reg2), "floorf.dw	$reg2, $reg3", []>;
 
   // FLOORF.SL reg2, reg3 - Floor Single to Long (subop2=3, cat=0, type=2,
   // subop=2)
@@ -2751,7 +2751,7 @@ let Predicates = [HasV850FPU] in {
   // FLOORF.DL reg2, reg3 - Floor Double to Long (subop2=3, cat=0, type=2,
   // subop=10)
   def FLOORFDL : FormatFPU_CVT<0b00011, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
-                               (ins GPR:$reg2), "floorf.dl\t$reg2, $reg3", []>;
+                               (ins DPR:$reg2), "floorf.dl	$reg2, $reg3", []>;
 
   // --- FLOORF (Floor) - Unsigned ---
   // FLOORF.SUW reg2, reg3 - Floor Single to Unsigned Word (subop2=19, cat=0,
@@ -2764,7 +2764,7 @@ let Predicates = [HasV850FPU] in {
   // type=2, subop=8)
   def FLOORFDUW
       : FormatFPU_CVT<0b10011, 0b000, 0b10, 0b1000, (outs GPR:$reg3),
-                      (ins GPR:$reg2), "floorf.duw\t$reg2, $reg3", []>;
+                      (ins DPR:$reg2), "floorf.duw	$reg2, $reg3", []>;
 
   // FLOORF.SUL reg2, reg3 - Floor Single to Unsigned Long (subop2=19, cat=0,
   // type=2, subop=2)
@@ -2776,7 +2776,7 @@ let Predicates = [HasV850FPU] in {
   // type=2, subop=10)
   def FLOORFDUL
       : FormatFPU_CVT<0b10011, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
-                      (ins GPR:$reg2), "floorf.dul\t$reg2, $reg3", []>;
+                      (ins DPR:$reg2), "floorf.dul	$reg2, $reg3", []>;
 
   //===----------------------------------------------------------------------===//
   // FPU System Register Access via BSEL Banking (V850E2M+)
@@ -2864,6 +2864,36 @@ let Predicates = [HasV850FPU] in {
       hasSideEffects = 1 in def WRITE_FPEC
       : V850Pseudo<(outs), (ins GPR:$value),
                    "# WRITE_FPEC $value", [(int_v850_write_fpec GPR:$value)]>;
+
+  //===--------------------------------------------------------------------===//
+  // Double-precision arithmetic ISel patterns
+  //===--------------------------------------------------------------------===//
+
+  def : Pat<(fadd (f64 DPR:$r2), (f64 DPR:$r1)), (ADDFD DPR:$r2, DPR:$r1)>;
+  def : Pat<(fsub (f64 DPR:$r2), (f64 DPR:$r1)), (SUBFD DPR:$r2, DPR:$r1)>;
+  def : Pat<(fmul (f64 DPR:$r2), (f64 DPR:$r1)), (MULFD DPR:$r2, DPR:$r1)>;
+  def : Pat<(fdiv (f64 DPR:$r2), (f64 DPR:$r1)), (DIVFD DPR:$r2, DPR:$r1)>;
+  def : Pat<(fabs (f64 DPR:$r2)), (ABSFD DPR:$r2)>;
+  def : Pat<(fneg (f64 DPR:$r2)), (NEGFD DPR:$r2)>;
+  def : Pat<(fsqrt (f64 DPR:$r2)), (SQRTFD DPR:$r2)>;
+  def : Pat<(fmaxnum (f64 DPR:$r2), (f64 DPR:$r1)),
+            (MAXFD DPR:$r2, DPR:$r1)>;
+  def : Pat<(fminnum (f64 DPR:$r2), (f64 DPR:$r1)),
+            (MINFD DPR:$r2, DPR:$r1)>;
+
+  //===--------------------------------------------------------------------===//
+  // Double-precision conversion ISel patterns
+  //===--------------------------------------------------------------------===//
+
+  // f64 <-> f32 conversions
+  def : Pat<(f32 (fpround (f64 DPR:$r2))), (CVTFDS DPR:$r2)>;
+  def : Pat<(f64 (fpextend (f32 FPR:$r2))), (CVTFSD FPR:$r2)>;
+
+  // f64 <-> i32 conversions (truncate toward zero for fp_to_sint/uint)
+  def : Pat<(i32 (fp_to_sint (f64 DPR:$r2))), (TRNCFDW DPR:$r2)>;
+  def : Pat<(i32 (fp_to_uint (f64 DPR:$r2))), (TRNCFDUW DPR:$r2)>;
+  def : Pat<(f64 (sint_to_fp (i32 GPR:$r2))), (CVTFWD GPR:$r2)>;
+  def : Pat<(f64 (uint_to_fp (i32 GPR:$r2))), (CVTFUWD GPR:$r2)>;
 
 } // Predicates = [HasV850FPU]
 

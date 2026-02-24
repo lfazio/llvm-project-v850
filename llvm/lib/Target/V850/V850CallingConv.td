@@ -42,8 +42,8 @@ def CC_V850 : CallingConv<[
   // f32 values are passed in r6-r9 (same as i32, using GPRs)
   CCIfType<[f32], CCAssignToReg<[R6, R7, R8, R9]>>,
 
-  // f64 values are passed in register pairs r6:r7, r8:r9 (even:odd pairs)
-  CCIfType<[f64], CCAssignToRegWithShadow<[R6, R8], [R7, R9]>>,
+  // f64 values are passed in DPR register pairs D6=(r6:r7), D8=(r8:r9)
+  CCIfType<[f64], CCAssignToReg<[D6, D8]>>,
 
   // i64 values on stack are 8-byte aligned
   CCIfType<[i64], CCAssignToStack<8, 8>>,
@@ -76,9 +76,10 @@ def RetCC_V850 : CallingConv<[
   // Single f32 uses r10, f64 (split into two f32/i32) uses r10:r11
   CCIfType<[f32], CCAssignToReg<[R10, R11]>>,
 
-  // Keep these for completeness in case i64/f64 are not split
+  // i64 uses r10:r11 (split into two i32 before this point on 32-bit targets)
   CCIfType<[i64], CCAssignToReg<[R10, R11]>>,
-  CCIfType<[f64], CCAssignToReg<[R10, R11]>>
+  // f64 is returned in DPR register D10 = (r10:r11)
+  CCIfType<[f64], CCAssignToReg<[D10]>>
 ]>;
 
 //===----------------------------------------------------------------------===//

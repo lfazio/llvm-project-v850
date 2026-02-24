@@ -171,8 +171,9 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
     SDValue RHS = Node->getOperand(1);
     ISD::CondCode CC = cast<CondCodeSDNode>(Node->getOperand(2))->get();
 
-    if (LHS.getValueType() == MVT::f32) {
-      // Floating-point comparison: CMPF.S + TRFSR + SETF
+    if (LHS.getValueType() == MVT::f32 || LHS.getValueType() == MVT::f64) {
+      // Floating-point comparison: CMPF.S/D + TRFSR + SETF
+      bool IsDouble = LHS.getValueType() == MVT::f64;
       // Map ISD condition code to V850 CMPF fcond
       struct {
         unsigned FCond;
@@ -247,13 +248,14 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
       if (FPC.NeedSwap)
         std::swap(LHS, RHS);
 
-      // Emit CMPF.S fcond, reg1(=RHS), reg2(=LHS), fcbit(=0)
+      // Emit CMPF.S/D fcond, reg1(=RHS), reg2(=LHS), fcbit(=0)
       // Semantics: FPCC[0] = (reg2 fcond reg1) = (LHS fcond RHS)
       SDValue FCondVal = CurDAG->getTargetConstant(FPC.FCond, DL, MVT::i32);
       SDValue FCBit = CurDAG->getTargetConstant(0, DL, MVT::i32);
       SDValue CmpFOps[] = {FCondVal, RHS, LHS, FCBit};
+      unsigned CmpFOpc = IsDouble ? V850::CMPFD : V850::CMPFS;
       SDNode *CmpFNode =
-          CurDAG->getMachineNode(V850::CMPFS, DL, MVT::Glue, CmpFOps);
+          CurDAG->getMachineNode(CmpFOpc, DL, MVT::Glue, CmpFOps);
       SDValue CmpGlue = SDValue(CmpFNode, 0);
 
       // Emit TRFSR 0 - transfer FPCC[0] to PSW.Z
@@ -417,20 +419,22 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
 
   case V850ISD::FP_CMP: {
     // V850ISD::FP_CMP fcond, lhs, rhs → Glue
-    // Emit CMPF.S + TRFSR sequence to set PSW.Z from FP comparison
+    // Emit CMPF.S/D + TRFSR sequence to set PSW.Z from FP comparison
     SDValue FCondOp = Node->getOperand(0);
     SDValue LHS = Node->getOperand(1);
     SDValue RHS = Node->getOperand(2);
     unsigned FCond = cast<ConstantSDNode>(FCondOp)->getZExtValue();
+    bool IsDouble = LHS.getValueType() == MVT::f64;
 
     SDValue FCondVal = CurDAG->getTargetConstant(FCond, DL, MVT::i32);
     SDValue FCBit = CurDAG->getTargetConstant(0, DL, MVT::i32);
 
-    // Emit CMPF.S fcond, reg1(=RHS), reg2(=LHS), fcbit(=0)
+    // Emit CMPF.S/D fcond, reg1(=RHS), reg2(=LHS), fcbit(=0)
     // Semantics: FPCC[0] = (reg2 fcond reg1) = (LHS fcond RHS)
     SDValue CmpFOps[] = {FCondVal, RHS, LHS, FCBit};
+    unsigned CmpFOpc = IsDouble ? V850::CMPFD : V850::CMPFS;
     SDNode *CmpFNode =
-        CurDAG->getMachineNode(V850::CMPFS, DL, MVT::Glue, CmpFOps);
+        CurDAG->getMachineNode(CmpFOpc, DL, MVT::Glue, CmpFOps);
     SDValue CmpGlue = SDValue(CmpFNode, 0);
 
     // Emit TRFSR 0 - transfer FPCC[0] to PSW.Z
