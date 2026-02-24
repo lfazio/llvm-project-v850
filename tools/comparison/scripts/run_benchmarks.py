@@ -22,7 +22,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-
 SCRIPT_DIR = Path(__file__).parent
 BENCHMARK_DIR = SCRIPT_DIR.parent / "benchmarks"
 RESULTS_DIR = SCRIPT_DIR.parent / "results"
@@ -31,6 +30,7 @@ RESULTS_DIR = SCRIPT_DIR.parent / "results"
 @dataclass
 class BenchmarkResult:
     """Results from compiling a single benchmark."""
+
     name: str
     source_file: str
     compiler: str
@@ -46,15 +46,16 @@ class BenchmarkResult:
 def find_benchmarks(benchmark_dir: Path) -> List[Path]:
     """Find all benchmark C files."""
     benchmarks = []
-    for category in ['micro', 'kernels', 'apps']:
+    for category in ["micro", "kernels", "apps"]:
         cat_dir = benchmark_dir / category
         if cat_dir.exists():
-            benchmarks.extend(sorted(cat_dir.glob('*.c')))
+            benchmarks.extend(sorted(cat_dir.glob("*.c")))
     return benchmarks
 
 
-def run_llvm_compile(source: Path, opt_level: str, cpu: str,
-                     output_dir: Path) -> BenchmarkResult:
+def run_llvm_compile(
+    source: Path, opt_level: str, cpu: str, output_dir: Path
+) -> BenchmarkResult:
     """Compile a benchmark with LLVM."""
     name = source.stem
     asm_file = output_dir / f"{name}_llvm.s"
@@ -68,8 +69,9 @@ def run_llvm_compile(source: Path, opt_level: str, cpu: str,
         f"-O{opt_level}",
         f"-mcpu={cpu}",
         "-S",
-        "-o", str(asm_file),
-        str(source)
+        "-o",
+        str(asm_file),
+        str(source),
     ]
 
     # Generate object
@@ -78,8 +80,9 @@ def run_llvm_compile(source: Path, opt_level: str, cpu: str,
         f"-O{opt_level}",
         f"-mcpu={cpu}",
         "-c",
-        "-o", str(obj_file),
-        str(source)
+        "-o",
+        str(obj_file),
+        str(source),
     ]
 
     try:
@@ -98,7 +101,7 @@ def run_llvm_compile(source: Path, opt_level: str, cpu: str,
             asm_file=str(asm_file),
             obj_file=str(obj_file),
             size_bytes=size,
-            error_message=""
+            error_message="",
         )
     except subprocess.CalledProcessError as e:
         return BenchmarkResult(
@@ -111,12 +114,13 @@ def run_llvm_compile(source: Path, opt_level: str, cpu: str,
             asm_file=None,
             obj_file=None,
             size_bytes=0,
-            error_message=e.stderr or str(e)
+            error_message=e.stderr or str(e),
         )
 
 
-def run_ccrh_compile(source: Path, opt_level: str, cpu: str,
-                     output_dir: Path) -> BenchmarkResult:
+def run_ccrh_compile(
+    source: Path, opt_level: str, cpu: str, output_dir: Path
+) -> BenchmarkResult:
     """Compile a benchmark with CCRH."""
     name = source.stem
     asm_file = output_dir / f"{name}_ccrh.s"
@@ -125,7 +129,7 @@ def run_ccrh_compile(source: Path, opt_level: str, cpu: str,
     compile_script = SCRIPT_DIR / "compile_ccrh.sh"
 
     # Check if CCRH is available
-    if not os.environ.get('CCRH_PATH'):
+    if not os.environ.get("CCRH_PATH"):
         return BenchmarkResult(
             name=name,
             source_file=str(source),
@@ -136,27 +140,49 @@ def run_ccrh_compile(source: Path, opt_level: str, cpu: str,
             asm_file=None,
             obj_file=None,
             size_bytes=0,
-            error_message="CCRH_PATH not set"
+            error_message="CCRH_PATH not set",
         )
 
     cmd_asm = [
-        "docker", "run", "--rm", "-e", f"CCRH_PATH={os.environ.get('CCRH_PATH')}", "-v", f"{SCRIPT_DIR.parent.parent.parent}:{SCRIPT_DIR.parent.parent.parent}", "-t", "dev:latest",
+        "docker",
+        "run",
+        "--rm",
+        "-u",
+        "1000:1000",
+        "-e",
+        f"CCRH_PATH={os.environ.get('CCRH_PATH')}",
+        "-v",
+        f"{SCRIPT_DIR.parent.parent.parent}:{SCRIPT_DIR.parent.parent.parent}",
+        "-t",
+        "dev:latest",
         str(compile_script),
         f"-O{opt_level}",
         f"-Xcpu={cpu}",
         "-S",
-        "-o", str(asm_file),
-        str(source)
+        "-o",
+        str(asm_file),
+        str(source),
     ]
 
     cmd_obj = [
-        "docker", "run", "--rm", "-e", f"CCRH_PATH={os.environ.get('CCRH_PATH')}", "-v", f"{SCRIPT_DIR.parent.parent.parent}:{SCRIPT_DIR.parent.parent.parent}", "-t", "dev:latest",
+        "docker",
+        "run",
+        "--rm",
+        "-u",
+        "1000:1000",
+        "-e",
+        f"CCRH_PATH={os.environ.get('CCRH_PATH')}",
+        "-v",
+        f"{SCRIPT_DIR.parent.parent.parent}:{SCRIPT_DIR.parent.parent.parent}",
+        "-t",
+        "dev:latest",
         str(compile_script),
         f"-O{opt_level}",
         f"-Xcpu={cpu}",
         "-c",
-        "-o", str(obj_file),
-        str(source)
+        "-o",
+        str(obj_file),
+        str(source),
     ]
 
     try:
@@ -175,7 +201,7 @@ def run_ccrh_compile(source: Path, opt_level: str, cpu: str,
             asm_file=str(asm_file),
             obj_file=str(obj_file),
             size_bytes=size,
-            error_message=""
+            error_message="",
         )
     except subprocess.CalledProcessError as e:
         return BenchmarkResult(
@@ -188,13 +214,13 @@ def run_ccrh_compile(source: Path, opt_level: str, cpu: str,
             asm_file=None,
             obj_file=None,
             size_bytes=0,
-            error_message=e.stderr or str(e)
+            error_message=e.stderr or str(e),
         )
 
 
-def compare_results(llvm_result: BenchmarkResult,
-                   ccrh_result: BenchmarkResult,
-                   output_dir: Path) -> Optional[Path]:
+def compare_results(
+    llvm_result: BenchmarkResult, ccrh_result: BenchmarkResult, output_dir: Path
+) -> Optional[Path]:
     """Compare LLVM and CCRH results for a benchmark."""
     if not llvm_result.success or not ccrh_result.success:
         return None
@@ -206,12 +232,23 @@ def compare_results(llvm_result: BenchmarkResult,
     report_file = output_dir / f"{llvm_result.name}_comparison.txt"
 
     cmd = [
-        "docker", "run", "--rm", "-e", f"CCRH_PATH={os.environ.get('CCRH_PATH')}", "-v", f"{SCRIPT_DIR.parent.parent.parent}:{SCRIPT_DIR.parent.parent.parent}", "-t", "dev:latest",
+        "docker",
+        "run",
+        "--rm",
+        "-u",
+        "1000:1000",
+        "-e",
+        f"CCRH_PATH={os.environ.get('CCRH_PATH')}",
+        "-v",
+        f"{SCRIPT_DIR.parent.parent.parent}:{SCRIPT_DIR.parent.parent.parent}",
+        "-t",
+        "dev:latest",
         sys.executable,
         str(compare_script),
         llvm_result.asm_file,
         ccrh_result.asm_file,
-        "-o", str(report_file)
+        "-o",
+        str(report_file),
     ]
 
     try:
@@ -251,7 +288,9 @@ def generate_summary(results: List[BenchmarkResult], output_file: Path):
     # Comparison table
     lines.append("Per-Benchmark Comparison")
     lines.append("-" * 60)
-    lines.append(f"{'Benchmark':<25} {'LLVM (bytes)':>12} {'CCRH (bytes)':>12} {'Diff':>10}")
+    lines.append(
+        f"{'Benchmark':<25} {'LLVM (bytes)':>12} {'CCRH (bytes)':>12} {'Diff':>10}"
+    )
     lines.append("-" * 60)
 
     llvm_dict = {r.name: r for r in llvm_results}
@@ -277,7 +316,9 @@ def generate_summary(results: List[BenchmarkResult], output_file: Path):
     if llvm_total_size and ccrh_total_size:
         total_diff = llvm_total_size - ccrh_total_size
         ratio = llvm_total_size / ccrh_total_size
-        lines.append(f"{'TOTAL':<25} {llvm_total_size:>12} {ccrh_total_size:>12} {total_diff:>+10}")
+        lines.append(
+            f"{'TOTAL':<25} {llvm_total_size:>12} {ccrh_total_size:>12} {total_diff:>+10}"
+        )
         lines.append(f"Size ratio (LLVM/CCRH): {ratio:.3f}")
     lines.append("")
 
@@ -288,7 +329,7 @@ def generate_summary(results: List[BenchmarkResult], output_file: Path):
         for r in failed:
             lines.append(f"  {r.name} ({r.compiler}): {r.error_message[:50]}...")
 
-    with open(output_file, 'w') as f:
+    with open(output_file, "w") as f:
         f.write("\n".join(lines))
 
     return "\n".join(lines)
@@ -296,16 +337,17 @@ def generate_summary(results: List[BenchmarkResult], output_file: Path):
 
 def main():
     parser = argparse.ArgumentParser(description="Run V850 benchmarks")
-    parser.add_argument("--llvm-only", action="store_true",
-                       help="Only compile with LLVM")
-    parser.add_argument("--ccrh-only", action="store_true",
-                       help="Only compile with CCRH")
-    parser.add_argument("--opt-level", "-O", default="2",
-                       help="Optimization level")
-    parser.add_argument("--cpu", default="rh850g3m",
-                       help="Target CPU")
-    parser.add_argument("--output-dir", "-o", type=Path, default=RESULTS_DIR,
-                       help="Output directory")
+    parser.add_argument(
+        "--llvm-only", action="store_true", help="Only compile with LLVM"
+    )
+    parser.add_argument(
+        "--ccrh-only", action="store_true", help="Only compile with CCRH"
+    )
+    parser.add_argument("--opt-level", "-O", default="2", help="Optimization level")
+    parser.add_argument("--cpu", default="rh850g3m", help="Target CPU")
+    parser.add_argument(
+        "--output-dir", "-o", type=Path, default=RESULTS_DIR, help="Output directory"
+    )
     args = parser.parse_args()
 
     # Create output directories
@@ -350,8 +392,9 @@ def main():
         for name in llvm_results:
             if name in ccrh_results:
                 print(f"  {name}...", end=" ", flush=True)
-                report = compare_results(llvm_results[name], ccrh_results[name],
-                                        reports_dir)
+                report = compare_results(
+                    llvm_results[name], ccrh_results[name], reports_dir
+                )
                 print("OK" if report else "SKIP")
 
     # Generate summary
@@ -364,18 +407,18 @@ def main():
     json_file = args.output_dir / "results.json"
     json_results = [
         {
-            'name': r.name,
-            'source_file': r.source_file,
-            'compiler': r.compiler,
-            'opt_level': r.opt_level,
-            'cpu': r.cpu,
-            'success': r.success,
-            'size_bytes': r.size_bytes,
-            'error_message': r.error_message
+            "name": r.name,
+            "source_file": r.source_file,
+            "compiler": r.compiler,
+            "opt_level": r.opt_level,
+            "cpu": r.cpu,
+            "success": r.success,
+            "size_bytes": r.size_bytes,
+            "error_message": r.error_message,
         }
         for r in results
     ]
-    with open(json_file, 'w') as f:
+    with open(json_file, "w") as f:
         json.dump(json_results, f, indent=2)
 
     print(f"\nResults saved to: {args.output_dir}")

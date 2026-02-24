@@ -19,10 +19,13 @@ set -e
 
 # Default settings
 OPT_LEVEL="2"
-CPU="v850e2m"
+CPU="g3m"
 OUTPUT_TYPE="obj"  # asm, obj
 OUTPUT_FILE=""
 EXTRA_FLAGS=""
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+LLVM_BUILD="${SCRIPT_DIR}/../../../build-v850"
+LLVM_OBJDUMP="${LLVM_OBJDUMP:-${LLVM_BUILD}/bin/llvm-objdump}"
 
 # Find CC-RH compiler
 find_ccrh() {
@@ -65,17 +68,15 @@ echo "Using CC-RH: $CCRH"
 # Map CPU names between LLVM and CCRH conventions
 map_cpu() {
     case $1 in
-        v850)     echo "-Xcpu=g3mh" ;;
-        v850e1)   echo "-Xcpu=g3mh" ;;
-        v850e2)   echo "-Xcpu=g3mh" ;;
-        v850e2m)  echo "-Xcpu=g3mh" ;;
-        g3m)      echo "-Xcpu=g3mh" ;;
+        v850)     echo "-Xcpu=g3m" ;;
+        v850e1)   echo "-Xcpu=g3m" ;;
+        v850e2)   echo "-Xcpu=g3m" ;;
+        v850e2m)  echo "-Xcpu=g3m" ;;
+        g3m)      echo "-Xcpu=g3m" ;;
         g3mh)     echo "-Xcpu=g3mh" ;;
-        rh850g3m) echo "-Xcpu=g3mh" ;;
-        rh850g3k) echo "-Xcpu=g3mh" ;;
-        rh850g3kh) echo "-Xcpu=g3mh" ;;
+        rh850g3m) echo "-Xcpu=g3m" ;;
         rh850g3mh) echo "-Xcpu=g3mh" ;;
-        rh850g4m) echo "-Xcpu=g4kh" ;;
+        rh850g4m) echo "-Xcpu=g4m" ;;
         rh850g4mh) echo "-Xcpu=g4mh" ;;
         *)        echo "-Xcpu=$1" ;;
     esac
@@ -157,7 +158,7 @@ OPT_FLAG=$(map_opt "$OPT_LEVEL")
 # -g : Debug info (useful for analysis)
 # -Xasm : Output assembly listing
 COMMON_FLAGS="$CPU_FLAG $OPT_FLAG"
-COMMON_FLAGS="$COMMON_FLAGS -Xcommon=rh850  -lang=c99 "
+COMMON_FLAGS="$COMMON_FLAGS -Xcommon=rh850 -lang=c99 "
 COMMON_FLAGS="$COMMON_FLAGS $EXTRA_FLAGS"
 COMMON_FLAGS="$COMMON_FLAGS -I$CCRH_PATH/../inc"
 
@@ -180,11 +181,8 @@ fi
 echo "Done."
 
 # Generate disassembly using CC-RH's objdump equivalent or external tool
-if [ "$OUTPUT_TYPE" = "obj" ]; then
+if [ "$OUTPUT_TYPE" = "obj" ] && [ -x "$LLVM_OBJDUMP" ]; then
     DISASM_FILE="${OUTPUT_FILE%.o}.dis"
-    # Try CC-RH's dumper or fall back to binutils
-    if command -v v850-elf-objdump &> /dev/null; then
-        v850-elf-objdump -mcpu=$CPU -d "$OUTPUT_FILE" > "$DISASM_FILE" 2>/dev/null || true
-        echo "Disassembly: $DISASM_FILE"
-    fi
+    $LLVM_OBJDUMP -mcpu=$CPU -d "$OUTPUT_FILE" > "$DISASM_FILE" 2>/dev/null || true
+    echo "Disassembly: $DISASM_FILE"
 fi
