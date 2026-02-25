@@ -171,24 +171,29 @@ class V850RegPair<bits<5> Enc, string n, list<Register> subregs>
   let CoveredBySubRegs = 1;
 }
 
-// Double-precision register pairs named after the even (low) register.
+// Double-precision register pairs.
+// Named "dN" (not "rN") to avoid conflict with GPR register names in the
+// AsmMatcher. The assembly parser maps even GPR names (r0, r2, r6, ...) to
+// the appropriate DPR register via a custom parseDPRRegister() method.
+// The instruction printer maps DPR registers back to even GPR names via
+// printDPRRegister().
 // D0/D2/D4/D30 include reserved GPRs; they exist for MC but are not allocatable.
-def D0  : V850RegPair<0,  "r0",  [R0,  R1]>;  // R0 = zero register
-def D2  : V850RegPair<2,  "r2",  [R2,  SP]>;  // SP is stack pointer
-def D4  : V850RegPair<4,  "r4",  [GP,  TP]>;  // GP/TP are reserved pointers
-def D6  : V850RegPair<6,  "r6",  [R6,  R7]>;
-def D8  : V850RegPair<8,  "r8",  [R8,  R9]>;
-def D10 : V850RegPair<10, "r10", [R10, R11]>;
-def D12 : V850RegPair<12, "r12", [R12, R13]>;
-def D14 : V850RegPair<14, "r14", [R14, R15]>;
-def D16 : V850RegPair<16, "r16", [R16, R17]>;
-def D18 : V850RegPair<18, "r18", [R18, R19]>;
-def D20 : V850RegPair<20, "r20", [R20, R21]>;
-def D22 : V850RegPair<22, "r22", [R22, R23]>;
-def D24 : V850RegPair<24, "r24", [R24, R25]>;
-def D26 : V850RegPair<26, "r26", [R26, R27]>;
-def D28 : V850RegPair<28, "r28", [R28, R29]>;
-def D30 : V850RegPair<30, "r30", [EP,  LP]>;  // EP=element ptr, LP=link ptr
+def D0  : V850RegPair<0,  "d0",  [R0,  R1]>;  // R0 = zero register
+def D2  : V850RegPair<2,  "d2",  [R2,  SP]>;  // SP is stack pointer
+def D4  : V850RegPair<4,  "d4",  [GP,  TP]>;  // GP/TP are reserved pointers
+def D6  : V850RegPair<6,  "d6",  [R6,  R7]>;
+def D8  : V850RegPair<8,  "d8",  [R8,  R9]>;
+def D10 : V850RegPair<10, "d10", [R10, R11]>;
+def D12 : V850RegPair<12, "d12", [R12, R13]>;
+def D14 : V850RegPair<14, "d14", [R14, R15]>;
+def D16 : V850RegPair<16, "d16", [R16, R17]>;
+def D18 : V850RegPair<18, "d18", [R18, R19]>;
+def D20 : V850RegPair<20, "d20", [R20, R21]>;
+def D22 : V850RegPair<22, "d22", [R22, R23]>;
+def D24 : V850RegPair<24, "d24", [R24, R25]>;
+def D26 : V850RegPair<26, "d26", [R26, R27]>;
+def D28 : V850RegPair<28, "d28", [R28, R29]>;
+def D30 : V850RegPair<30, "d30", [EP,  LP]>;  // EP=element ptr, LP=link ptr
 
 // FPR - Floating-point register class (uses same physical registers as GPR)
 // V850 uses GPRs for single-precision FP operations

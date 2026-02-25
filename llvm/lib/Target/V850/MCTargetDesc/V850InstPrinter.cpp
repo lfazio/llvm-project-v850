@@ -15,6 +15,7 @@
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCInst.h"
+#include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/Support/Casting.h"
@@ -160,6 +161,16 @@ void V850InstPrinter::printDisp5EP(const MCInst *MI, unsigned OpNo,
     MAI.printExpr(O, *Disp.getExpr());
   }
   O << "[ep]";
+}
+
+void V850InstPrinter::printDPRRegister(const MCInst *MI, unsigned OpNo,
+                                       const MCSubtargetInfo &STI,
+                                       raw_ostream &O) {
+  // A DPR operand (D6, D8, ...) is printed as its even GPR sub-register name
+  // ("r6", "r8", ...) to match standard V850 assembly syntax.
+  unsigned DPReg = MI->getOperand(OpNo).getReg();
+  unsigned GPReg = MRI.getSubReg(DPReg, sub_lo);
+  markup(O, Markup::Register) << getRegisterName(GPReg);
 }
 
 void V850InstPrinter::printSystemRegister(const MCInst *MI, unsigned OpNo,
