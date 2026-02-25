@@ -919,6 +919,10 @@ SDValue V850TargetLowering::LowerFormalArguments(
   MachineFrameInfo &MFI = MF.getFrameInfo();
   MachineRegisterInfo &RegInfo = MF.getRegInfo();
 
+  // Mark SP as live-in so that ADJCALLSTACKDOWN's implicit use of $sp has a
+  // reaching definition in functions that make calls with stack arguments.
+  MF.front().addLiveIn(V850::SP);
+
   // Assign locations to all of the incoming arguments
   SmallVector<CCValAssign, 16> ArgLocs;
   CCState CCInfo(CallConv, isVarArg, MF, ArgLocs, *DAG.getContext());
