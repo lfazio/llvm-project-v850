@@ -69,6 +69,16 @@ BitVector V850RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   // r5 (TP) is text pointer - reserve for now
   Reserved.set(V850::TP);
 
+  // Reserve DPR pairs whose sub-registers are all reserved.
+  // D2=[R2,SP] and D4=[GP,TP]: if their sub-registers are reserved, the pair
+  // must also be reserved so that isReservedRegUnit() returns true for SP/GP/TP
+  // register units (otherwise LiveIntervals crashes on non-entry-block calls).
+  // D0=[R0,R1]: likewise for the zero/assembler-temp pair.
+  // D30=[EP,LP] is intentionally NOT reserved since EP and LP are not reserved.
+  Reserved.set(V850::D0);
+  Reserved.set(V850::D2);
+  Reserved.set(V850::D4);
+
   // Mark frame pointer as reserved if needed
   if (TFI->hasFP(MF)) {
     // Use r29 as frame pointer when needed
