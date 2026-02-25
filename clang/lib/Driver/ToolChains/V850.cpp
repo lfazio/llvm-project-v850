@@ -18,8 +18,46 @@
 using namespace clang::driver;
 using namespace clang::driver::toolchains;
 using namespace clang::driver::tools;
+using namespace llvm::opt;
 using namespace clang;
 using namespace llvm::opt;
+
+/// Translate -mcpu=<cpu> into the corresponding set of target features.
+/// V850E2M and later include the hardware FPU.
+void v850::getV850TargetFeatures(const Driver &D, const ArgList &Args,
+                                 std::vector<StringRef> &Features) {
+  // Derive FPU capability from the CPU name.  CPUs that include V850E2M
+  // or later implicitly have the hardware FPU.
+  bool CPUHasFPU = false;
+  if (const Arg *A = Args.getLastArg(options::OPT_mcpu_EQ)) {
+    StringRef CPU = A->getValue();
+    CPUHasFPU = llvm::StringSwitch<bool>(CPU)
+                    .Cases("v850e2m", "v850e2v3", "v850e3", "v850e3v5", true)
+                    .Cases("g3m", "g3mh", true)
+                    .Default(false);
+  }
+
+  // Explicit -mv850-fpu / -mno-v850-fpu override the CPU default.
+  if (const Arg *A =
+          Args.getLastArg(options::OPT_mv850_fpu, options::OPT_mno_v850_fpu)) {
+    CPUHasFPU = A->getOption().matches(options::OPT_mv850_fpu);
+  }
+
+  if (CPUHasFPU)
+    Features.push_back("+v850fpu");
+  else
+    Features.push_back("-v850fpu");
+
+  // Soft-float overrides FPU: FPU instructions are still available, but
+  // the ABI uses integer registers for floating-point arguments.
+  if (const Arg *A = Args.getLastArg(options::OPT_mv850_soft_float,
+                                     options::OPT_mno_v850_soft_float)) {
+    if (A->getOption().matches(options::OPT_mv850_soft_float))
+      Features.push_back("+soft-float");
+    else
+      Features.push_back("-soft-float");
+  }
+}
 
 /// V850 Toolchain
 V850ToolChain::V850ToolChain(const Driver &D, const llvm::Triple &Triple,
@@ -29,8 +67,8 @@ V850ToolChain::V850ToolChain(const Driver &D, const llvm::Triple &Triple,
   GCCInstallation.init(Triple, Args);
   if (GCCInstallation.isValid()) {
     SmallString<128> GCCBinPath;
-    llvm::sys::path::append(GCCBinPath,
-                            GCCInstallation.getParentLibPath(), "..", "bin");
+    llvm::sys::path::append(GCCBinPath, GCCInstallation.getParentLibPath(),
+                            "..", "bin");
     addPathIfExists(D, GCCBinPath, getProgramPaths());
 
     SmallString<128> GCCRtPath;
@@ -118,8 +156,7 @@ void v850::Linker::ConstructJob(Compilation &C, const JobAction &JA,
     CmdArgs.push_back("--end-group");
   }
 
-  C.addCommand(std::make_unique<Command>(JA, *this,
-                                         ResponseFileSupport::AtFileCurCP(),
-                                         Args.MakeArgString(Linker), CmdArgs,
-                                         Inputs, Output));
+  C.addCommand(std::make_unique<Command>(
+      JA, *this, ResponseFileSupport::AtFileCurCP(), Args.MakeArgString(Linker),
+      CmdArgs, Inputs, Output));
 }

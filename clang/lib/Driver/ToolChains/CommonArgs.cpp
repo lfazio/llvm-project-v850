@@ -23,6 +23,7 @@
 #include "Hexagon.h"
 #include "MSP430.h"
 #include "Solaris.h"
+#include "V850.h"
 #include "clang/Basic/CodeGenOptions.h"
 #include "clang/Config/config.h"
 #include "clang/Driver/Action.h"
@@ -879,6 +880,9 @@ void tools::getTargetFeatures(const Driver &D, const llvm::Triple &Triple,
     break;
   case llvm::Triple::msp430:
     msp430::getMSP430TargetFeatures(D, Args, Features);
+    break;
+  case llvm::Triple::v850:
+    v850::getV850TargetFeatures(D, Args, Features);
     break;
   case llvm::Triple::ve:
     ve::getVETargetFeatures(D, Args, Features);

@@ -2297,35 +2297,13 @@ void Clang::AddVETargetArgs(const ArgList &Args, ArgStringList &CmdArgs) const {
 
 void Clang::AddV850TargetArgs(const ArgList &Args,
                                ArgStringList &CmdArgs) const {
-  if (Arg *A = Args.getLastArg(options::OPT_mcpu_EQ)) {
+  if (const Arg *A = Args.getLastArg(options::OPT_mcpu_EQ)) {
     StringRef CPUName = A->getValue();
     CmdArgs.push_back("-target-cpu");
     CmdArgs.push_back(Args.MakeArgString(CPUName));
   }
-
-  // Handle V850 FPU feature
-  if (Arg *A = Args.getLastArg(options::OPT_mv850_fpu,
-                                options::OPT_mno_v850_fpu)) {
-    if (A->getOption().matches(options::OPT_mv850_fpu)) {
-      CmdArgs.push_back("-target-feature");
-      CmdArgs.push_back("+fpu");
-    } else {
-      CmdArgs.push_back("-target-feature");
-      CmdArgs.push_back("-fpu");
-    }
-  }
-
-  // Handle V850 soft-float feature
-  if (Arg *A = Args.getLastArg(options::OPT_mv850_soft_float,
-                                options::OPT_mno_v850_soft_float)) {
-    if (A->getOption().matches(options::OPT_mv850_soft_float)) {
-      CmdArgs.push_back("-target-feature");
-      CmdArgs.push_back("+soft-float");
-    } else {
-      CmdArgs.push_back("-target-feature");
-      CmdArgs.push_back("-soft-float");
-    }
-  }
+  // FPU and soft-float features are now handled by getV850TargetFeatures()
+  // via getTargetFeatures() in RenderTargetOptions().
 }
 
 void Clang::DumpCompilationDatabase(Compilation &C, StringRef Filename,

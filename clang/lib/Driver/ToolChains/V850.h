@@ -67,6 +67,9 @@ public:
                     const char *LinkingOutput) const override;
 };
 
+void getV850TargetFeatures(const Driver &D, const llvm::opt::ArgList &Args,
+                           std::vector<llvm::StringRef> &Features);
+
 } // end namespace v850
 } // end namespace tools
 } // end namespace driver
