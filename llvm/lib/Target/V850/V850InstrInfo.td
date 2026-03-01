@@ -2915,6 +2915,15 @@ let Predicates = [HasV850FPU] in {
   def : Pat<(f64 (sint_to_fp (i32 GPR:$r2))), (CVTFWD GPR:$r2)>;
   def : Pat<(f64 (uint_to_fp (i32 GPR:$r2))), (CVTFUWD GPR:$r2)>;
 
+  // Pseudo f64 conditional move: expanded to two GPR CMOVr instructions.
+  // V850 has no native f64 CMOV, so this pseudo splits the DPR register pair
+  // into lo/hi GPR halves, applies CMOVr on each, and reassembles.
+  let usesCustomInserter = 1, Uses = [PSW], isCodeGenOnly = 1 in
+  def CMOV_F64 : V850Pseudo<(outs DPR:$dst),
+                             (ins cmov_cond:$cond, DPR:$true_val, DPR:$false_val),
+                             "# CMOV_F64 $cond, $true_val, $false_val, $dst",
+                             []>;
+
 } // Predicates = [HasV850FPU]
 
 //===----------------------------------------------------------------------===//
@@ -3402,6 +3411,25 @@ let Predicates = [HasRH850G3M], DecoderNamespace = "RH850G3M" in {
     let Inst{47 -32} = disp23{22 -7}; // disp23[22:7]
   }
 
+  // LD_DW_F - Load double word to f64 DPR register (same encoding as LD_DW,
+  // isCodeGenOnly so the disassembler uses LD_DW; ISel uses this for f64 loads)
+  let hasSideEffects = 0, mayLoad = 1, mayStore = 0, isCodeGenOnly = 1 in
+  def LD_DW_F
+      : V850Inst48<(outs DPR:$reg3), (ins GPR:$reg1, simm23:$disp23),
+                   "ld.dw $disp23[$reg1], $reg3", []> {
+    bits<5> reg3;
+    bits<5> reg1;
+    bits<23> disp23;
+
+    let Inst{15 -11} = 0b00000;
+    let Inst{10 -5} = 0b111101;
+    let Inst{4 -0} = reg1;
+    let Inst{31 -27} = reg3;
+    let Inst{26 -21} = disp23{6 -1};
+    let Inst{20 -16} = 0b01001;
+    let Inst{47 -32} = disp23{22 -7};
+  }
+
   //===----------------------------------------------------------------------===//
   // ST.DW - Store Double Word (RH850G3M+)
   // Format XIV (48-bit)
@@ -3424,6 +3452,25 @@ let Predicates = [HasRH850G3M], DecoderNamespace = "RH850G3M" in {
     let Inst{26 -21} = disp23{6 -1}; // disp23[6:1]
     let Inst{20 -16} = 0b01111;
     let Inst{47 -32} = disp23{22 -7}; // disp23[22:7]
+  }
+
+  // ST_DW_F - Store double word from f64 DPR register (same encoding as ST_DW,
+  // isCodeGenOnly so the disassembler uses ST_DW; ISel uses this for f64 stores)
+  let hasSideEffects = 0, mayLoad = 0, mayStore = 1, isCodeGenOnly = 1 in
+  def ST_DW_F
+      : V850Inst48<(outs), (ins DPR:$reg3, GPR:$reg1, simm23:$disp23),
+                   "st.dw $reg3, $disp23[$reg1]", []> {
+    bits<5> reg3;
+    bits<5> reg1;
+    bits<23> disp23;
+
+    let Inst{15 -11} = 0b00000;
+    let Inst{10 -5} = 0b111101;
+    let Inst{4 -0} = reg1;
+    let Inst{31 -27} = reg3;
+    let Inst{26 -21} = disp23{6 -1};
+    let Inst{20 -16} = 0b01111;
+    let Inst{47 -32} = disp23{22 -7};
   }
 
 } // Predicates = [HasRH850G3M], DecoderNamespace = "RH850G3M"
@@ -3457,5 +3504,15 @@ let Predicates = [HasRH850G3M] in {
   // PREF intrinsic (standalone pattern to avoid mayLoad/mayStore conflicts)
   def : Pat<(int_v850_pref timm:$prefop, GPR:$reg1), (PREF timm:$prefop,
                                                          GPR:$reg1)>;
+
+  // f64 load/store patterns via LD.DW / ST.DW (G3M only)
+  // Used for constant pool, stack, and heap f64 values.
+  def : Pat<(f64 (load GPR:$base)), (LD_DW_F GPR:$base, 0)>;
+  def : Pat<(f64 (load (add GPR:$base, simm23:$off))),
+            (LD_DW_F GPR:$base, simm23:$off)>;
+  def : Pat<(store (f64 DPR:$src), GPR:$base),
+            (ST_DW_F DPR:$src, GPR:$base, 0)>;
+  def : Pat<(store (f64 DPR:$src), (add GPR:$base, simm23:$off)),
+            (ST_DW_F DPR:$src, GPR:$base, simm23:$off)>;
 
 } // Predicates = [HasRH850G3M]

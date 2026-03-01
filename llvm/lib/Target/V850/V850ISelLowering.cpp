@@ -274,6 +274,11 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::FP_EXTEND, MVT::f64, Legal);
     setOperationAction(ISD::FP_ROUND, MVT::f32, Legal);
 
+    // Prevent LLVM from folding double constants into f32 constant-pool entries
+    // with anyext-on-load. We have no single instruction for "load f32, extend
+    // to f64"; instead Expand splits it into load<f32> + FP_EXTEND (CVTF.SD).
+    setLoadExtAction(ISD::EXTLOAD, MVT::f64, MVT::f32, Expand);
+
     // f64 <-> i32 conversions - Legal via TRNCF.DW / CVTF.WD
     setOperationAction(ISD::FP_TO_SINT, MVT::f64, Legal);
     setOperationAction(ISD::FP_TO_UINT, MVT::f64, Legal);
@@ -285,6 +290,9 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::SELECT_CC, MVT::f64, Custom);
     setOperationAction(ISD::SELECT, MVT::f64, Expand);
     setOperationAction(ISD::BR_CC, MVT::f64, Custom);
+
+    // Truncating store f64 -> f32: expand to fpround + store<f32>
+    setTruncStoreAction(MVT::f64, MVT::f32, Expand);
 
     // Bitcast between i32 and f32
     setOperationAction(ISD::BITCAST, MVT::i32, Legal);
@@ -621,6 +629,10 @@ SDValue V850TargetLowering::LowerSELECT_CC(SDValue Op,
     return DAG.getNode(ISD::BITCAST, DL, MVT::f32, Sel);
   }
 
+  // For f64 result: emit V850ISD::SELECT_CC with f64 type.
+  // V850 has no f64 CMOV instruction; the DAGToDAG ISel handles this by
+  // splitting the DPR register into sub_lo/sub_hi GPR halves via
+  // EXTRACT_SUBREG, applying two CMOVr (one per half), then INSERT_SUBREG.
   return DAG.getNode(V850ISD::SELECT_CC, DL, ResultVT, TrueV, FalseV,
                      DAG.getConstant(SelCC, DL, MVT::i32), Cmp);
 }
@@ -2065,6 +2077,56 @@ V850TargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
     }
 
     EmitWriteFPUReg(MI, MBB, TII, FPURegNo, ValueReg, ScratchReg1, ScratchReg2);
+    MI.eraseFromParent();
+    return MBB;
+  }
+
+  case V850::CMOV_F64: {
+    // Expand CMOV_F64 cond, %true, %false → %dst
+    // into two CMOVr instructions operating on the lo and hi GPR halves of
+    // the DPR register pair, then combine with REG_SEQUENCE.
+    DebugLoc DL = MI.getDebugLoc();
+    Register DstReg = MI.getOperand(0).getReg();
+    int64_t Cond = MI.getOperand(1).getImm();
+    Register TrueReg = MI.getOperand(2).getReg();
+    Register FalseReg = MI.getOperand(3).getReg();
+
+    Register TrueLo = MRI.createVirtualRegister(&V850::GPRRegClass);
+    Register TrueHi = MRI.createVirtualRegister(&V850::GPRRegClass);
+    Register FalseLo = MRI.createVirtualRegister(&V850::GPRRegClass);
+    Register FalseHi = MRI.createVirtualRegister(&V850::GPRRegClass);
+    Register ResLo = MRI.createVirtualRegister(&V850::GPRRegClass);
+    Register ResHi = MRI.createVirtualRegister(&V850::GPRRegClass);
+
+    auto Iter = MI.getIterator();
+
+    // Extract the lo and hi 32-bit GPR halves from each DPR operand.
+    BuildMI(*MBB, Iter, DL, TII.get(TargetOpcode::COPY), TrueLo)
+        .addReg(TrueReg, 0, llvm::sub_lo);
+    BuildMI(*MBB, Iter, DL, TII.get(TargetOpcode::COPY), TrueHi)
+        .addReg(TrueReg, 0, llvm::sub_hi);
+    BuildMI(*MBB, Iter, DL, TII.get(TargetOpcode::COPY), FalseLo)
+        .addReg(FalseReg, 0, llvm::sub_lo);
+    BuildMI(*MBB, Iter, DL, TII.get(TargetOpcode::COPY), FalseHi)
+        .addReg(FalseReg, 0, llvm::sub_hi);
+
+    // Conditionally select each half using CMOVr (reads PSW for condition).
+    BuildMI(*MBB, Iter, DL, TII.get(V850::CMOVr), ResLo)
+        .addImm(Cond)
+        .addReg(TrueLo)
+        .addReg(FalseLo);
+    BuildMI(*MBB, Iter, DL, TII.get(V850::CMOVr), ResHi)
+        .addImm(Cond)
+        .addReg(TrueHi)
+        .addReg(FalseHi);
+
+    // Combine the two GPR halves into the DPR output register.
+    BuildMI(*MBB, Iter, DL, TII.get(TargetOpcode::REG_SEQUENCE), DstReg)
+        .addReg(ResLo)
+        .addImm(llvm::sub_lo)
+        .addReg(ResHi)
+        .addImm(llvm::sub_hi);
+
     MI.eraseFromParent();
     return MBB;
   }

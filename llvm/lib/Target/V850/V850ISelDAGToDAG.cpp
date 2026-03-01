@@ -344,8 +344,21 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
     unsigned V850CC = getSetFCondCode(CC);
     SDValue CondVal = CurDAG->getTargetConstant(V850CC, DL, MVT::i32);
 
+    // Handle f64 result type: V850 has no native f64 CMOV instruction.
+    // Emit the CMOV_F64 pseudo which consumes the PSW glue and is later
+    // expanded by EmitInstrWithCustomInserter into two CMOVr instructions
+    // (one for the lo GPR half and one for the hi GPR half of the DPR pair).
+    if (Node->getValueType(0) == MVT::f64) {
+      SDValue Ops[] = {CondVal, TrueVal, FalseVal, Glue};
+      SDNode *CmovF64 =
+          CurDAG->getMachineNode(V850::CMOV_F64, DL, MVT::f64, Ops);
+      ReplaceNode(Node, CmovF64);
+      return;
+    }
+
+    // Default: i32 result (f32 was already BITCAST'd to i32 in LowerSELECT_CC).
     // Emit CMOVr: cmov cond, trueVal, falseVal, result
-    // Note: Glue must be the last operand
+    // Note: Glue must be the last operand.
     SDValue Ops[] = {CondVal, TrueVal, FalseVal, Glue};
     SDNode *CmovNode = CurDAG->getMachineNode(V850::CMOVr, DL, MVT::i32, Ops);
     ReplaceNode(Node, CmovNode);
@@ -433,8 +446,7 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
     // Semantics: FPCC[0] = (reg2 fcond reg1) = (LHS fcond RHS)
     SDValue CmpFOps[] = {FCondVal, RHS, LHS, FCBit};
     unsigned CmpFOpc = IsDouble ? V850::CMPFD : V850::CMPFS;
-    SDNode *CmpFNode =
-        CurDAG->getMachineNode(CmpFOpc, DL, MVT::Glue, CmpFOps);
+    SDNode *CmpFNode = CurDAG->getMachineNode(CmpFOpc, DL, MVT::Glue, CmpFOps);
     SDValue CmpGlue = SDValue(CmpFNode, 0);
 
     // Emit TRFSR 0 - transfer FPCC[0] to PSW.Z
