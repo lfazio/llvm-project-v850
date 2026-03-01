@@ -342,6 +342,38 @@ let SchedModel = RH850G3MModel in {
   def : InstRW<[G3MWriteFRSqrt32], (instrs RSQRTFS)>;
   def : InstRW<[G3MWriteFRSqrt64], (instrs RSQRTFD)>;
 
+  // FPU instruction scheduling — map FPU instructions to their resource
+  // classes. Single-precision arithmetic uses WriteFAdd32/WriteFMul32/etc. from
+  // base model.
+  def : InstRW<[WriteFAdd32], (instrs ADDFS, SUBFS)>;
+  def : InstRW<[WriteFMul32], (instrs MULFS)>;
+  def : InstRW<[WriteFDiv32], (instrs DIVFS)>;
+  def : InstRW<[WriteFSqrt32], (instrs SQRTFS)>;
+  def : InstRW<[WriteFMov], (instrs ABSFS, NEGFS)>;
+  def : InstRW<[WriteFMinMax], (instrs MAXFS, MINFS)>;
+  def : InstRW<[WriteFMA32], (instrs MADDFS, MSUBFS, NMADDFS, NMSUBFS)>;
+
+  // Double-precision arithmetic
+  def : InstRW<[WriteFAdd64], (instrs ADDFD, SUBFD)>;
+  def : InstRW<[WriteFMul64], (instrs MULFD)>;
+  def : InstRW<[WriteFDiv64], (instrs DIVFD)>;
+  def : InstRW<[WriteFSqrt64], (instrs SQRTFD)>;
+  def : InstRW<[WriteFMov], (instrs ABSFD, NEGFD)>;
+  def : InstRW<[WriteFMinMax], (instrs MAXFD, MINFD)>;
+
+  // FP compare and condition transfer
+  def : InstRW<[WriteFCmp], (instrs CMPFS, CMPFD, TRFSR)>;
+
+  // FP conversions
+  def : InstRW<[WriteFCvt], (instrs CVTFDS, CVTFSD, CVTFWS, CVTFUWS, CVTFWD,
+                                CVTFUWD, TRNCFSW, TRNCFSUW, TRNCFDW, TRNCFDUW)>;
+
+  // FP load/store (via Lpipe)
+  def : InstRW<[WriteFLD32], (instrs LDW_F)>;
+  def : InstRW<[WriteFST32], (instrs STW_F)>;
+  def : InstRW<[WriteFLD64], (instrs LD_DW_F)>;
+  def : InstRW<[WriteFST64], (instrs ST_DW_F)>;
+
   //===----------------------------------------------------------------------===//
   // Read Advances
   //===----------------------------------------------------------------------===//

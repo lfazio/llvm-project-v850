@@ -1084,18 +1084,20 @@ varargs_receiver:
 19. ~~ADF/SBF 64-bit Arithmetic (2.3)~~ - DONE (ADDC/ADDE→ADF, SUBC/SUBE→SBF for V850E2+)
 20. ~~Atomic Load/Store/Fence (1.4)~~ - DONE (custom lowering, shouldInsertFencesForAtomic, SYNCP fences)
 21. ~~RH850G3M Scheduling (4.4)~~ - DONE (faster div/FPU, branch prediction, G3M-specific instructions)
+22. ~~f64 CodeGen — DPR register class, ISel patterns, calling convention~~ - DONE (ADDFD/SUBFD/etc., CMOV_F64 pseudo, D6/D8/D10 ABI)
 
 ### High Priority (Next Phase)
 - None currently queued
 
 ### Medium Priority
-- None currently queued (all medium priority items completed or blocked)
+- f64 scheduling rules (V850SchedV850E2M.td, V850SchedRH850G3M.td) — latencies for ADDFD/MULFD/DIVFD/SQRTFD
 
 ### Hardware Limitations (Requires RH850 Backend)
 1. Post-Increment Addressing (6.2) - RH850 only, not available on V850E2M
 
 ### Low Priority / Future
 1. RH850G4MH Scheduling (4.5)
+2. f64 rounding intrinsics (CEILF.D*, FLOORF.D*, ROUNDF.D*)
 3. Hardware Loop Support (6.1)
 4. Loop Strength Reduction (6.3)
 5. Memory Barrier Optimization (8.3)
@@ -1181,6 +1183,7 @@ Metrics to track:
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-03-01 | 1.8 | f64 CodeGen complete: DPR register class, FADD/FSUB/FMUL/FDIV/FABS/FNEG/FSQRT/FMINNUM/FMAXNUM Legal, CVTFDS/CVTFSD/CVTFWD/TRNCFDW patterns, CMOV_F64 pseudo (SELECT_CC f64 via split CMOVr), LD_DW_F/ST_DW_F for G3M f64 memory, f64 calling convention (D6/D8 args, D10 return), setTruncStoreAction/setLoadExtAction for f32↔f64 interop. f64 scheduling rules remain TODO. |
 | 2026-02-11 | 1.7 | Added atomic load/store/fence custom lowering (SYNCP fences, shouldInsertFencesForAtomic, MaxAtomicInlineWidth) |
 | 2026-02-11 | 1.6 | Added RH850G3M scheduling model (faster div/FPU, branch prediction, G3M-specific instructions) |
 | 2026-02-07 | 1.5 | Added ADF/SBF 64-bit arithmetic (efficient ADDC/ADDE/SUBC/SUBE for V850E2+) |
