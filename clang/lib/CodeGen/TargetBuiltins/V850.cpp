@@ -734,6 +734,46 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
     return Builder.CreateCall(F, {Val, Builder.getInt32((1 << 5) | 4)});
   }
 
+  // MCFG0 - Machine configuration register 0 (regID=0, selID=1, enc=32)
+  case V850::BI__builtin_v850_read_mcfg0: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((1 << 5) | 0));
+  }
+  case V850::BI__builtin_v850_write_mcfg0: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32((1 << 5) | 0)});
+  }
+
+  // MCTL - Machine control register (regID=5, selID=1, enc=37)
+  case V850::BI__builtin_v850_read_mctl: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((1 << 5) | 5));
+  }
+  case V850::BI__builtin_v850_write_mctl: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32((1 << 5) | 5)});
+  }
+
+  // PID - Processor ID (regID=6, selID=1, enc=38, read-only)
+  case V850::BI__builtin_v850_read_pid: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((1 << 5) | 6));
+  }
+
+  // FPIPR - FPU interrupt priority register (regID=7, selID=1, enc=39)
+  // Deleted in G3MH; do not use on G3MH targets.
+  case V850::BI__builtin_v850_read_fpipr: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((1 << 5) | 7));
+  }
+  case V850::BI__builtin_v850_write_fpipr: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32((1 << 5) | 7)});
+  }
+
   // SCBP - SYSCALL base pointer (regID=12, selID=1, enc=44)
   case V850::BI__builtin_v850_read_scbp: {
     Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
@@ -746,6 +786,13 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
   }
 
   // --- Group 2: Thread/Interrupt (selID=2) ---
+
+  // HTCFG0 - Hardware thread configuration 0 (regID=0, selID=2, enc=64,
+  // read-only)
+  case V850::BI__builtin_v850_read_htcfg0: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((2 << 5) | 0));
+  }
 
   // MEA - Memory error address (regID=6, selID=2, enc=70)
   case V850::BI__builtin_v850_read_mea: {

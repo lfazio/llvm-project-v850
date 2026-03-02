@@ -31,7 +31,7 @@ and provides implementation steps for each.
 | ~~**System Registers**~~ | ~~Medium~~ | ~~G3M Groups 1-7~~ DONE (LDSR/STSR sel + named builtins) |
 | ~~**Frame Optimization**~~ | ~~Medium~~ | ~~PUSHSP/POPSP for prologue/epilogue~~ DONE |
 | ~~**SysReg Refactoring**~~ | ~~Medium~~ | ~~Replace pseudo register class with immediate operands~~ DONE (10-bit unified encoding) |
-| **Double-Precision FPU CodeGen** | Low | Scheduling rules for f64 ops; `fpu-double-compare.ll` test; f64 rounding intrinsics (CEILF.D etc.) |
+| **Double-Precision FPU CodeGen** | Low | f64 rounding intrinsics (CEILF.D, FLOORF.D, ROUNDF.D) — libcall fallback works |
 | **LOOP instruction** | Low | Hardware loop codegen |
 | **G3MH specifics** | Low | FPU precision changes, FPINT exception |
 | **Post-increment** | Low | LD/ST with [reg1]+ addressing (**G4MH only**, not G3M/G3MH) |
@@ -438,9 +438,9 @@ select operations.
 | f64 calling convention (D6/D8 args, D10 return) | ✅ | `V850CallingConv.td` |
 | f64 extend load (f32→f64 EXTLOAD) | ✅ | Expand → fpextend + load |
 | f64 truncating store (f64→f32) | ✅ | Expand → fpround + store |
-| Tests: `fpu-double-arith.ll`, `fpu-double-convert.ll` | ✅ | 146/146 CodeGen tests pass |
+| Tests: `fpu-double-arith.ll`, `fpu-double-convert.ll`, `fpu-double-compare.ll` | ✅ | 147/147 CodeGen tests pass |
 | FMA for f64 (MADDFD/MSUBFD/NMADDFD/NMSUBFD instructions) | ❌ | V850E2M has no f64 FMA; f32 FMA exists (MADDFS etc.) |
-| Scheduling rules for f64 ops in V850SchedV850E2M.td | ⚠️ | Latencies documented but not in SchedWrite |
+| Scheduling rules for f64 ops in V850SchedV850E2M.td | ✅ | InstRW entries added for all FPU instructions |
 
 **Note:** V850E2M **does not have** MADDF.D/MSUBF.D/NMADDF.D/NMSUBF.D instructions —
 only `MADDF.S` (single-precision) exists per the V850E2M ISA manual. Therefore
@@ -633,8 +633,8 @@ Constraint: reg1 != reg3 (same register causes undefined behavior).
 12. ~~[4c.1] Mark f64 operations Legal in ISelLowering, add DPR register class~~ DONE
 13. ~~[4c.1] Add ISel patterns for all double-precision instructions~~ DONE (arith, convert, compare, load/store, SELECT_CC via CMOV_F64)
 14. ~~[4c.1] Add f64 calling convention (r10+r11 return, r6+r7/r8+r9 args)~~ DONE (D10 return, D6/D8 args)
-15. [4c.1] Add scheduling rules for ADDF.D, MULF.D, DIVF.D, SQRTF.D etc. (TODO)
-16. [4c.1] Add `fpu-double-compare.ll` test (TODO)
+15. ~~[4c.1] Add scheduling rules for ADDF.D, MULF.D, DIVF.D, SQRTF.D etc.~~ DONE
+16. ~~[4c.1] Add `fpu-double-compare.ll` test~~ DONE
 
 ### Sprint 7: LOOP and G3MH
 16. [7.1] LOOP instruction pass (if feasible)

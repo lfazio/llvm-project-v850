@@ -130,6 +130,9 @@ let FeaturesRequired = [{ {V850::FeatureV850E2M} }] in {
 //===----------------------------------------------------------------------===//
 
 let FeaturesRequired = [{ {V850::FeatureRH850G3M} }] in {
+  // MCFG0 - Machine configuration register 0 (regID=0, selID=1)
+  // Encoding = (1 << 5) | 0 = 32
+  def SysRegMCFG0 : V850SysRegEntry<"mcfg0", 0, 1>;
   // RBASE - Reset vector base (regID=2, selID=1)
   // Encoding = (1 << 5) | 2 = 34
   def SysRegRBASE : V850SysRegEntry<"rbase", 2, 1>;
@@ -139,6 +142,16 @@ let FeaturesRequired = [{ {V850::FeatureRH850G3M} }] in {
   // INTBP - Interrupt handler table base (regID=4, selID=1)
   // Encoding = (1 << 5) | 4 = 36
   def SysRegINTBP : V850SysRegEntry<"intbp", 4, 1>;
+  // MCTL - Machine control register (regID=5, selID=1)
+  // Encoding = (1 << 5) | 5 = 37
+  def SysRegMCTL : V850SysRegEntry<"mctl", 5, 1>;
+  // PID - Processor ID (regID=6, selID=1, read-only)
+  // Encoding = (1 << 5) | 6 = 38
+  def SysRegPID : V850SysRegEntry<"pid", 6, 1>;
+  // FPIPR - FPU interrupt priority register (regID=7, selID=1)
+  // Encoding = (1 << 5) | 7 = 39
+  // NOTE: Deleted in RH850G3MH (FPINT exception replaces FPP/FPI).
+  def SysRegFPIPR : V850SysRegEntry<"fpipr", 7, 1>;
   // SCBP - SYSCALL base pointer (regID=12, selID=1)
   // Encoding = (1 << 5) | 12 = 44
   def SysRegSCBPG1 : V850SysRegEntry<"scbp_g1", 12, 1>;
@@ -150,6 +163,10 @@ let FeaturesRequired = [{ {V850::FeatureRH850G3M} }] in {
 //===----------------------------------------------------------------------===//
 
 let FeaturesRequired = [{ {V850::FeatureRH850G3M} }] in {
+  // HTCFG0 - Hardware thread configuration 0 (regID=0, selID=2, read-only)
+  // Encoding = (2 << 5) | 0 = 64
+  // Contains PEID (Processor Element ID) for multi-core identification.
+  def SysRegHTCFG0 : V850SysRegEntry<"htcfg0", 0, 2>;
   // MEA - Memory error address (regID=6, selID=2)
   // Encoding = (2 << 5) | 6 = 70
   def SysRegMEA : V850SysRegEntry<"mea", 6, 2>;

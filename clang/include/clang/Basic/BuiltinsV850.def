@@ -510,6 +510,10 @@ TARGET_BUILTIN(__builtin_v850_stsr_group, "UiIUiIUi", "n", "rh850g3m")
 
 // --- Group 1: Machine Configuration ---
 
+// MCFG0 - Machine configuration register 0 (regID=0, selID=1)
+TARGET_BUILTIN(__builtin_v850_read_mcfg0, "Ui", "n", "rh850g3m")
+TARGET_BUILTIN(__builtin_v850_write_mcfg0, "vUi", "n", "rh850g3m")
+
 // RBASE - Reset vector base address (regID=2, selID=1)
 TARGET_BUILTIN(__builtin_v850_read_rbase, "Ui", "n", "rh850g3m")
 TARGET_BUILTIN(__builtin_v850_write_rbase, "vUi", "n", "rh850g3m")
@@ -522,11 +526,28 @@ TARGET_BUILTIN(__builtin_v850_write_ebase, "vUi", "n", "rh850g3m")
 TARGET_BUILTIN(__builtin_v850_read_intbp, "Ui", "n", "rh850g3m")
 TARGET_BUILTIN(__builtin_v850_write_intbp, "vUi", "n", "rh850g3m")
 
+// MCTL - Machine control register (regID=5, selID=1)
+TARGET_BUILTIN(__builtin_v850_read_mctl, "Ui", "n", "rh850g3m")
+TARGET_BUILTIN(__builtin_v850_write_mctl, "vUi", "n", "rh850g3m")
+
+// PID - Processor ID register (regID=6, selID=1, read-only)
+TARGET_BUILTIN(__builtin_v850_read_pid, "Ui", "n", "rh850g3m")
+
+// FPIPR - FPU interrupt priority register (regID=7, selID=1)
+// Note: This register is DELETED in RH850G3MH (FPINT exception replaces FPP/FPI).
+// Do not use on G3MH targets.
+TARGET_BUILTIN(__builtin_v850_read_fpipr, "Ui", "n", "rh850g3m")
+TARGET_BUILTIN(__builtin_v850_write_fpipr, "vUi", "n", "rh850g3m")
+
 // SCBP - SYSCALL base pointer (regID=12, selID=1)
 TARGET_BUILTIN(__builtin_v850_read_scbp, "Ui", "n", "rh850g3m")
 TARGET_BUILTIN(__builtin_v850_write_scbp, "vUi", "n", "rh850g3m")
 
 // --- Group 2: Thread/Interrupt ---
+
+// HTCFG0 - Hardware thread configuration 0 (regID=0, selID=2, read-only)
+// Contains PEID (Processor Element ID) for multi-core identification.
+TARGET_BUILTIN(__builtin_v850_read_htcfg0, "Ui", "n", "rh850g3m")
 
 // MEA - Memory error address (regID=6, selID=2)
 TARGET_BUILTIN(__builtin_v850_read_mea, "Ui", "n", "rh850g3m")
