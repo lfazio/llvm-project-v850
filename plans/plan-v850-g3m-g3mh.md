@@ -33,7 +33,7 @@ and provides implementation steps for each.
 | ~~**SysReg Refactoring**~~ | ~~Medium~~ | ~~Replace pseudo register class with immediate operands~~ DONE (10-bit unified encoding) |
 | **Double-Precision FPU CodeGen** | Low | f64 rounding intrinsics (CEILF.D, FLOORF.D, ROUNDF.D) — libcall fallback works |
 | **LOOP instruction** | Low | Hardware loop codegen |
-| **G3MH specifics** | Low | FPU precision changes, FPINT exception |
+| **G3MH specifics** | Low | FPINT exception (FPP/FPI abolished); FPIPR deleted; FPEC deleted — documented in builtins, no compile-time enforcement |
 | **Post-increment** | Low | LD/ST with [reg1]+ addressing (**G4MH only**, not G3M/G3MH) |
 
 ---
@@ -636,9 +636,9 @@ Constraint: reg1 != reg3 (same register causes undefined behavior).
 15. ~~[4c.1] Add scheduling rules for ADDF.D, MULF.D, DIVF.D, SQRTF.D etc.~~ DONE
 16. ~~[4c.1] Add `fpu-double-compare.ll` test~~ DONE
 
-### Sprint 7: LOOP and G3MH
+### Sprint 7: LOOP and G3MH [PARTIALLY DONE]
 16. [7.1] LOOP instruction pass (if feasible)
-17. [5.1] G3MH FPU differences (FPEC deletion, FPINT exception)
+17. ~~[5.1] G3MH register differences (FPIPR deleted)~~ DONE — MCFG0, MCTL, PID, FPIPR, HTCFG0 added to system register table; FPIPR deletion documented in builtin comment
 
 ### Sprint 8: Post-Increment (G4MH Only)
 18. [6.1] Post-increment load/store instructions and ISel patterns (requires G4MH subtarget)
