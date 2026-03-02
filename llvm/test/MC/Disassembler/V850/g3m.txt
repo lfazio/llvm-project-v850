@@ -120,3 +120,65 @@
 # BGT disp17 - Greater than (signed)
 # CHECK: bgt -65536
 0xff 0x07 0x01 0x00
+
+# PUSHSP reg_list - Push multiple registers onto stack
+# CHECK: pushsp r20, r31
+0xf4 0x47 0x60 0xf9
+
+# POPSP reg_list - Pop multiple registers from stack
+# CHECK: popsp r20, r31
+0xf4 0x67 0x60 0xf9
+
+# LOOP reg1, disp16 - Decrement and branch if not zero (32-bit)
+# Note: bit[16]=1 distinguishes LOOP from JMP32 (bit[16]=0)
+# CHECK: loop r5, -100
+0xe5 0x06 0x9d 0xff
+
+# CACHE cacheop, [reg1] - Cache operation
+# CHECK: cache 31, [r5]
+0xe5 0xe7 0x60 0xf9
+
+# PREF prefop, [reg1] - Prefetch hint
+# CHECK: pref 0, [r10]
+0xea 0xdf 0x60 0x01
+
+# BINS reg1, lsb, msb, reg2 - Bit field insert
+# CHECK: bins r6, 0, 15, r10
+0xe6 0x57 0x90 0xf0
+
+# LD.DW disp23[reg1], reg3 - Load double word (48-bit, Format XIV)
+# Positive displacement
+# CHECK: ld.dw 100[r10], r12
+0xaa 0x07 0x49 0x66 0x00 0x00
+
+# Negative displacement
+# CHECK: ld.dw -100[r10], r12
+0xaa 0x07 0xc9 0x61 0xff 0xff
+
+# ST.DW reg3, disp23[reg1] - Store double word (48-bit, Format XIV)
+# Positive displacement
+# CHECK: st.dw r14, 200[r10]
+0xaa 0x07 0x8f 0x74 0x01 0x00
+
+# Negative displacement
+# CHECK: st.dw r14, -200[r10]
+0xaa 0x07 0x8f 0x73 0xfe 0xff
+
+# JR32 disp32 - Jump relative with 32-bit displacement (48-bit, V850E2+)
+# Available on G3M (which is a superset of V850E2)
+# CHECK: jr	4000000
+0xe0 0x02 0x80 0x84 0x1e 0x00
+
+# JARL32 disp32, reg1 - Jump and link with 32-bit displacement (48-bit, V850E2+)
+# CHECK: jarl	4000000, r10
+0xea 0x02 0x80 0x84 0x1e 0x00
+
+# JMP32 disp32[reg1] - Jump with 32-bit displacement (48-bit, V850E2+)
+# Note: bit[16]=0 distinguishes JMP32 from LOOP (bit[16]=1)
+# Positive displacement
+# CHECK: jmp	100[r10]
+0xea 0x06 0x32 0x00 0x00 0x00
+
+# Negative displacement
+# CHECK: jmp	-100[r10]
+0xea 0x06 0xce 0xff 0xff 0xff
