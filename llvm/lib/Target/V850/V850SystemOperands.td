@@ -170,6 +170,11 @@ let FeaturesRequired = [{ {V850::FeatureRH850G3M} }] in {
   // MEA - Memory error address (regID=6, selID=2)
   // Encoding = (2 << 5) | 6 = 70
   def SysRegMEA : V850SysRegEntry<"mea", 6, 2>;
+  // ASID - Address space ID (regID=7, selID=2)
+  // Encoding = (2 << 5) | 7 = 71
+  // NOTE: On G3M ASID moved from the V850E1 location (regID=23, selID=0) to
+  // (regID=7, selID=2). Use "asid_g2" to access it on G3M targets.
+  def SysRegASIDG2 : V850SysRegEntry<"asid_g2", 7, 2>;
   // MEI - Memory error information (regID=8, selID=2)
   // Encoding = (2 << 5) | 8 = 72
   def SysRegMEI : V850SysRegEntry<"mei", 8, 2>;
@@ -185,4 +190,132 @@ let FeaturesRequired = [{ {V850::FeatureRH850G3M} }] in {
   // INTCFG - Interrupt function setting (regID=13, selID=2)
   // Encoding = (2 << 5) | 13 = 77
   def SysRegINTCFG : V850SysRegEntry<"intcfg", 13, 2>;
+}
+
+//===----------------------------------------------------------------------===//
+// RH850G3M+ System Registers - Group 4 (selID=4)
+// Instruction cache control registers. Only present when an instruction cache
+// is installed in the hardware.
+//===----------------------------------------------------------------------===//
+
+let FeaturesRequired = [{ {V850::FeatureRH850G3M} }] in {
+  // ICTAGL - Instruction cache tag Lo access (regID=16, selID=4)
+  // Encoding = (4 << 5) | 16 = 144
+  def SysRegICTAGL : V850SysRegEntry<"ictagl", 16, 4>;
+  // ICTAGH - Instruction cache tag Hi access (regID=17, selID=4)
+  // Encoding = (4 << 5) | 17 = 145
+  def SysRegICTAGH : V850SysRegEntry<"ictagh", 17, 4>;
+  // ICDATL - Instruction cache data Lo access (regID=18, selID=4)
+  // Encoding = (4 << 5) | 18 = 146
+  def SysRegICDATL : V850SysRegEntry<"icdatl", 18, 4>;
+  // ICDATH - Instruction cache data Hi access (regID=19, selID=4)
+  // Encoding = (4 << 5) | 19 = 147
+  def SysRegICDATH : V850SysRegEntry<"icdath", 19, 4>;
+  // ICCTRL - Instruction cache control (regID=24, selID=4)
+  // Encoding = (4 << 5) | 24 = 152
+  def SysRegICCTRL : V850SysRegEntry<"icctrl", 24, 4>;
+  // ICCFG - Instruction cache configuration (regID=26, selID=4, read-only)
+  // Encoding = (4 << 5) | 26 = 154
+  def SysRegICCFG : V850SysRegEntry<"iccfg", 26, 4>;
+  // ICERR - Instruction cache error (regID=28, selID=4)
+  // Encoding = (4 << 5) | 28 = 156
+  def SysRegICERR : V850SysRegEntry<"icerr", 28, 4>;
+}
+
+//===----------------------------------------------------------------------===//
+// RH850G3M+ System Registers - Group 5 (selID=5)
+// MPU mode and control registers. Only present when MPU is installed.
+//===----------------------------------------------------------------------===//
+
+let FeaturesRequired = [{ {V850::FeatureRH850G3M} }] in {
+  // MPM - Memory protection operation mode (regID=0, selID=5)
+  // Encoding = (5 << 5) | 0 = 160
+  def SysRegMPM : V850SysRegEntry<"mpm", 0, 5>;
+  // MPRC - MPU region control (regID=1, selID=5)
+  // Encoding = (5 << 5) | 1 = 161
+  def SysRegMPRC : V850SysRegEntry<"mprc", 1, 5>;
+  // MPBRGN - MPU base region number (regID=4, selID=5, read-only)
+  // Encoding = (5 << 5) | 4 = 164
+  def SysRegMPBRGN : V850SysRegEntry<"mpbrgn", 4, 5>;
+  // MPTRGN - MPU end region number (regID=5, selID=5, read-only)
+  // Encoding = (5 << 5) | 5 = 165
+  def SysRegMPTRGN : V850SysRegEntry<"mptrgn", 5, 5>;
+  // MCA - Memory protection setting check address (regID=8, selID=5)
+  // Encoding = (5 << 5) | 8 = 168
+  def SysRegMCA : V850SysRegEntry<"mca", 8, 5>;
+  // MCS - Memory protection setting check size (regID=9, selID=5)
+  // Encoding = (5 << 5) | 9 = 169
+  def SysRegMCS : V850SysRegEntry<"mcs", 9, 5>;
+  // MCC - Memory protection setting check command (regID=10, selID=5)
+  // Encoding = (5 << 5) | 10 = 170
+  def SysRegMCC : V850SysRegEntry<"mcc", 10, 5>;
+  // MCR - Memory protection setting check result (regID=11, selID=5)
+  // Encoding = (5 << 5) | 11 = 171
+  def SysRegMCR : V850SysRegEntry<"mcr", 11, 5>;
+}
+
+//===----------------------------------------------------------------------===//
+// RH850G3M+ System Registers - Group 6 (selID=6)
+// MPU protection area registers for regions 0-7 (MPLA/MPUA/MPAT).
+// The number of regions incorporated depends on hardware configuration.
+//===----------------------------------------------------------------------===//
+
+let FeaturesRequired = [{ {V850::FeatureRH850G3M} }] in {
+  def SysRegMPLA0 : V850SysRegEntry<"mpla0", 0, 6>;   // (6<<5)|0  = 192
+  def SysRegMPUA0 : V850SysRegEntry<"mpua0", 1, 6>;   // (6<<5)|1  = 193
+  def SysRegMPAT0 : V850SysRegEntry<"mpat0", 2, 6>;   // (6<<5)|2  = 194
+  def SysRegMPLA1 : V850SysRegEntry<"mpla1", 4, 6>;   // (6<<5)|4  = 196
+  def SysRegMPUA1 : V850SysRegEntry<"mpua1", 5, 6>;   // (6<<5)|5  = 197
+  def SysRegMPAT1 : V850SysRegEntry<"mpat1", 6, 6>;   // (6<<5)|6  = 198
+  def SysRegMPLA2 : V850SysRegEntry<"mpla2", 8, 6>;   // (6<<5)|8  = 200
+  def SysRegMPUA2 : V850SysRegEntry<"mpua2", 9, 6>;   // (6<<5)|9  = 201
+  def SysRegMPAT2 : V850SysRegEntry<"mpat2", 10, 6>;  // (6<<5)|10 = 202
+  def SysRegMPLA3 : V850SysRegEntry<"mpla3", 12, 6>;  // (6<<5)|12 = 204
+  def SysRegMPUA3 : V850SysRegEntry<"mpua3", 13, 6>;  // (6<<5)|13 = 205
+  def SysRegMPAT3 : V850SysRegEntry<"mpat3", 14, 6>;  // (6<<5)|14 = 206
+  def SysRegMPLA4 : V850SysRegEntry<"mpla4", 16, 6>;  // (6<<5)|16 = 208
+  def SysRegMPUA4 : V850SysRegEntry<"mpua4", 17, 6>;  // (6<<5)|17 = 209
+  def SysRegMPAT4 : V850SysRegEntry<"mpat4", 18, 6>;  // (6<<5)|18 = 210
+  def SysRegMPLA5 : V850SysRegEntry<"mpla5", 20, 6>;  // (6<<5)|20 = 212
+  def SysRegMPUA5 : V850SysRegEntry<"mpua5", 21, 6>;  // (6<<5)|21 = 213
+  def SysRegMPAT5 : V850SysRegEntry<"mpat5", 22, 6>;  // (6<<5)|22 = 214
+  def SysRegMPLA6 : V850SysRegEntry<"mpla6", 24, 6>;  // (6<<5)|24 = 216
+  def SysRegMPUA6 : V850SysRegEntry<"mpua6", 25, 6>;  // (6<<5)|25 = 217
+  def SysRegMPAT6 : V850SysRegEntry<"mpat6", 26, 6>;  // (6<<5)|26 = 218
+  def SysRegMPLA7 : V850SysRegEntry<"mpla7", 28, 6>;  // (6<<5)|28 = 220
+  def SysRegMPUA7 : V850SysRegEntry<"mpua7", 29, 6>;  // (6<<5)|29 = 221
+  def SysRegMPAT7 : V850SysRegEntry<"mpat7", 30, 6>;  // (6<<5)|30 = 222
+}
+
+//===----------------------------------------------------------------------===//
+// RH850G3M+ System Registers - Group 7 (selID=7)
+// MPU protection area registers for regions 8-15 (MPLA/MPUA/MPAT).
+// The number of regions incorporated depends on hardware configuration.
+//===----------------------------------------------------------------------===//
+
+let FeaturesRequired = [{ {V850::FeatureRH850G3M} }] in {
+  def SysRegMPLA8  : V850SysRegEntry<"mpla8",  0,  7>;  // (7<<5)|0  = 224
+  def SysRegMPUA8  : V850SysRegEntry<"mpua8",  1,  7>;  // (7<<5)|1  = 225
+  def SysRegMPAT8  : V850SysRegEntry<"mpat8",  2,  7>;  // (7<<5)|2  = 226
+  def SysRegMPLA9  : V850SysRegEntry<"mpla9",  4,  7>;  // (7<<5)|4  = 228
+  def SysRegMPUA9  : V850SysRegEntry<"mpua9",  5,  7>;  // (7<<5)|5  = 229
+  def SysRegMPAT9  : V850SysRegEntry<"mpat9",  6,  7>;  // (7<<5)|6  = 230
+  def SysRegMPLA10 : V850SysRegEntry<"mpla10", 8,  7>;  // (7<<5)|8  = 232
+  def SysRegMPUA10 : V850SysRegEntry<"mpua10", 9,  7>;  // (7<<5)|9  = 233
+  def SysRegMPAT10 : V850SysRegEntry<"mpat10", 10, 7>;  // (7<<5)|10 = 234
+  def SysRegMPLA11 : V850SysRegEntry<"mpla11", 12, 7>;  // (7<<5)|12 = 236
+  def SysRegMPUA11 : V850SysRegEntry<"mpua11", 13, 7>;  // (7<<5)|13 = 237
+  def SysRegMPAT11 : V850SysRegEntry<"mpat11", 14, 7>;  // (7<<5)|14 = 238
+  def SysRegMPLA12 : V850SysRegEntry<"mpla12", 16, 7>;  // (7<<5)|16 = 240
+  def SysRegMPUA12 : V850SysRegEntry<"mpua12", 17, 7>;  // (7<<5)|17 = 241
+  def SysRegMPAT12 : V850SysRegEntry<"mpat12", 18, 7>;  // (7<<5)|18 = 242
+  def SysRegMPLA13 : V850SysRegEntry<"mpla13", 20, 7>;  // (7<<5)|20 = 244
+  def SysRegMPUA13 : V850SysRegEntry<"mpua13", 21, 7>;  // (7<<5)|21 = 245
+  def SysRegMPAT13 : V850SysRegEntry<"mpat13", 22, 7>;  // (7<<5)|22 = 246
+  def SysRegMPLA14 : V850SysRegEntry<"mpla14", 24, 7>;  // (7<<5)|24 = 248
+  def SysRegMPUA14 : V850SysRegEntry<"mpua14", 25, 7>;  // (7<<5)|25 = 249
+  def SysRegMPAT14 : V850SysRegEntry<"mpat14", 26, 7>;  // (7<<5)|26 = 250
+  def SysRegMPLA15 : V850SysRegEntry<"mpla15", 28, 7>;  // (7<<5)|28 = 252
+  def SysRegMPUA15 : V850SysRegEntry<"mpua15", 29, 7>;  // (7<<5)|29 = 253
+  def SysRegMPAT15 : V850SysRegEntry<"mpat15", 30, 7>;  // (7<<5)|30 = 254
 }
