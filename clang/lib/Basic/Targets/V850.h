@@ -124,6 +124,7 @@ public:
         .Case("v850e3", CPU >= CK_V850E3)
         .Case("rh850g3m", CPU >= CK_RH850G3M)
         .Case("rh850g3mh", CPU >= CK_RH850G3MH)
+        .Case("v850-fpipr", CPU >= CK_RH850G3M && CPU < CK_RH850G3MH)
         .Case("v850fpu", HasFPU && !SoftFloat)
         .Case("soft-float", SoftFloat)
         .Default(false);

@@ -218,6 +218,11 @@ bool V850TargetInfo::initFeatureMap(
   if (CpuKind >= CK_RH850G3M)
     Features["rh850g3m"] = true;
 
+  // FPIPR register exists on G3M but is removed on G3MH+
+  // (FPINT exception replaces FPP/FPI, FPIPR no longer needed)
+  if (CpuKind >= CK_RH850G3M && CpuKind < CK_RH850G3MH)
+    Features["v850-fpipr"] = true;
+
   // RH850G3MH and later
   if (CpuKind >= CK_RH850G3MH)
     Features["rh850g3mh"] = true;

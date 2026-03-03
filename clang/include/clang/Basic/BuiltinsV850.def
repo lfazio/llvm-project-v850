@@ -535,9 +535,9 @@ TARGET_BUILTIN(__builtin_v850_read_pid, "Ui", "n", "rh850g3m")
 
 // FPIPR - FPU interrupt priority register (regID=7, selID=1)
 // Note: This register is DELETED in RH850G3MH (FPINT exception replaces
-// FPP/FPI). Do not use on G3MH targets.
-TARGET_BUILTIN(__builtin_v850_read_fpipr, "Ui", "n", "rh850g3m")
-TARGET_BUILTIN(__builtin_v850_write_fpipr, "vUi", "n", "rh850g3m")
+// FPP/FPI). Gated on v850-fpipr feature (G3M only, not G3MH+).
+TARGET_BUILTIN(__builtin_v850_read_fpipr, "Ui", "n", "v850-fpipr")
+TARGET_BUILTIN(__builtin_v850_write_fpipr, "vUi", "n", "v850-fpipr")
 
 // SCBP - SYSCALL base pointer (regID=12, selID=1)
 TARGET_BUILTIN(__builtin_v850_read_scbp, "Ui", "n", "rh850g3m")
