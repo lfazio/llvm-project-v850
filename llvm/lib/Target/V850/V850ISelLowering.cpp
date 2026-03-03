@@ -29,6 +29,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/IntrinsicsV850.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -221,6 +222,12 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
   if (STI.hasV850E1()) {
     setOperationAction(ISD::INTRINSIC_W_CHAIN, MVT::Other, Custom);
   }
+
+  // Hardware loop intrinsics (RH850G3M+ LOOP instruction)
+  // start_loop_iterations and loop_decrement_reg are INTRINSIC_W_CHAIN
+  // (they have IntrNoDuplicate which adds a chain).
+  // Note: INTRINSIC_W_CHAIN is already set to Custom for V850E1+ above,
+  // and G3M implies E1, so no additional setOperationAction needed.
 
   // FPU operations when hardware FPU feature is present
   if (STI.hasV850FPU()) {
@@ -802,6 +809,23 @@ SDValue V850TargetLowering::LowerINTRINSIC_W_CHAIN(SDValue Op,
   switch (IntNo) {
   default:
     return SDValue(); // Don't custom lower this intrinsic
+  case Intrinsic::start_loop_iterations: {
+    // start_loop_iterations(n) -> n (identity, count goes to GPR via phi)
+    // Returns: (i32 result, chain)
+    SDValue Chain = Op.getOperand(0);
+    SDValue Count = Op.getOperand(2); // Operand 1 is intrinsic ID, 2 is the arg
+    return DAG.getMergeValues({Count, Chain}, DL);
+  }
+  case Intrinsic::loop_decrement_reg: {
+    // loop_decrement_reg(counter, decrement) -> counter - decrement
+    // The result feeds back through a phi as the new counter value.
+    // A later machine pass can convert sub+bne into the LOOP instruction.
+    SDValue Chain = Op.getOperand(0);
+    SDValue Counter = Op.getOperand(2); // operand 1 is intrinsic ID
+    SDValue Decrement = Op.getOperand(3);
+    SDValue Sub = DAG.getNode(ISD::SUB, DL, MVT::i32, Counter, Decrement);
+    return DAG.getMergeValues({Sub, Chain}, DL);
+  }
   case Intrinsic::v850_tst1: {
     // TST1 - Test bit in memory
     // Returns 1 if bit was 0 (Z flag set), 0 otherwise

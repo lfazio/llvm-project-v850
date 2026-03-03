@@ -16,6 +16,7 @@
 #include "V850MachineFunctionInfo.h"
 #include "V850Subtarget.h"
 #include "V850TargetObjectFile.h"
+#include "V850TargetTransformInfo.h"
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/CodeGen/TargetPassConfig.h"
 #include "llvm/IR/LegacyPassManager.h"
@@ -97,6 +98,7 @@ public:
   }
 
   void addIRPasses() override;
+  bool addPreISel() override;
   bool addInstSelector() override;
   void addPreRegAlloc() override;
   void addPreEmitPass() override;
@@ -108,12 +110,27 @@ TargetPassConfig *V850TargetMachine::createPassConfig(PassManagerBase &PM) {
   return new V850PassConfig(*this, PM);
 }
 
+TargetTransformInfo
+V850TargetMachine::getTargetTransformInfo(const Function &F) const {
+  return TargetTransformInfo(std::make_unique<V850TTIImpl>(this, F));
+}
+
 void V850PassConfig::addIRPasses() {
   // Add the AtomicExpandPass to expand atomic RMW operations to cmpxchg loops
   // V850E2M has CAXI for 32-bit compare-and-swap
   addPass(createAtomicExpandLegacyPass());
 
   TargetPassConfig::addIRPasses();
+}
+
+bool V850PassConfig::addPreISel() {
+  // Hardware loop conversion for RH850G3M+ LOOP instruction.
+  // The HardwareLoops pass converts counted loops to use hardware loop
+  // intrinsics, which are then lowered to LOOP instructions in ISel.
+  if (getOptLevel() != CodeGenOptLevel::None)
+    addPass(createHardwareLoopsLegacyPass());
+
+  return false;
 }
 
 bool V850PassConfig::addInstSelector() {
