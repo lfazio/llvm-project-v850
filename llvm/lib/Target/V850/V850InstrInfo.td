@@ -2749,7 +2749,7 @@ let Predicates = [HasV850FPU] in {
 
   // CEILF.DUL reg2, reg3 - Ceiling Double to Unsigned Long (subop2=18, cat=0,
   // type=2, subop=10)
-  def CELIFDUL : FormatFPU_CVT<0b10010, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
+  def CEILFDUL : FormatFPU_CVT<0b10010, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
                                (ins dprreg:$reg2), "ceilf.dul	$reg2, $reg3", []>;
 
   // --- FLOORF (Floor) - Signed ---

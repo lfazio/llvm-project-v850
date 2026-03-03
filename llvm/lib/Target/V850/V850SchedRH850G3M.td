@@ -364,9 +364,18 @@ let SchedModel = RH850G3MModel in {
   // FP compare and condition transfer
   def : InstRW<[WriteFCmp], (instrs CMPFS, CMPFD, TRFSR)>;
 
-  // FP conversions
+  // FP conversions (all rounding modes use FP ALU, 4 cycles)
   def : InstRW<[WriteFCvt], (instrs CVTFDS, CVTFSD, CVTFWS, CVTFUWS, CVTFWD,
-                                CVTFUWD, TRNCFSW, TRNCFSUW, TRNCFDW, TRNCFDUW)>;
+                                CVTFUWD,
+                                // Truncate (toward zero)
+                                TRNCFSW, TRNCFSUW, TRNCFDW, TRNCFDUW,
+                                TRNCFSL, TRNCFSUL, TRNCFDL, TRNCFDUL,
+                                // Ceiling (toward +infinity)
+                                CEILFSW, CEILFSUW, CEILFDW, CEILFDUW,
+                                CEILFSL, CEILFSUL, CEILFDL, CEILFDUL,
+                                // Floor (toward -infinity)
+                                FLOORFSW, FLOORFSUW, FLOORFDW, FLOORFDUW,
+                                FLOORFSL, FLOORFSUL, FLOORFDL, FLOORFDUL)>;
 
   // FP load/store (via Lpipe)
   def : InstRW<[WriteFLD32], (instrs LDW_F)>;

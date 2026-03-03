@@ -314,9 +314,18 @@ let SchedModel = V850E2MModel in {
   // FP compare and condition transfer
   def : InstRW<[WriteFCmp], (instrs CMPFS, CMPFD, TRFSR)>;
 
-  // FP conversions
+  // FP conversions (all rounding modes use FP ALU, 4 cycles)
   def : InstRW<[WriteFCvt], (instrs CVTFDS, CVTFSD, CVTFWS, CVTFUWS, CVTFWD,
-                                CVTFUWD, TRNCFSW, TRNCFSUW, TRNCFDW, TRNCFDUW)>;
+                                CVTFUWD,
+                                // Truncate (toward zero)
+                                TRNCFSW, TRNCFSUW, TRNCFDW, TRNCFDUW,
+                                TRNCFSL, TRNCFSUL, TRNCFDL, TRNCFDUL,
+                                // Ceiling (toward +infinity)
+                                CEILFSW, CEILFSUW, CEILFDW, CEILFDUW,
+                                CEILFSL, CEILFSUL, CEILFDL, CEILFDUL,
+                                // Floor (toward -infinity)
+                                FLOORFSW, FLOORFSUW, FLOORFDW, FLOORFDUW,
+                                FLOORFSL, FLOORFSUL, FLOORFDL, FLOORFDUL)>;
 
   // RECIP/RSQRT
   def : InstRW<[WriteFDiv32], (instrs RECIPFS, RSQRTFS)>;
