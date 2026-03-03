@@ -534,8 +534,8 @@ TARGET_BUILTIN(__builtin_v850_write_mctl, "vUi", "n", "rh850g3m")
 TARGET_BUILTIN(__builtin_v850_read_pid, "Ui", "n", "rh850g3m")
 
 // FPIPR - FPU interrupt priority register (regID=7, selID=1)
-// Note: This register is DELETED in RH850G3MH (FPINT exception replaces FPP/FPI).
-// Do not use on G3MH targets.
+// Note: This register is DELETED in RH850G3MH (FPINT exception replaces
+// FPP/FPI). Do not use on G3MH targets.
 TARGET_BUILTIN(__builtin_v850_read_fpipr, "Ui", "n", "rh850g3m")
 TARGET_BUILTIN(__builtin_v850_write_fpipr, "vUi", "n", "rh850g3m")
 
@@ -571,6 +571,78 @@ TARGET_BUILTIN(__builtin_v850_read_icsr, "Ui", "n", "rh850g3m")
 // INTCFG - Interrupt function setting (regID=13, selID=2)
 TARGET_BUILTIN(__builtin_v850_read_intcfg, "Ui", "n", "rh850g3m")
 TARGET_BUILTIN(__builtin_v850_write_intcfg, "vUi", "n", "rh850g3m")
+
+// ASID - Address Space ID at G3M location (regID=7, selID=2)
+// On V850E1, ASID is at regID=23, selID=0. On G3M, it moves to regID=7,
+// selID=2.
+TARGET_BUILTIN(__builtin_v850_read_asid_g2, "Ui", "n", "rh850g3m")
+TARGET_BUILTIN(__builtin_v850_write_asid_g2, "vUi", "n", "rh850g3m")
+
+//===----------------------------------------------------------------------===//
+// RH850G3M+ Named System Register Access (Group 4)
+//
+// Group 4 (selID=4): Instruction Cache Control registers.
+//===----------------------------------------------------------------------===//
+
+// ICTAGL - IC tag low (regID=16, selID=4, write-only)
+TARGET_BUILTIN(__builtin_v850_write_ictagl, "vUi", "n", "rh850g3m")
+
+// ICTAGH - IC tag high (regID=17, selID=4, write-only)
+TARGET_BUILTIN(__builtin_v850_write_ictagh, "vUi", "n", "rh850g3m")
+
+// ICDATL - IC data low (regID=18, selID=4, write-only)
+TARGET_BUILTIN(__builtin_v850_write_icdatl, "vUi", "n", "rh850g3m")
+
+// ICDATH - IC data high (regID=19, selID=4, write-only)
+TARGET_BUILTIN(__builtin_v850_write_icdath, "vUi", "n", "rh850g3m")
+
+// ICCTRL - IC control register (regID=24, selID=4)
+TARGET_BUILTIN(__builtin_v850_read_icctrl, "Ui", "n", "rh850g3m")
+TARGET_BUILTIN(__builtin_v850_write_icctrl, "vUi", "n", "rh850g3m")
+
+// ICCFG - IC configuration register (regID=26, selID=4, read-only)
+TARGET_BUILTIN(__builtin_v850_read_iccfg, "Ui", "n", "rh850g3m")
+
+// ICERR - IC error register (regID=28, selID=4)
+TARGET_BUILTIN(__builtin_v850_read_icerr, "Ui", "n", "rh850g3m")
+TARGET_BUILTIN(__builtin_v850_write_icerr, "vUi", "n", "rh850g3m")
+
+//===----------------------------------------------------------------------===//
+// RH850G3M+ Named System Register Access (Group 5)
+//
+// Group 5 (selID=5): MPU Mode/Control registers.
+// Note: Groups 6-7 (MPU region registers mpla0-15, mpua0-15, mpat0-15)
+// are best accessed via __builtin_v850_ldsr_group / __builtin_v850_stsr_group.
+//===----------------------------------------------------------------------===//
+
+// MPM - MPU operation mode register (regID=0, selID=5)
+TARGET_BUILTIN(__builtin_v850_read_mpm, "Ui", "n", "rh850g3m")
+TARGET_BUILTIN(__builtin_v850_write_mpm, "vUi", "n", "rh850g3m")
+
+// MPRC - MPU region count control register (regID=1, selID=5)
+TARGET_BUILTIN(__builtin_v850_read_mprc, "Ui", "n", "rh850g3m")
+TARGET_BUILTIN(__builtin_v850_write_mprc, "vUi", "n", "rh850g3m")
+
+// MPBRGN - MPU base region number (regID=4, selID=5, read-only)
+TARGET_BUILTIN(__builtin_v850_read_mpbrgn, "Ui", "n", "rh850g3m")
+
+// MPTRGN - MPU total region number (regID=5, selID=5, read-only)
+TARGET_BUILTIN(__builtin_v850_read_mptrgn, "Ui", "n", "rh850g3m")
+
+// MCA - MDP check address register (regID=8, selID=5)
+TARGET_BUILTIN(__builtin_v850_read_mca, "Ui", "n", "rh850g3m")
+TARGET_BUILTIN(__builtin_v850_write_mca, "vUi", "n", "rh850g3m")
+
+// MCS - MDP check size register (regID=9, selID=5)
+TARGET_BUILTIN(__builtin_v850_read_mcs, "Ui", "n", "rh850g3m")
+TARGET_BUILTIN(__builtin_v850_write_mcs, "vUi", "n", "rh850g3m")
+
+// MCC - MDP check command register (regID=10, selID=5)
+TARGET_BUILTIN(__builtin_v850_read_mcc, "Ui", "n", "rh850g3m")
+TARGET_BUILTIN(__builtin_v850_write_mcc, "vUi", "n", "rh850g3m")
+
+// MCR - MDP check result register (regID=11, selID=5, read-only)
+TARGET_BUILTIN(__builtin_v850_read_mcr, "Ui", "n", "rh850g3m")
 
 #undef BUILTIN
 #undef TARGET_BUILTIN

@@ -854,5 +854,153 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
     Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
     return Builder.CreateCall(F, {Val, Builder.getInt32((2 << 5) | 13)});
   }
+
+  // ASID_G2 - Address Space ID at G3M location (regID=7, selID=2, enc=71)
+  case V850::BI__builtin_v850_read_asid_g2: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((2 << 5) | 7));
+  }
+  case V850::BI__builtin_v850_write_asid_g2: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32((2 << 5) | 7)});
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Named G3M System Register Access (Group 4: IC Cache, selID=4)
+  //===--------------------------------------------------------------------===//
+
+  // ICTAGL - IC tag low (regID=16, selID=4, enc=144, write-only)
+  case V850::BI__builtin_v850_write_ictagl: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32((4 << 5) | 16)});
+  }
+
+  // ICTAGH - IC tag high (regID=17, selID=4, enc=145, write-only)
+  case V850::BI__builtin_v850_write_ictagh: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32((4 << 5) | 17)});
+  }
+
+  // ICDATL - IC data low (regID=18, selID=4, enc=146, write-only)
+  case V850::BI__builtin_v850_write_icdatl: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32((4 << 5) | 18)});
+  }
+
+  // ICDATH - IC data high (regID=19, selID=4, enc=147, write-only)
+  case V850::BI__builtin_v850_write_icdath: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32((4 << 5) | 19)});
+  }
+
+  // ICCTRL - IC control (regID=24, selID=4, enc=152)
+  case V850::BI__builtin_v850_read_icctrl: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((4 << 5) | 24));
+  }
+  case V850::BI__builtin_v850_write_icctrl: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32((4 << 5) | 24)});
+  }
+
+  // ICCFG - IC configuration (regID=26, selID=4, enc=154, read-only)
+  case V850::BI__builtin_v850_read_iccfg: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((4 << 5) | 26));
+  }
+
+  // ICERR - IC error (regID=28, selID=4, enc=156)
+  case V850::BI__builtin_v850_read_icerr: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((4 << 5) | 28));
+  }
+  case V850::BI__builtin_v850_write_icerr: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32((4 << 5) | 28)});
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Named G3M System Register Access (Group 5: MPU Control, selID=5)
+  //===--------------------------------------------------------------------===//
+
+  // MPM - MPU operation mode (regID=0, selID=5, enc=160)
+  case V850::BI__builtin_v850_read_mpm: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((5 << 5) | 0));
+  }
+  case V850::BI__builtin_v850_write_mpm: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32((5 << 5) | 0)});
+  }
+
+  // MPRC - MPU region count control (regID=1, selID=5, enc=161)
+  case V850::BI__builtin_v850_read_mprc: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((5 << 5) | 1));
+  }
+  case V850::BI__builtin_v850_write_mprc: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32((5 << 5) | 1)});
+  }
+
+  // MPBRGN - MPU base region number (regID=4, selID=5, enc=164, read-only)
+  case V850::BI__builtin_v850_read_mpbrgn: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((5 << 5) | 4));
+  }
+
+  // MPTRGN - MPU total region number (regID=5, selID=5, enc=165, read-only)
+  case V850::BI__builtin_v850_read_mptrgn: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((5 << 5) | 5));
+  }
+
+  // MCA - MDP check address (regID=8, selID=5, enc=168)
+  case V850::BI__builtin_v850_read_mca: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((5 << 5) | 8));
+  }
+  case V850::BI__builtin_v850_write_mca: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32((5 << 5) | 8)});
+  }
+
+  // MCS - MDP check size (regID=9, selID=5, enc=169)
+  case V850::BI__builtin_v850_read_mcs: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((5 << 5) | 9));
+  }
+  case V850::BI__builtin_v850_write_mcs: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32((5 << 5) | 9)});
+  }
+
+  // MCC - MDP check command (regID=10, selID=5, enc=170)
+  case V850::BI__builtin_v850_read_mcc: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((5 << 5) | 10));
+  }
+  case V850::BI__builtin_v850_write_mcc: {
+    Value *Val = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_ldsr);
+    return Builder.CreateCall(F, {Val, Builder.getInt32((5 << 5) | 10)});
+  }
+
+  // MCR - MDP check result (regID=11, selID=5, enc=171, read-only)
+  case V850::BI__builtin_v850_read_mcr: {
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
+    return Builder.CreateCall(F, Builder.getInt32((5 << 5) | 11));
+  }
   }
 }
