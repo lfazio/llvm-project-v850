@@ -38,13 +38,14 @@ entry:
 
 declare i32 @bar(i32)
 
-; When frame pointer is used, fall back to individual stores
-; because SP restoration from FP conflicts with DISPOSE
+; When frame pointer is used, PREPARE/DISPOSE is still used.
+; PREPARE saves r29 (old FP) and LP, then FP is set up in the prologue.
 define void @test_with_fp() "frame-pointer"="all" {
 ; V850E1-LABEL: test_with_fp:
-; V850E1: st.w r29
-; V850E1: st.w r31
+; V850E1: prepare
+; V850E1: .cfi_def_cfa r29,
 ; V850E1: jarl external, r31
+; V850E1: dispose
   call void @external()
   ret void
 }

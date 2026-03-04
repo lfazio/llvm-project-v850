@@ -106,7 +106,10 @@ void V850FrameLowering::emitPrologue(MachineFunction &MF,
   // Get the number of bytes to allocate from the FrameInfo
   uint64_t StackSize = MFI.getStackSize();
 
-  if (StackSize == 0)
+  // When block CSR save (PREPARE/PUSHSP) is used with FP, we may still need
+  // to set up FP even if StackSize == 0 (e.g., VLA-only functions). Don't
+  // return early in that case.
+  if (StackSize == 0 && !(UsedBlockCSRSave && hasFP(MF)))
     return;
 
   // Calculate total CFA offset for CFI directives.
@@ -119,40 +122,46 @@ void V850FrameLowering::emitPrologue(MachineFunction &MF,
       UsedBlockCSRSave ? CalleeSavedSize + StackSize : StackSize;
 
   // Adjust stack pointer: SP = SP - StackSize
-  // Prefer 16-bit ADDi for small offsets, then 32-bit ADDI, then use a register
-  int64_t NegStackSize = -static_cast<int64_t>(StackSize);
-  if (isInt<5>(NegStackSize)) {
-    // 16-bit ADDi for small offsets (-16 to +15)
-    BuildMI(MBB, MBBI, DL, TII.get(V850::ADDi), V850::SP)
-        .addImm(NegStackSize)
-        .addReg(V850::SP)
-        .setMIFlag(MachineInstr::FrameSetup);
-  } else if (isInt<16>(NegStackSize)) {
-    // 32-bit ADDI for medium offsets
-    BuildMI(MBB, MBBI, DL, TII.get(V850::ADDI), V850::SP)
-        .addReg(V850::SP)
-        .addImm(NegStackSize)
-        .setMIFlag(MachineInstr::FrameSetup);
-  } else {
-    // For large frames, load the offset into a temp register first
-    // Use r1 (assembler temporary)
-    BuildMI(MBB, MBBI, DL, TII.get(V850::MOVHI), V850::R1)
-        .addImm(((-static_cast<int64_t>(StackSize)) >> 16) & 0xFFFF)
-        .addReg(V850::R0)
-        .setMIFlag(MachineInstr::FrameSetup);
-    BuildMI(MBB, MBBI, DL, TII.get(V850::ADDI), V850::R1)
-        .addReg(V850::R1)
-        .addImm((-static_cast<int64_t>(StackSize)) & 0xFFFF)
-        .setMIFlag(MachineInstr::FrameSetup);
-    BuildMI(MBB, MBBI, DL, TII.get(V850::ADD), V850::SP)
-        .addReg(V850::R1)
-        .addReg(V850::SP)
-        .setMIFlag(MachineInstr::FrameSetup);
+  if (StackSize > 0) {
+    // Prefer 16-bit ADDi for small offsets, then 32-bit ADDI, then use a
+    // register
+    int64_t NegStackSize = -static_cast<int64_t>(StackSize);
+    if (isInt<5>(NegStackSize)) {
+      // 16-bit ADDi for small offsets (-16 to +15)
+      BuildMI(MBB, MBBI, DL, TII.get(V850::ADDi), V850::SP)
+          .addImm(NegStackSize)
+          .addReg(V850::SP)
+          .setMIFlag(MachineInstr::FrameSetup);
+    } else if (isInt<16>(NegStackSize)) {
+      // 32-bit ADDI for medium offsets
+      BuildMI(MBB, MBBI, DL, TII.get(V850::ADDI), V850::SP)
+          .addReg(V850::SP)
+          .addImm(NegStackSize)
+          .setMIFlag(MachineInstr::FrameSetup);
+    } else {
+      // For large frames, load the offset into a temp register first
+      // Use r1 (assembler temporary)
+      BuildMI(MBB, MBBI, DL, TII.get(V850::MOVHI), V850::R1)
+          .addImm(((-static_cast<int64_t>(StackSize)) >> 16) & 0xFFFF)
+          .addReg(V850::R0)
+          .setMIFlag(MachineInstr::FrameSetup);
+      BuildMI(MBB, MBBI, DL, TII.get(V850::ADDI), V850::R1)
+          .addReg(V850::R1)
+          .addImm((-static_cast<int64_t>(StackSize)) & 0xFFFF)
+          .setMIFlag(MachineInstr::FrameSetup);
+      BuildMI(MBB, MBBI, DL, TII.get(V850::ADD), V850::SP)
+          .addReg(V850::R1)
+          .addReg(V850::SP)
+          .setMIFlag(MachineInstr::FrameSetup);
+    }
   }
 
-  // Emit CFI directive for total CFA offset (callee-saved + locals)
+  // Emit CFI directive for total CFA offset (callee-saved + locals).
+  // Only emit when StackSize > 0, because when StackSize == 0 the CFA offset
+  // was already set by spillCalleeSavedRegisters (PREPARE/PUSHSP CFI).
   CFIInstBuilder CFIBuilder(MBB, MBBI, MachineInstr::FrameSetup);
-  CFIBuilder.buildDefCFAOffset(TotalCFAOffset);
+  if (StackSize > 0)
+    CFIBuilder.buildDefCFAOffset(TotalCFAOffset);
 
   // Set up frame pointer if needed
   // For proper frame pointer chain, FP should point to where old FP was saved
@@ -226,7 +235,9 @@ void V850FrameLowering::emitEpilogue(MachineFunction &MF,
   // Get the number of bytes to deallocate
   uint64_t StackSize = MFI.getStackSize();
 
-  if (StackSize == 0)
+  // When block CSR save is used with FP, we need to restore SP from FP even
+  // if StackSize == 0 (e.g., VLA-only functions).
+  if (StackSize == 0 && !(FuncInfo->usesBlockCSRSave() && hasFP(MF)))
     return;
 
   // When using block CSR save (PUSHSP/POPSP or DISPOSE), the
@@ -256,12 +267,26 @@ void V850FrameLowering::emitEpilogue(MachineFunction &MF,
       DL = MBBI->getDebugLoc();
   }
 
-  // Restore stack pointer from frame pointer if used
-  // FP = SP + (StackSize - FPOffset)
-  // So SP = FP - (StackSize - FPOffset) = FP - StackSize + FPOffset
+  // Restore stack pointer from frame pointer if used.
+  // In prologue: FP = SP + (TotalCFAOffset - FPOffset)
+  //   where TotalCFAOffset = CalleeSavedSize + StackSize (block CSR)
+  //                        = StackSize (fallback, CSRs in StackSize)
+  // So SP = FP - TotalCFAOffset + FPOffset = FP + (FPOffset - TotalCFAOffset)
+  //
+  // With block CSR save (PREPARE/PUSHSP), DISPOSE/POPSP expects SP at the
+  // CSR area, i.e., SP = CFA - CalleeSavedSize. So:
+  //   SPFromFP = FPOffset - CalleeSavedSize
+  // Without block save, the full frame is one unit:
+  //   SPFromFP = FPOffset - StackSize
   if (hasFP(MF)) {
     int FPOffset = FuncInfo->getFPOffset();
-    int SPFromFP = FPOffset - static_cast<int>(StackSize);
+    int SPFromFP;
+    if (FuncInfo->usesBlockCSRSave()) {
+      unsigned CalleeSavedSize = FuncInfo->getCalleeSavedStackSize();
+      SPFromFP = FPOffset - static_cast<int>(CalleeSavedSize);
+    } else {
+      SPFromFP = FPOffset - static_cast<int>(StackSize);
+    }
 
     if (SPFromFP == 0) {
       // SP = FP
@@ -370,8 +395,9 @@ bool V850FrameLowering::assignCalleeSavedSpillSlots(
 /// register is not part of the PREPARE/DISPOSE save list.
 ///
 /// The PREPARE/DISPOSE instruction (Format XIII) encodes the 12-bit list12
-/// operand into instruction bits as list12{11:1}→Inst{31:21}, list12{0}→Inst{0}.
-/// Per the V850 spec the instruction bits map to registers as:
+/// operand into instruction bits as list12{11:1}→Inst{31:21},
+/// list12{0}→Inst{0}. Per the V850 spec the instruction bits map to registers
+/// as:
 ///   Inst{31}=r24, Inst{30}=r25, Inst{29}=r26, Inst{28}=r27,
 ///   Inst{27}=r20, Inst{26}=r21, Inst{25}=r22, Inst{24}=r23,
 ///   Inst{23}=r28, Inst{22}=r29, Inst{21}=r31(LP), Inst{0}=r30(EP)
@@ -420,24 +446,37 @@ bool V850FrameLowering::spillCalleeSavedRegisters(
 
   // Calculate FP offset: where is r29 saved relative to CFA?
   // This is needed for proper frame pointer chain where [FP] = old FP.
-  //
-  // Frame layout (CSRs stored at negative offsets from CFA):
-  //   CFA - 4:  first CSR (CSI[0])
-  //   CFA - 8:  second CSR (CSI[1])
-  //   ...
-  //   CFA - (i+1)*4: CSR at index i (CSI[i])
-  //
-  // For r29 at CSI index i: r29 is at CFA - (i+1)*4
-  // FPOffset = (i+1)*4 represents the offset from CFA to where r29 is saved.
+  // FPOffset = offset from CFA to where r29 is saved (e.g., 12 means CFA-12).
   if (hasFP(MF)) {
     int FPOffset = CalleeSavedSize; // Default: last position if not found
-    for (unsigned i = 0; i < CSI.size(); ++i) {
-      if (CSI[i].getReg() == V850::R29) {
-        // r29 at CFA - (i+1)*4, so FPOffset = (i+1)*4
-        FPOffset = (i + 1) * 4;
-        break;
+
+    if (canUsePrepareDispose(MF, CSI)) {
+      // PREPARE saves in fixed order: LP, EP, r29, r28, ..., r20.
+      // Count registers saved before r29 (inclusive) to find its offset.
+      static const unsigned PrepareOrder[] = {
+          V850::LP,  V850::EP,  V850::R29, V850::R28, V850::R27, V850::R26,
+          V850::R25, V850::R24, V850::R23, V850::R22, V850::R21, V850::R20};
+      unsigned List12 = buildList12Mask(CSI);
+      int Pos = 0;
+      for (unsigned Reg : PrepareOrder) {
+        if (List12 & getList12BitForHWReg(TRI->getEncodingValue(Reg))) {
+          Pos++;
+          if (Reg == V850::R29) {
+            FPOffset = Pos * 4;
+            break;
+          }
+        }
+      }
+    } else {
+      // Fallback (individual stores): CSI order determines position.
+      for (unsigned i = 0; i < CSI.size(); ++i) {
+        if (CSI[i].getReg() == V850::R29) {
+          FPOffset = (i + 1) * 4;
+          break;
+        }
       }
     }
+
     FuncInfo->setFPOffset(FPOffset);
   }
 
@@ -747,12 +786,6 @@ bool V850FrameLowering::canUsePrepareDispose(
   // PREPARE/DISPOSE requires V850E1 or later
   const V850Subtarget &Subtarget = MF.getSubtarget<V850Subtarget>();
   if (!Subtarget.hasV850E1())
-    return false;
-
-  // When frame pointer is used, the epilogue restores SP from FP which
-  // conflicts with DISPOSE's stack pointer handling. Disable for now.
-  // TODO: Handle FP case by excluding r29 from list12 or adjusting SP.
-  if (hasFP(MF))
     return false;
 
   // Check that all callee-saved registers are in r20-r31 range

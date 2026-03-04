@@ -4,26 +4,20 @@
 ;
 ; PUSHSP/POPSP are used when:
 ;   1. Target is RH850G3M or later
-;   2. PREPARE/DISPOSE cannot be used (e.g., frame pointer required, or
-;      registers outside r20-r31 range)
+;   2. PREPARE/DISPOSE cannot be used (e.g., registers outside r20-r31
+;      range, such as interrupt handlers)
 ;
 ; PUSHSP rh, rt: pushes registers r[rh] through r[rt] to stack
 ; POPSP rh, rt: pops registers r[rh] through r[rt] from stack
 
-; Test 1: PUSHSP/POPSP with frame pointer (disables PREPARE/DISPOSE)
-; The frame pointer (r29) conflicts with DISPOSE's SP handling,
-; so PUSHSP/POPSP is used instead.
-; With no local stack frame (StackSize=0), FP is saved/restored via PUSHSP
-; but not set up as an active frame pointer (no addi to initialize r29).
-define void @pushsp_with_fp(ptr %p) "frame-pointer"="all" {
-; CHECK-LABEL: pushsp_with_fp:
-; CHECK:       pushsp r29, r29
-; CHECK:       pushsp r31, r31
-; CHECK-NOT:   addi {{.*}}, r3, r29
+; Test 1: PREPARE/DISPOSE with frame pointer.
+; Since FP no longer prevents PREPARE, this uses PREPARE for r20-r31 CSRs.
+define void @prepare_with_fp(ptr %p) "frame-pointer"="all" {
+; CHECK-LABEL: prepare_with_fp:
+; CHECK:       prepare
+; CHECK:       .cfi_def_cfa r29,
 ; CHECK:       jarl external
-; CHECK:       popsp r31, r31
-; CHECK:       popsp r29, r29
-; CHECK:       jmp [r31]
+; CHECK:       dispose
 entry:
   %v = load volatile i32, ptr %p
   call void @external(i32 %v)
@@ -49,17 +43,14 @@ entry:
   ret void
 }
 
-; Test 3: PUSHSP/POPSP with many callee-saved registers and FP.
-; When FP is used, PREPARE can't be used, so PUSHSP handles r20-r31.
-; All 10 loaded values fit in CSRs (r20-r28, r30), so StackSize=0
-; and FP is pushed/popped but not set up as an active frame pointer.
-define i32 @pushsp_many_regs(ptr %p) "frame-pointer"="all" {
-; CHECK-LABEL: pushsp_many_regs:
-; CHECK:       pushsp r20, r31
-; CHECK-NOT:   addi {{.*}}, r3, r29
+; Test 3: PREPARE/DISPOSE with many callee-saved registers and FP.
+; All CSRs are in r20-r31, so PREPARE is used even with FP.
+define i32 @prepare_many_regs_fp(ptr %p) "frame-pointer"="all" {
+; CHECK-LABEL: prepare_many_regs_fp:
+; CHECK:       prepare
+; CHECK:       .cfi_def_cfa r29,
 ; CHECK:       jarl external
-; CHECK:       popsp r20, r31
-; CHECK:       jmp [r31]
+; CHECK:       dispose
 entry:
   %v0 = load volatile i32, ptr %p
   %p1 = getelementptr i32, ptr %p, i32 1

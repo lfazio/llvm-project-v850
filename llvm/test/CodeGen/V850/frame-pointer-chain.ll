@@ -7,24 +7,24 @@
 ; When frame pointer is enabled, FP (r29) should point to where the old FP
 ; was saved, enabling debuggers to walk the stack by following the chain:
 ;   [FP] = previous frame's FP
+;
+; With PREPARE/DISPOSE enabled for FP functions, the old r29 is saved by
+; PREPARE and FP is set up via ADDI to point to the saved location.
 ;===----------------------------------------------------------------------===;
 
 ;===----------------------------------------------------------------------===;
 ; Test 1: Basic function with frame pointer
 ;
-; With frame pointer enabled:
-; - FP should point to the saved old FP location
-; - [FP] = old FP (frame chain)
-; - CFI should correctly describe the frame layout
+; PREPARE saves LP, r29, and other CSRs. FP is set up to point to saved r29.
 ;===----------------------------------------------------------------------===;
 
 ; CHECK-FP-LABEL: test_frame_chain:
+; CHECK-FP:       prepare
 ; CHECK-FP:       .cfi_def_cfa_offset
+; CHECK-FP:       .cfi_offset r31,
+; CHECK-FP:       .cfi_offset r29,
 ; CHECK-FP:       addi {{[0-9]+}}, r3, r29
 ; CHECK-FP:       .cfi_def_cfa r29,
-; Stack frame stores old FP at [FP + 0] for proper frame chain
-; CHECK-FP:       st.w r29, 0[r29]
-; CHECK-FP:       .cfi_offset r29,
 
 ; Without frame pointer, uses PREPARE instruction and no FP setup
 ; CHECK-NO-FP-LABEL: test_frame_chain:
@@ -46,8 +46,9 @@ entry:
 ;===----------------------------------------------------------------------===;
 
 ; CHECK-FP-LABEL: test_nested_calls:
+; CHECK-FP:       prepare
 ; CHECK-FP:       addi {{[0-9]+}}, r3, r29
-; CHECK-FP:       st.w r29, 0[r29]
+; CHECK-FP:       .cfi_def_cfa r29,
 define i32 @test_nested_calls(i32 %a, i32 %b) {
 entry:
   %local1 = alloca i32
@@ -66,13 +67,13 @@ entry:
 ; Test 3: Variable-sized stack allocation (alloca with variable size)
 ;
 ; Variable-sized allocations require frame pointer, and the frame chain
-; should still be correct.
+; should still be correct. StackSize == 0 with block CSR save.
 ;===----------------------------------------------------------------------===;
 
 ; CHECK-FP-LABEL: test_variable_alloca:
-; Frame pointer is required for variable alloca
+; CHECK-FP:       prepare
 ; CHECK-FP:       addi {{[0-9]+}}, r3, r29
-; CHECK-FP:       st.w r29, 0[r29]
+; CHECK-FP:       .cfi_def_cfa r29,
 define i32 @test_variable_alloca(i32 %n) {
 entry:
   %vla = alloca i32, i32 %n
@@ -90,8 +91,9 @@ entry:
 ;===----------------------------------------------------------------------===;
 
 ; CHECK-FP-LABEL: test_large_frame:
+; CHECK-FP:       prepare
 ; CHECK-FP:       addi {{[0-9]+}}, r3, r29
-; CHECK-FP:       st.w r29, 0[r29]
+; CHECK-FP:       .cfi_def_cfa r29,
 define i32 @test_large_frame(i32 %a) {
 entry:
   %local1 = alloca [100 x i32]
@@ -110,15 +112,16 @@ entry:
 ;===----------------------------------------------------------------------===;
 ; Test 5: Epilogue correctly restores SP from FP
 ;
-; SP should be correctly restored from FP in the epilogue.
+; SP should be correctly restored from FP in the epilogue before DISPOSE.
 ;===----------------------------------------------------------------------===;
 
 ; CHECK-FP-LABEL: test_epilogue_restore:
 ; Prologue: FP = SP + offset
+; CHECK-FP:       prepare
 ; CHECK-FP:       addi {{[0-9]+}}, r3, r29
-; Epilogue: SP = FP - offset (inverse of prologue)
+; Epilogue: SP = FP - offset (inverse of prologue), then DISPOSE
 ; CHECK-FP:       addi {{-[0-9]+}}, r29, r3
-; CHECK-FP:       jmp [r31]
+; CHECK-FP:       dispose
 define i32 @test_epilogue_restore(i32 %a, i32 %b) {
 entry:
   %local = alloca i32
