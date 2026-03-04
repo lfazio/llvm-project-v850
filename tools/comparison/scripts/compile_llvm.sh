@@ -28,6 +28,8 @@ CLANG="${CLANG:-${LLVM_BUILD}/bin/clang}"
 LLC="${LLC:-${LLVM_BUILD}/bin/llc}"
 LLVM_OBJDUMP="${LLVM_OBJDUMP:-${LLVM_BUILD}/bin/llvm-objdump}"
 
+echo $LLVM_OBJDUMP
+
 # Check if tools exist
 if [ ! -x "$CLANG" ]; then
     # Try system clang with V850 support
@@ -115,6 +117,7 @@ echo "Done."
 # Optionally generate disassembly for object files
 if [ "$OUTPUT_TYPE" = "obj" ] && [ -x "$LLVM_OBJDUMP" ]; then
     DISASM_FILE="${OUTPUT_FILE%.o}.dis"
-    $LLVM_OBJDUMP -mcpu=$CPU -d "$OUTPUT_FILE" > "$DISASM_FILE" 2>/dev/null || true
+    echo $LLVM_OBJDUMP -mcpu=$CPU -d "$OUTPUT_FILE"
+    $LLVM_OBJDUMP --mcpu=$CPU -d "$OUTPUT_FILE" > "$DISASM_FILE" 2>/dev/null || true
     echo "Disassembly: $DISASM_FILE"
 fi

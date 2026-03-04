@@ -39,6 +39,7 @@ class BenchmarkResult:
     success: bool
     asm_file: Optional[str]
     obj_file: Optional[str]
+    dis_file: Optional[str]
     size_bytes: int
     error_message: str
 
@@ -91,6 +92,10 @@ def run_llvm_compile(
 
         size = obj_file.stat().st_size if obj_file.exists() else 0
 
+        # compile_llvm.sh generates .dis alongside .o when objdump is available
+        dis_file = output_dir / f"{name}_llvm.dis"
+        dis_path = str(dis_file) if dis_file.exists() else None
+
         return BenchmarkResult(
             name=name,
             source_file=str(source),
@@ -100,6 +105,7 @@ def run_llvm_compile(
             success=True,
             asm_file=str(asm_file),
             obj_file=str(obj_file),
+            dis_file=dis_path,
             size_bytes=size,
             error_message="",
         )
@@ -113,6 +119,7 @@ def run_llvm_compile(
             success=False,
             asm_file=None,
             obj_file=None,
+            dis_file=None,
             size_bytes=0,
             error_message=e.stderr or str(e),
         )
@@ -139,6 +146,7 @@ def run_ccrh_compile(
             success=False,
             asm_file=None,
             obj_file=None,
+            dis_file=None,
             size_bytes=0,
             error_message="CCRH_PATH not set",
         )
@@ -158,6 +166,9 @@ def run_ccrh_compile(
         str(compile_script),
         f"-O{opt_level}",
         f"-Xcpu={cpu}",
+        "-Xswitch=binary",
+        "-Xreserve_r2",
+        "-Xfloat=fpu",
         "-S",
         "-o",
         str(asm_file),
@@ -179,6 +190,9 @@ def run_ccrh_compile(
         str(compile_script),
         f"-O{opt_level}",
         f"-Xcpu={cpu}",
+        "-Xswitch=binary",
+        "-Xreserve_r2",
+        "-Xfloat=fpu",
         "-c",
         "-o",
         str(obj_file),
@@ -200,6 +214,7 @@ def run_ccrh_compile(
             success=True,
             asm_file=str(asm_file),
             obj_file=str(obj_file),
+            dis_file=None,
             size_bytes=size,
             error_message="",
         )
@@ -213,6 +228,7 @@ def run_ccrh_compile(
             success=False,
             asm_file=None,
             obj_file=None,
+            dis_file=None,
             size_bytes=0,
             error_message=e.stderr or str(e),
         )
@@ -250,6 +266,10 @@ def compare_results(
         "-o",
         str(report_file),
     ]
+
+    # Pass disassembly file for cross-verification when available
+    if llvm_result.dis_file:
+        cmd.extend(["--disasm", llvm_result.dis_file, "--mode", "full"])
 
     try:
         subprocess.run(cmd, check=True, capture_output=True)

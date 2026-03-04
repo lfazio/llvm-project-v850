@@ -179,10 +179,3 @@ else
 fi
 
 echo "Done."
-
-# Generate disassembly using CC-RH's objdump equivalent or external tool
-if [ "$OUTPUT_TYPE" = "obj" ] && [ -x "$LLVM_OBJDUMP" ]; then
-    DISASM_FILE="${OUTPUT_FILE%.o}.dis"
-    $LLVM_OBJDUMP -mcpu=$CPU -d "$OUTPUT_FILE" > "$DISASM_FILE" 2>/dev/null || true
-    echo "Disassembly: $DISASM_FILE"
-fi
