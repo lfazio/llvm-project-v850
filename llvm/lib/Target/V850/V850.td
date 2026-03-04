@@ -63,6 +63,10 @@ def FeatureRH850G3M : SubtargetFeature<"rh850g3m", "HasRH850G3M", "true",
                                         "Enable RH850G3M extensions",
                                         [FeatureV850E2M]>;
 
+// FPIPR feature - FPU interrupt priority register (present on G3M, removed on G3MH+)
+def FeatureV850FPIPR : SubtargetFeature<"v850-fpipr", "HasV850FPIPR", "true",
+                                         "Has FPIPR register">;
+
 // RH850G3MH feature - G3M with performance enhancements
 // Simplified FPU exceptions (FPINT replaces FPP/FPI), FPIPR register removed
 def FeatureRH850G3MH : SubtargetFeature<"rh850g3mh", "HasRH850G3MH", "true",
@@ -110,7 +114,7 @@ def : ProcessorModel<"v850e3", V850E2MModel, [FeatureV850E3]>;
 def : ProcessorModel<"v850e3v5", V850E2MModel, [FeatureV850E3]>;
 
 // RH850 processors (use RH850G3MModel - improved timings over V850E2M)
-def : ProcessorModel<"g3m", RH850G3MModel, [FeatureRH850G3M]>;
+def : ProcessorModel<"g3m", RH850G3MModel, [FeatureRH850G3M, FeatureV850FPIPR]>;
 def : ProcessorModel<"g3mh", RH850G3MModel, [FeatureRH850G3MH]>;
 
 //===----------------------------------------------------------------------===//
