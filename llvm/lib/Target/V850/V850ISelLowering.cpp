@@ -819,7 +819,7 @@ SDValue V850TargetLowering::LowerINTRINSIC_W_CHAIN(SDValue Op,
   case Intrinsic::loop_decrement_reg: {
     // loop_decrement_reg(counter, decrement) -> counter - decrement
     // The result feeds back through a phi as the new counter value.
-    // A later machine pass can convert sub+bne into the LOOP instruction.
+    // V850HardwareLoopPass converts add -1 + cmp 0 + bnz into LOOP.
     SDValue Chain = Op.getOperand(0);
     SDValue Counter = Op.getOperand(2); // operand 1 is intrinsic ID
     SDValue Decrement = Op.getOperand(3);

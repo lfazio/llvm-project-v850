@@ -18,6 +18,7 @@ add_public_tablegen_target(V850CommonTableGen)
 add_llvm_target(V850CodeGen
   V850AsmPrinter.cpp
   V850FrameLowering.cpp
+  V850HardwareLoopPass.cpp
   V850InstrInfo.cpp
   V850ISelDAGToDAG.cpp
   V850ISelLowering.cpp

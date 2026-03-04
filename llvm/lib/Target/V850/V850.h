@@ -36,9 +36,14 @@ FunctionPass *createV850LoadStoreOptimizerPass();
 // on V850 machine code, such as folding MOV+ADD to MOV immediate.
 FunctionPass *createV850PeepholeOptimizerPass();
 
+// createV850HardwareLoopPass - This pass converts ADD -1 + CMP 0 + BNZ
+// patterns into the RH850G3M+ LOOP instruction.
+FunctionPass *createV850HardwareLoopPass();
+
 void initializeV850DAGToDAGISelLegacyPass(PassRegistry &);
 void initializeV850LoadStoreOptimizerPass(PassRegistry &);
 void initializeV850PeepholeOptimizerPass(PassRegistry &);
+void initializeV850HardwareLoopPassPass(PassRegistry &);
 void initializeV850AsmPrinterPass(PassRegistry &);
 
 } // namespace llvm

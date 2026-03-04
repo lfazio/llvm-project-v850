@@ -3243,7 +3243,7 @@ let Predicates = [HasRH850G3M], DecoderNamespace = "RH850G3M" in {
   //===----------------------------------------------------------------------===//
 
   let isBranch = 1, isTerminator = 1,
-      Uses = [PSW] in def LOOP
+      Defs = [PSW] in def LOOP
       : V850Inst32<(outs GPR:$reg1_out), (ins GPR:$reg1, brtarget16:$disp16),
                    "loop $reg1, $disp16", []> {
     bits<5> reg1;

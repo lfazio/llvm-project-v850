@@ -34,6 +34,7 @@ extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void LLVMInitializeV850Target() {
   initializeV850DAGToDAGISelLegacyPass(PR);
   initializeV850LoadStoreOptimizerPass(PR);
   initializeV850PeepholeOptimizerPass(PR);
+  initializeV850HardwareLoopPassPass(PR);
 }
 
 static std::string computeDataLayout(const Triple &TT) {
@@ -150,6 +151,11 @@ void V850PassConfig::addPreEmitPass() {
   // to MOV immediate, removing redundant ANDI after zero-extending loads.
   if (getOptLevel() != CodeGenOptLevel::None)
     addPass(createV850PeepholeOptimizerPass());
+
+  // Hardware loop conversion: converts ADD -1 + CMP 0 + BNZ patterns into
+  // the RH850G3M+ LOOP instruction. Must run before branch relaxation.
+  if (getOptLevel() != CodeGenOptLevel::None)
+    addPass(createV850HardwareLoopPass());
 
   // Load/store optimizer: promotes 32-bit LD.W/ST.W to 16-bit SLD.W/SST.W
   // when EP is the base and displacement fits. Must run before branch

@@ -525,6 +525,10 @@ bool V850InstrInfo::isBranchOffsetInRange(unsigned BranchOpc,
   // Range: approximately ±2MB
   case V850::JR:
     return isInt<22>(BrOffset) && (BrOffset & 1) == 0;
+
+  // LOOP uses 16-bit displacement (backward branch only)
+  case V850::LOOP:
+    return isInt<16>(BrOffset) && (BrOffset & 1) == 0 && BrOffset <= 0;
   }
 }
 
@@ -551,6 +555,10 @@ V850InstrInfo::getBranchDestBlock(const MachineInstr &MI) const {
   case V850::BGT:
   case V850::JR:
     return MI.getOperand(0).getMBB();
+  // LOOP: (outs GPR:$reg1_out), (ins GPR:$reg1, brtarget16:$disp16)
+  // Branch target is operand 2.
+  case V850::LOOP:
+    return MI.getOperand(2).getMBB();
   }
 }
 
