@@ -74,21 +74,14 @@ int mod_const8(int a) { return a % 8; }
 unsigned umod_const3(unsigned a) { return a % 3; }
 
 /* Saturating arithmetic (tests SATADD/SATSUB) */
+/* Use builtins — manual overflow checks on signed int are UB in C and get
+   optimized away, resulting in plain add/sub instead of satadd/satsub. */
 int sat_add(int a, int b) {
-    int result = a + b;
-    /* Check for overflow */
-    if ((b > 0 && result < a) || (b < 0 && result > a)) {
-        return (b > 0) ? 0x7FFFFFFF : 0x80000000;
-    }
-    return result;
+    return __builtin_v850_satadd(a, b);
 }
 
 int sat_sub(int a, int b) {
-    int result = a - b;
-    if ((b < 0 && result < a) || (b > 0 && result > a)) {
-        return (b < 0) ? 0x7FFFFFFF : 0x80000000;
-    }
-    return result;
+    return __builtin_v850_satsub(a, b);
 }
 
 /* Absolute value */
