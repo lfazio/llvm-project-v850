@@ -1753,27 +1753,27 @@ let Predicates = [HasV850E2] in {
 
   // MAC reg1, reg2, reg3, reg4 - Multiply-accumulate signed
   // (reg3:reg4) = (reg3:reg4) + sext(reg1) * sext(reg2)
-  // Opcode: 111111, sub-op: 011110, sub-id: 00000
-  def MAC : FormatXI<0b111111, 0b011110, 0b00000, (outs GPR:$reg3, GPR:$reg4),
-                     (ins GPR:$reg1, GPR:$reg2, GPR:$reg3_in, GPR:$reg4_in),
-                     "mac\t$reg1, $reg2, $reg3, $reg4",
-                     [(set GPR:$reg3, GPR:$reg4,
-                         (V850smac GPR:$reg1, GPR:$reg2, GPR:$reg3_in,
-                             GPR:$reg4_in))]>,
-            Requires<[HasV850E2M]> {
+  // Opcode: 111111, sub-op: 011110, reg4 in bits[20:16]
+  def MAC : FormatXI_MAC<0b111111, 0b011110, (outs GPR:$reg3, GPR:$reg4),
+                          (ins GPR:$reg1, GPR:$reg2, GPR:$reg3_in, GPR:$reg4_in),
+                          "mac\t$reg1, $reg2, $reg3, $reg4",
+                          [(set GPR:$reg3, GPR:$reg4,
+                              (V850smac GPR:$reg1, GPR:$reg2, GPR:$reg3_in,
+                                  GPR:$reg4_in))]>,
+             Requires<[HasV850E2M]> {
     let Constraints = "$reg3_in = $reg3, $reg4_in = $reg4";
   }
 
   // MACU reg1, reg2, reg3, reg4 - Multiply-accumulate unsigned
   // (reg3:reg4) = (reg3:reg4) + zext(reg1) * zext(reg2)
-  // Opcode: 111111, sub-op: 011111, sub-id: 00000
-  def MACU : FormatXI<0b111111, 0b011111, 0b00000, (outs GPR:$reg3, GPR:$reg4),
-                      (ins GPR:$reg1, GPR:$reg2, GPR:$reg3_in, GPR:$reg4_in),
-                      "macu\t$reg1, $reg2, $reg3, $reg4",
-                      [(set GPR:$reg3, GPR:$reg4,
-                          (V850umac GPR:$reg1, GPR:$reg2, GPR:$reg3_in,
-                              GPR:$reg4_in))]>,
-             Requires<[HasV850E2M]> {
+  // Opcode: 111111, sub-op: 011111, reg4 in bits[20:16]
+  def MACU : FormatXI_MAC<0b111111, 0b011111, (outs GPR:$reg3, GPR:$reg4),
+                           (ins GPR:$reg1, GPR:$reg2, GPR:$reg3_in, GPR:$reg4_in),
+                           "macu\t$reg1, $reg2, $reg3, $reg4",
+                           [(set GPR:$reg3, GPR:$reg4,
+                               (V850umac GPR:$reg1, GPR:$reg2, GPR:$reg3_in,
+                                   GPR:$reg4_in))]>,
+              Requires<[HasV850E2M]> {
     let Constraints = "$reg3_in = $reg3, $reg4_in = $reg4";
   }
 
@@ -1858,29 +1858,8 @@ let Predicates = [HasV850E2] in {
     def : Pat<(shl GPR:$reg2, GPR:$reg1), (SHL_3 GPR:$reg2, GPR:$reg1)>;
   }
 
-  //===----------------------------------------------------------------------===//
-  // 3-operand Saturated Arithmetic Instructions (V850E2)
-  //===----------------------------------------------------------------------===//
-
-  // SATADD reg1, reg2, reg3 - Saturating add 3-operand
-  // Opcode: 111111, sub-op: 011101, sub-id: 00010
-  // Flags: CY, OV, S, Z, SAT modified
-  // Operation: reg3 = saturate(reg2 + reg1)
-  // Use AddedComplexity to prefer 3-operand over 2-operand when available
-  let Defs = [PSW], AddedComplexity = 1 in def SATADD_3
-      : FormatXI<0b111111, 0b011101, 0b00010, (outs GPR:$reg3),
-                 (ins GPR:$reg2, GPR:$reg1), "satadd\t$reg1, $reg2, $reg3",
-                 [(set GPR:$reg3, (saddsat GPR:$reg2, GPR:$reg1))]>;
-
-  // SATSUB reg1, reg2, reg3 - Saturating subtract 3-operand
-  // Opcode: 111111, sub-op: 011100, sub-id: 00010
-  // Flags: CY, OV, S, Z, SAT modified
-  // Operation: reg3 = saturate(reg2 - reg1)
-  // Use AddedComplexity to prefer 3-operand over 2-operand when available
-  let Defs = [PSW], AddedComplexity = 1 in def SATSUB_3
-      : FormatXI<0b111111, 0b011100, 0b00010, (outs GPR:$reg3),
-                 (ins GPR:$reg2, GPR:$reg1), "satsub\t$reg1, $reg2, $reg3",
-                 [(set GPR:$reg3, (ssubsat GPR:$reg2, GPR:$reg1))]>;
+  // NOTE: 3-operand SATADD/SATSUB moved to V850E2M DecoderNamespace block
+  // to avoid decoder conflict with ADF/SBF (same subop, overlapping subid).
 
   //===----------------------------------------------------------------------===//
   // HSH Instruction
@@ -1900,9 +1879,7 @@ let Predicates = [HasV850E2] in {
   // Intrinsic pattern for HSH
   def : Pat<(int_v850_hsh GPR:$src), (HSH GPR:$src)>;
 
-  // Intrinsic patterns for 3-operand saturating arithmetic
-  def : Pat<(int_v850_satadd3 GPR:$a, GPR:$b), (SATADD_3 GPR:$a, GPR:$b)>;
-  def : Pat<(int_v850_satsub3 GPR:$a, GPR:$b), (SATSUB_3 GPR:$a, GPR:$b)>;
+  // NOTE: Intrinsic patterns for SATADD_3/SATSUB_3 moved to V850E2M block.
 
   //===----------------------------------------------------------------------===//
   // 32-bit Displacement Jump Instructions (V850E2)
@@ -1950,6 +1927,34 @@ def uimm4_nz : Operand<i32>, ImmLeaf<i32, [{return Imm >= 1 && Imm <= 15;}]> {
 // 8-bit unsigned immediate for SYSCALL vector
 def uimm8 : Operand<i32>, ImmLeaf<i32, [{return isUInt<8>(Imm);}]> {
   let DecoderMethod = "decodeUImmOperand<8>";
+}
+
+//===----------------------------------------------------------------------===//
+// 3-operand Saturated Arithmetic Instructions (V850E2+)
+// Placed in V850E2M DecoderNamespace to avoid conflict with ADF/SBF
+// (ADF cond=C has identical encoding to SATADD_3: subop=011101, subid=00010)
+//===----------------------------------------------------------------------===//
+
+let Predicates = [HasV850E2], DecoderNamespace = "V850E2M" in {
+  // SATADD reg1, reg2, reg3 - Saturating add 3-operand
+  // Opcode: 111111, sub-op: 011101, sub-id: 00010
+  let Defs = [PSW], AddedComplexity = 1 in def SATADD_3
+      : FormatXI<0b111111, 0b011101, 0b00010, (outs GPR:$reg3),
+                 (ins GPR:$reg2, GPR:$reg1), "satadd\t$reg1, $reg2, $reg3",
+                 [(set GPR:$reg3, (saddsat GPR:$reg2, GPR:$reg1))]>;
+
+  // SATSUB reg1, reg2, reg3 - Saturating subtract 3-operand
+  // Opcode: 111111, sub-op: 011100, sub-id: 00010
+  let Defs = [PSW], AddedComplexity = 1 in def SATSUB_3
+      : FormatXI<0b111111, 0b011100, 0b00010, (outs GPR:$reg3),
+                 (ins GPR:$reg2, GPR:$reg1), "satsub\t$reg1, $reg2, $reg3",
+                 [(set GPR:$reg3, (ssubsat GPR:$reg2, GPR:$reg1))]>;
+} // DecoderNamespace = "V850E2M"
+
+// Intrinsic patterns for 3-operand saturating arithmetic
+let Predicates = [HasV850E2] in {
+  def : Pat<(int_v850_satadd3 GPR:$a, GPR:$b), (SATADD_3 GPR:$a, GPR:$b)>;
+  def : Pat<(int_v850_satsub3 GPR:$a, GPR:$b), (SATSUB_3 GPR:$a, GPR:$b)>;
 }
 
 let Predicates = [HasV850E2M], DecoderNamespace = "V850E2M" in {

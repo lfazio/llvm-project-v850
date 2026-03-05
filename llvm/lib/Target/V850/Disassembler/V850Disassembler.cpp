@@ -663,8 +663,10 @@ DecodeStatus V850Disassembler::getInstruction(MCInst &MI, uint64_t &Size,
   // halfword happens to match Format III (Bcond) pattern because bits[10:7]
   // equals 0b1011 (branch opcode), so we need to prefer 32-bit for Format V.
 
-  bool Prefer32 = (Opcode6 == 0x3F) || // Extended opcode
-                  (Opcode6 == 0x2F);   // JR/JARL (Format V)
+  unsigned Opcode5 = (Insn16 >> 6) & 0x1F; // bits[10:6]
+  bool Prefer32 = (Opcode6 == 0x3F) ||     // Extended opcode
+                  (Opcode6 == 0x2F) ||      // JR/JARL (Format V)
+                  (Reg2 == 0 && Opcode5 == 0x19); // PREPARE/DISPOSE (FormatXIII)
 
   if (Prefer32 && Bytes.size() >= 4) {
     DecodeStatus R = getInstruction32(MI, Size, Bytes, Address, CS);

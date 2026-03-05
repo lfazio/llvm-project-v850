@@ -44,10 +44,16 @@ public:
   MCFixupKindInfo getFixupKindInfo(MCFixupKind Kind) const override {
     const static MCFixupKindInfo Infos[V850::NumTargetFixupKinds] = {
         // name                    offset  bits  flags
-        {"fixup_v850_9_pcrel", 0, 9, 0},   {"fixup_v850_16_pcrel", 0, 16, 0},
-        {"fixup_v850_17_pcrel", 0, 17, 0}, {"fixup_v850_22_pcrel", 0, 22, 0},
-        {"fixup_v850_16", 16, 16, 0},      {"fixup_v850_32", 0, 32, 0},
-        {"fixup_v850_hi16", 16, 16, 0},    {"fixup_v850_lo16", 16, 16, 0},
+        // PC-relative fixups use full instruction width because displacement
+        // bits are scattered across the encoding (not contiguous).
+        {"fixup_v850_9_pcrel", 0, 16, 0},
+        {"fixup_v850_16_pcrel", 0, 16, 0},
+        {"fixup_v850_17_pcrel", 0, 32, 0},
+        {"fixup_v850_22_pcrel", 0, 32, 0},
+        {"fixup_v850_16", 16, 16, 0},
+        {"fixup_v850_32", 0, 32, 0},
+        {"fixup_v850_hi16", 16, 16, 0},
+        {"fixup_v850_lo16", 16, 16, 0},
         {"fixup_v850_sda_16", 16, 16, 0},
     };
 
@@ -90,7 +96,7 @@ public:
       // Value is shifted right by 1 (bit 0 always 0)
       Value >>= 1;
       // Upper 5 bits go to [15:11], lower 3 bits to [6:4]
-      Data[Offset] = (Data[Offset] & 0x0F) | ((Value & 0x07) << 4);
+      Data[Offset] = (Data[Offset] & 0x8F) | ((Value & 0x07) << 4);
       Data[Offset + 1] = (Data[Offset + 1] & 0x07) | ((Value >> 3) & 0x1F) << 3;
       return;
     case V850::fixup_v850_16_pcrel:
@@ -117,7 +123,7 @@ public:
       // Value is shifted right by 1
       Value >>= 1;
       // Split across 32-bit instruction
-      Data[Offset] = Value & 0x3F;
+      Data[Offset] = (Data[Offset] & 0xC0) | (Value & 0x3F);
       Data[Offset + 2] = (Value >> 6) & 0xFF;
       Data[Offset + 3] = (Value >> 14) & 0xFF;
       return;

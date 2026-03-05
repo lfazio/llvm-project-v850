@@ -337,6 +337,30 @@ class FormatXI<bits<6> opcode, bits<6> subop, bits<5> subid, dag outs, dag ins,
 }
 
 //===----------------------------------------------------------------------===//
+// Format XI-MAC: Extended 4-operand reg-reg-reg-reg (32-bit)
+// First halfword: 15-11 = reg2, 10-5 = 111111, 4-0 = reg1
+// Second halfword: 31-27 = reg3, 26-21 = sub-op, 20-16 = reg4
+// Used for: MAC, MACU (multiply-accumulate)
+// Unlike FormatXI, bits[20:16] encode reg4 instead of a fixed subid.
+//===----------------------------------------------------------------------===//
+
+class FormatXI_MAC<bits<6> opcode, bits<6> subop, dag outs, dag ins,
+                   string asmstr, list<dag> pattern>
+    : V850Inst32<outs, ins, asmstr, pattern> {
+  bits<5> reg1;
+  bits<5> reg2;
+  bits<5> reg3;
+  bits<5> reg4;
+
+  let Inst{15 -11} = reg2;
+  let Inst{10 -5} = opcode;
+  let Inst{4 -0} = reg1;
+  let Inst{31 -27} = reg3;
+  let Inst{26 -21} = subop;
+  let Inst{20 -16} = reg4;
+}
+
+//===----------------------------------------------------------------------===//
 // Format XI-IMM: Extended 3-operand with 9-bit immediate (32-bit)
 // First halfword: 15-11 = reg2, 10-5 = 111111, 4-0 = imm9[4:0]
 // Second halfword: 31-27 = reg3, 26-21 = sub-op, 20-17 = imm9[8:5], 16 = 0
