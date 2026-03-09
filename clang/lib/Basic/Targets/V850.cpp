@@ -95,6 +95,25 @@ void V850TargetInfo::getTargetDefines(const LangOptions &Opts,
     Builder.defineMacro("__rh850g3m__");
     Builder.defineMacro("__rh850g3mh__");
     break;
+  case CK_RH850G4MH:
+    Builder.defineMacro("__v850e__");
+    Builder.defineMacro("__v850e2__");
+    Builder.defineMacro("__v850e2m__");
+    Builder.defineMacro("__rh850__");
+    Builder.defineMacro("__rh850g3m__");
+    Builder.defineMacro("__rh850g3mh__");
+    Builder.defineMacro("__rh850g4mh__");
+    break;
+  case CK_RH850G4MH2:
+    Builder.defineMacro("__v850e__");
+    Builder.defineMacro("__v850e2__");
+    Builder.defineMacro("__v850e2m__");
+    Builder.defineMacro("__rh850__");
+    Builder.defineMacro("__rh850g3m__");
+    Builder.defineMacro("__rh850g3mh__");
+    Builder.defineMacro("__rh850g4mh__");
+    Builder.defineMacro("__rh850g4mh2__");
+    break;
   default:
     break;
   }
@@ -135,6 +154,8 @@ bool V850TargetInfo::isValidCPUName(StringRef Name) const {
       .Case("v850e3", true)
       .Case("g3m", true)
       .Case("g3mh", true)
+      .Case("g4mh", true)
+      .Case("g4mh2", true)
       .Default(false);
 }
 
@@ -149,6 +170,8 @@ void V850TargetInfo::fillValidCPUList(
   Values.emplace_back("v850e3");
   Values.emplace_back("g3m");
   Values.emplace_back("g3mh");
+  Values.emplace_back("g4mh");
+  Values.emplace_back("g4mh2");
 }
 
 bool V850TargetInfo::setCPU(const std::string &Name) {
@@ -162,6 +185,8 @@ bool V850TargetInfo::setCPU(const std::string &Name) {
             .Case("v850e3", CK_V850E3)
             .Case("g3m", CK_RH850G3M)
             .Case("g3mh", CK_RH850G3MH)
+            .Case("g4mh", CK_RH850G4MH)
+            .Case("g4mh2", CK_RH850G4MH2)
             .Default(CK_NONE);
 
   // V850E2M and later have FPU by default (includes RH850 variants)
@@ -194,6 +219,8 @@ bool V850TargetInfo::initFeatureMap(
                         .Case("v850e3", CK_V850E3)
                         .Case("g3m", CK_RH850G3M)
                         .Case("g3mh", CK_RH850G3MH)
+                        .Case("g4mh", CK_RH850G4MH)
+                        .Case("g4mh2", CK_RH850G4MH2)
                         .Default(CK_V850);
 
   // V850E1 and later (including V850ES)
@@ -226,6 +253,14 @@ bool V850TargetInfo::initFeatureMap(
   // RH850G3MH and later
   if (CpuKind >= CK_RH850G3MH)
     Features["rh850g3mh"] = true;
+
+  // RH850G4MH and later
+  if (CpuKind >= CK_RH850G4MH)
+    Features["rh850g4mh"] = true;
+
+  // RH850G4MH2 and later
+  if (CpuKind >= CK_RH850G4MH2)
+    Features["rh850g4mh2"] = true;
 
   return TargetInfo::initFeatureMap(Features, Diags, CPU, FeaturesVec);
 }

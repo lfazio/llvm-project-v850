@@ -270,6 +270,10 @@ def HasRH850G3M : Predicate<"Subtarget->hasRH850G3M()">,
                   AssemblerPredicate<(all_of FeatureRH850G3M), "RH850G3M">;
 def HasRH850G3MH : Predicate<"Subtarget->hasRH850G3MH()">,
                    AssemblerPredicate<(all_of FeatureRH850G3MH), "RH850G3MH">;
+def HasRH850G4MH : Predicate<"Subtarget->hasRH850G4MH()">,
+                   AssemblerPredicate<(all_of FeatureRH850G4MH), "RH850G4MH">;
+def HasRH850G4MH2 : Predicate<"Subtarget->hasRH850G4MH2()">,
+                    AssemblerPredicate<(all_of FeatureRH850G4MH2), "RH850G4MH2">;
 
 //===----------------------------------------------------------------------===//
 // Instruction Pattern Stuff

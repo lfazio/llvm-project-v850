@@ -34,6 +34,7 @@ void v850::getV850TargetFeatures(const Driver &D, const ArgList &Args,
     CPUHasFPU = llvm::StringSwitch<bool>(CPU)
                     .Cases("v850e2m", "v850e2v3", "v850e3", "v850e3v5", true)
                     .Cases("g3m", "g3mh", true)
+                    .Cases("g4mh", "g4mh2", true)
                     .Default(false);
   }
 

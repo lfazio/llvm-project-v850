@@ -73,6 +73,16 @@ def FeatureRH850G3MH : SubtargetFeature<"rh850g3mh", "HasRH850G3MH", "true",
                                          "Enable RH850G3MH extensions",
                                          [FeatureRH850G3M]>;
 
+// RH850G4MH feature - adds post-increment load/store, CLIP, FXU vector unit
+def FeatureRH850G4MH : SubtargetFeature<"rh850g4mh", "HasRH850G4MH", "true",
+                                          "Enable RH850G4MH extensions",
+                                          [FeatureRH850G3MH]>;
+
+// RH850G4MH2 feature - adds virtualization (HVTRAP, LDM.GSR, STM.GSR) and MPU bulk ops
+def FeatureRH850G4MH2 : SubtargetFeature<"rh850g4mh2", "HasRH850G4MH2", "true",
+                                           "Enable RH850G4MH2 extensions (virtualization)",
+                                           [FeatureRH850G4MH]>;
+
 //===----------------------------------------------------------------------===//
 // Register File, Calling Conv, Instruction Descriptions
 //===----------------------------------------------------------------------===//
@@ -116,6 +126,8 @@ def : ProcessorModel<"v850e3v5", V850E2MModel, [FeatureV850E3]>;
 // RH850 processors (use RH850G3MModel - improved timings over V850E2M)
 def : ProcessorModel<"g3m", RH850G3MModel, [FeatureRH850G3M, FeatureV850FPIPR]>;
 def : ProcessorModel<"g3mh", RH850G3MModel, [FeatureRH850G3MH]>;
+def : ProcessorModel<"g4mh", RH850G3MModel, [FeatureRH850G4MH, FeatureV850FPU]>;
+def : ProcessorModel<"g4mh2", RH850G3MModel, [FeatureRH850G4MH2, FeatureV850FPU]>;
 
 //===----------------------------------------------------------------------===//
 // V850 assembly writer

@@ -41,6 +41,8 @@ class V850Subtarget : public V850GenSubtargetInfo {
   bool HasRH850G3M = false;
   bool HasV850FPIPR = false;
   bool HasRH850G3MH = false;
+  bool HasRH850G4MH = false;
+  bool HasRH850G4MH2 = false;
 
   V850InstrInfo InstrInfo;
   V850TargetLowering TLInfo;
@@ -86,6 +88,8 @@ public:
   bool hasRH850G3M() const { return HasRH850G3M; }
   bool hasV850FPIPR() const { return HasV850FPIPR; }
   bool hasRH850G3MH() const { return HasRH850G3MH; }
+  bool hasRH850G4MH() const { return HasRH850G4MH; }
+  bool hasRH850G4MH2() const { return HasRH850G4MH2; }
 
   // Post-RA scheduling support
   // Enable anti-dependency breaking for all registers to improve scheduling
