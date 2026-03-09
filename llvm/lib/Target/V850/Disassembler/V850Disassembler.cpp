@@ -408,6 +408,17 @@ DecodeStatus V850Disassembler::getInstruction32(MCInst &MI, uint64_t &Size,
     return MCDisassembler::Success;
   }
 
+  // Try RH850G4MH-specific instructions (superset of G3M)
+  if (STI.hasFeature(V850::FeatureRH850G4MH)) {
+    MI.clear();
+    DecodeStatus Result = decodeInstruction(DecoderTableRH850G4MH32, MI, Insn32,
+                                            Address, this, STI);
+    if (Result != MCDisassembler::Fail) {
+      Size = 4;
+      return Result;
+    }
+  }
+
   // Try RH850G3M-specific instructions (superset of V850E2M)
   if (HasRH850G3M) {
     MI.clear();

@@ -416,4 +416,26 @@ let TargetPrefix = "v850" in { // All intrinsics start with "llvm.v850.".
                   [llvm_i32_ty, llvm_i32_ty, llvm_i32_ty, llvm_i32_ty],
                   [IntrNoMem, ImmArg<ArgIndex<2>>, ImmArg<ArgIndex<3>>]>;
 
+  // CLIP - Value saturation (RH850G4MH+)
+
+  // i32 @llvm.v850.clip.b(i32 %x)
+  // Clamps signed value to byte range [-128, 127]
+  def int_v850_clip_b : Intrinsic<[llvm_i32_ty], [llvm_i32_ty],
+                                  [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
+
+  // i32 @llvm.v850.clip.bu(i32 %x)
+  // Clamps value to unsigned byte range [0, 255]
+  def int_v850_clip_bu : Intrinsic<[llvm_i32_ty], [llvm_i32_ty],
+                                   [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
+
+  // i32 @llvm.v850.clip.h(i32 %x)
+  // Clamps signed value to halfword range [-32768, 32767]
+  def int_v850_clip_h : Intrinsic<[llvm_i32_ty], [llvm_i32_ty],
+                                  [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
+
+  // i32 @llvm.v850.clip.hu(i32 %x)
+  // Clamps value to unsigned halfword range [0, 65535]
+  def int_v850_clip_hu : Intrinsic<[llvm_i32_ty], [llvm_i32_ty],
+                                   [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
+
 } // TargetPrefix = "v850"

@@ -1002,5 +1002,27 @@ Value *CodeGenFunction::EmitV850BuiltinExpr(unsigned BuiltinID,
     Function *F = CGM.getIntrinsic(Intrinsic::v850_stsr);
     return Builder.CreateCall(F, Builder.getInt32((5 << 5) | 11));
   }
+
+  // RH850G4MH CLIP - Value saturation
+  case V850::BI__builtin_v850_clip_b: {
+    Value *Src = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_clip_b);
+    return Builder.CreateCall(F, Src);
+  }
+  case V850::BI__builtin_v850_clip_bu: {
+    Value *Src = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_clip_bu);
+    return Builder.CreateCall(F, Src);
+  }
+  case V850::BI__builtin_v850_clip_h: {
+    Value *Src = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_clip_h);
+    return Builder.CreateCall(F, Src);
+  }
+  case V850::BI__builtin_v850_clip_hu: {
+    Value *Src = EmitScalarExpr(E->getArg(0));
+    Function *F = CGM.getIntrinsic(Intrinsic::v850_clip_hu);
+    return Builder.CreateCall(F, Src);
+  }
   }
 }

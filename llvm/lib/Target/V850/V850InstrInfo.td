@@ -3485,6 +3485,58 @@ let Predicates = [HasRH850G3M], DecoderNamespace = "RH850G3M" in {
 } // Predicates = [HasRH850G3M], DecoderNamespace = "RH850G3M"
 
 //===----------------------------------------------------------------------===//
+// RH850G4MH Instructions
+//===----------------------------------------------------------------------===//
+// These instructions are only available on RH850G4MH and later processors.
+//===----------------------------------------------------------------------===//
+
+let Predicates = [HasRH850G4MH], DecoderNamespace = "RH850G4MH" in {
+
+  //===--------------------------------------------------------------------===//
+  // CLIP Instructions - Value saturation (RH850G4MH+)
+  //===--------------------------------------------------------------------===//
+  // Format XI: reg2_111111_reg1 | 00000_000000_subid
+  // opcode=111111, subop=000000, reg3=0
+
+  // CLIP.B reg1, reg2 - Clamp signed value to byte range [-128, 127]
+  let Defs = [PSW] in def CLIP_B
+      : FormatXI<0b111111, 0b000000, 0b01000, (outs GPR:$reg2), (ins GPR:$reg1),
+                 "clip.b\t$reg1, $reg2", []> {
+    let reg3 = 0;
+  }
+
+  // CLIP.BU reg1, reg2 - Clamp value to unsigned byte range [0, 255]
+  let Defs = [PSW] in def CLIP_BU
+      : FormatXI<0b111111, 0b000000, 0b01010, (outs GPR:$reg2), (ins GPR:$reg1),
+                 "clip.bu\t$reg1, $reg2", []> {
+    let reg3 = 0;
+  }
+
+  // CLIP.H reg1, reg2 - Clamp signed value to halfword range [-32768, 32767]
+  let Defs = [PSW] in def CLIP_H
+      : FormatXI<0b111111, 0b000000, 0b01100, (outs GPR:$reg2), (ins GPR:$reg1),
+                 "clip.h\t$reg1, $reg2", []> {
+    let reg3 = 0;
+  }
+
+  // CLIP.HU reg1, reg2 - Clamp value to unsigned halfword range [0, 65535]
+  let Defs = [PSW] in def CLIP_HU
+      : FormatXI<0b111111, 0b000000, 0b01110, (outs GPR:$reg2), (ins GPR:$reg1),
+                 "clip.hu\t$reg1, $reg2", []> {
+    let reg3 = 0;
+  }
+
+} // Predicates = [HasRH850G4MH], DecoderNamespace = "RH850G4MH"
+
+// Intrinsic patterns for RH850G4MH CLIP instructions
+let Predicates = [HasRH850G4MH] in {
+  def : Pat<(int_v850_clip_b GPR:$src), (CLIP_B GPR:$src)>;
+  def : Pat<(int_v850_clip_bu GPR:$src), (CLIP_BU GPR:$src)>;
+  def : Pat<(int_v850_clip_h GPR:$src), (CLIP_H GPR:$src)>;
+  def : Pat<(int_v850_clip_hu GPR:$src), (CLIP_HU GPR:$src)>;
+} // Predicates = [HasRH850G4MH]
+
+//===----------------------------------------------------------------------===//
 // Intrinsic patterns for RH850G3M instructions
 // Note: Patterns don't need DecoderNamespace, only Predicates
 //===----------------------------------------------------------------------===//

@@ -644,5 +644,15 @@ TARGET_BUILTIN(__builtin_v850_write_mcc, "vUi", "n", "rh850g3m")
 // MCR - MDP check result register (regID=11, selID=5, read-only)
 TARGET_BUILTIN(__builtin_v850_read_mcr, "Ui", "n", "rh850g3m")
 
+// RH850G4MH CLIP - Value saturation instructions
+// CLIP.B: Clamp signed value to byte range [-128, 127]
+TARGET_BUILTIN(__builtin_v850_clip_b, "ii", "nc", "rh850g4mh")
+// CLIP.BU: Clamp value to unsigned byte range [0, 255]
+TARGET_BUILTIN(__builtin_v850_clip_bu, "Uii", "nc", "rh850g4mh")
+// CLIP.H: Clamp signed value to halfword range [-32768, 32767]
+TARGET_BUILTIN(__builtin_v850_clip_h, "ii", "nc", "rh850g4mh")
+// CLIP.HU: Clamp value to unsigned halfword range [0, 65535]
+TARGET_BUILTIN(__builtin_v850_clip_hu, "Uii", "nc", "rh850g4mh")
+
 #undef BUILTIN
 #undef TARGET_BUILTIN
