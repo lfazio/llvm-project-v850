@@ -600,6 +600,40 @@ class FormatFPU_TRFSR<dag outs, dag ins, string asmstr, list<dag> pattern>
   let Inst{16} = 0;
 }
 
+//===----------------------------------------------------------------------===//
+// Format XI-PostInc: Post-increment/decrement load/store (32-bit)
+// RH850G4MH+
+// First halfword:  15-11 = dir (direction/signedness), 10-5 = 111111,
+//                  4-0 = reg1 (base register, updated in-place)
+// Second halfword: 31-27 = reg3 (data register), 26-21 = 011011 (subop),
+//                  20-16 = subid (data type/size)
+//
+// dir encoding:
+//   00010 = post-increment (signed load / store)
+//   00011 = post-increment (unsigned load)
+//   00100 = post-decrement (signed load / store)
+//   00101 = post-decrement (unsigned load)
+//
+// subid encoding:
+//   10000 = byte load, 10010 = byte store
+//   10100 = halfword load, 10110 = halfword store
+//   11000 = word load, 11010 = word store
+//===----------------------------------------------------------------------===//
+
+class FormatXI_PostInc<bits<5> dir, bits<5> subid, dag outs, dag ins,
+                       string asmstr, list<dag> pattern>
+    : V850Inst32<outs, ins, asmstr, pattern> {
+  bits<5> reg1;
+  bits<5> reg3;
+
+  let Inst{15 -11} = dir;       // Direction/signedness (NOT a register)
+  let Inst{10 -5} = 0b111111;   // opcode (always)
+  let Inst{4 -0} = reg1;        // Base address register
+  let Inst{31 -27} = reg3;      // Data register
+  let Inst{26 -21} = 0b011011;  // subop (always)
+  let Inst{20 -16} = subid;     // Data type
+}
+
 // FPU comparison instructions: FPCC[fcbit] = reg2 cmp reg1
 // Used for: CMPF.S, CMPF.D
 // Encoding: reg2[15:11], 111111[10:5], reg1[4:0] | 0fcond[31:27],

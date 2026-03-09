@@ -3526,6 +3526,148 @@ let Predicates = [HasRH850G4MH], DecoderNamespace = "RH850G4MH" in {
     let reg3 = 0;
   }
 
+  //===--------------------------------------------------------------------===//
+  // Post-Increment/Decrement Load/Store Instructions (RH850G4MH+)
+  //===--------------------------------------------------------------------===//
+  // Format XI-PostInc: dir_111111_reg1 | reg3_011011_subid
+  // These instructions load/store data and automatically update the base
+  // register by the access size (±1/2/4 bytes).
+  // Constraint: reg1 != reg3 for loads (writeback wins over load).
+
+  // --- Post-increment loads: reg3 = mem[reg1]; reg1 += step ---
+  let mayLoad = 1, hasSideEffects = 0 in {
+    // LD.B [reg1]+, reg3 — signed byte load, post-increment
+    def LDB_PostInc : FormatXI_PostInc<0b00010, 0b10000,
+      (outs GPR:$reg3, GPR:$wb), (ins GPR:$reg1),
+      "ld.b\t[$reg1]+, $reg3", []> {
+      let Constraints = "$wb = $reg1";
+      let DecoderMethod = "DecodePostIncLoadInstruction";
+    }
+
+    // LD.B [reg1]-, reg3 — signed byte load, post-decrement
+    def LDB_PostDec : FormatXI_PostInc<0b00100, 0b10000,
+      (outs GPR:$reg3, GPR:$wb), (ins GPR:$reg1),
+      "ld.b\t[$reg1]-, $reg3", []> {
+      let Constraints = "$wb = $reg1";
+      let DecoderMethod = "DecodePostIncLoadInstruction";
+    }
+
+    // LD.BU [reg1]+, reg3 — unsigned byte load, post-increment
+    def LDBU_PostInc : FormatXI_PostInc<0b00011, 0b10000,
+      (outs GPR:$reg3, GPR:$wb), (ins GPR:$reg1),
+      "ld.bu\t[$reg1]+, $reg3", []> {
+      let Constraints = "$wb = $reg1";
+      let DecoderMethod = "DecodePostIncLoadInstruction";
+    }
+
+    // LD.BU [reg1]-, reg3 — unsigned byte load, post-decrement
+    def LDBU_PostDec : FormatXI_PostInc<0b00101, 0b10000,
+      (outs GPR:$reg3, GPR:$wb), (ins GPR:$reg1),
+      "ld.bu\t[$reg1]-, $reg3", []> {
+      let Constraints = "$wb = $reg1";
+      let DecoderMethod = "DecodePostIncLoadInstruction";
+    }
+
+    // LD.H [reg1]+, reg3 — signed halfword load, post-increment
+    def LDH_PostInc : FormatXI_PostInc<0b00010, 0b10100,
+      (outs GPR:$reg3, GPR:$wb), (ins GPR:$reg1),
+      "ld.h\t[$reg1]+, $reg3", []> {
+      let Constraints = "$wb = $reg1";
+      let DecoderMethod = "DecodePostIncLoadInstruction";
+    }
+
+    // LD.H [reg1]-, reg3 — signed halfword load, post-decrement
+    def LDH_PostDec : FormatXI_PostInc<0b00100, 0b10100,
+      (outs GPR:$reg3, GPR:$wb), (ins GPR:$reg1),
+      "ld.h\t[$reg1]-, $reg3", []> {
+      let Constraints = "$wb = $reg1";
+      let DecoderMethod = "DecodePostIncLoadInstruction";
+    }
+
+    // LD.HU [reg1]+, reg3 — unsigned halfword load, post-increment
+    def LDHU_PostInc : FormatXI_PostInc<0b00011, 0b10100,
+      (outs GPR:$reg3, GPR:$wb), (ins GPR:$reg1),
+      "ld.hu\t[$reg1]+, $reg3", []> {
+      let Constraints = "$wb = $reg1";
+      let DecoderMethod = "DecodePostIncLoadInstruction";
+    }
+
+    // LD.HU [reg1]-, reg3 — unsigned halfword load, post-decrement
+    def LDHU_PostDec : FormatXI_PostInc<0b00101, 0b10100,
+      (outs GPR:$reg3, GPR:$wb), (ins GPR:$reg1),
+      "ld.hu\t[$reg1]-, $reg3", []> {
+      let Constraints = "$wb = $reg1";
+      let DecoderMethod = "DecodePostIncLoadInstruction";
+    }
+
+    // LD.W [reg1]+, reg3 — word load, post-increment
+    def LDW_PostInc : FormatXI_PostInc<0b00010, 0b11000,
+      (outs GPR:$reg3, GPR:$wb), (ins GPR:$reg1),
+      "ld.w\t[$reg1]+, $reg3", []> {
+      let Constraints = "$wb = $reg1";
+      let DecoderMethod = "DecodePostIncLoadInstruction";
+    }
+
+    // LD.W [reg1]-, reg3 — word load, post-decrement
+    def LDW_PostDec : FormatXI_PostInc<0b00100, 0b11000,
+      (outs GPR:$reg3, GPR:$wb), (ins GPR:$reg1),
+      "ld.w\t[$reg1]-, $reg3", []> {
+      let Constraints = "$wb = $reg1";
+      let DecoderMethod = "DecodePostIncLoadInstruction";
+    }
+  } // mayLoad
+
+  // --- Post-increment stores: mem[reg1] = reg3; reg1 += step ---
+  let mayStore = 1, hasSideEffects = 0 in {
+    // ST.B reg3, [reg1]+ — byte store, post-increment
+    def STB_PostInc : FormatXI_PostInc<0b00010, 0b10010,
+      (outs GPR:$wb), (ins GPR:$reg3, GPR:$reg1),
+      "st.b\t$reg3, [$reg1]+", []> {
+      let Constraints = "$wb = $reg1";
+      let DecoderMethod = "DecodePostIncStoreInstruction";
+    }
+
+    // ST.B reg3, [reg1]- — byte store, post-decrement
+    def STB_PostDec : FormatXI_PostInc<0b00100, 0b10010,
+      (outs GPR:$wb), (ins GPR:$reg3, GPR:$reg1),
+      "st.b\t$reg3, [$reg1]-", []> {
+      let Constraints = "$wb = $reg1";
+      let DecoderMethod = "DecodePostIncStoreInstruction";
+    }
+
+    // ST.H reg3, [reg1]+ — halfword store, post-increment
+    def STH_PostInc : FormatXI_PostInc<0b00010, 0b10110,
+      (outs GPR:$wb), (ins GPR:$reg3, GPR:$reg1),
+      "st.h\t$reg3, [$reg1]+", []> {
+      let Constraints = "$wb = $reg1";
+      let DecoderMethod = "DecodePostIncStoreInstruction";
+    }
+
+    // ST.H reg3, [reg1]- — halfword store, post-decrement
+    def STH_PostDec : FormatXI_PostInc<0b00100, 0b10110,
+      (outs GPR:$wb), (ins GPR:$reg3, GPR:$reg1),
+      "st.h\t$reg3, [$reg1]-", []> {
+      let Constraints = "$wb = $reg1";
+      let DecoderMethod = "DecodePostIncStoreInstruction";
+    }
+
+    // ST.W reg3, [reg1]+ — word store, post-increment
+    def STW_PostInc : FormatXI_PostInc<0b00010, 0b11010,
+      (outs GPR:$wb), (ins GPR:$reg3, GPR:$reg1),
+      "st.w\t$reg3, [$reg1]+", []> {
+      let Constraints = "$wb = $reg1";
+      let DecoderMethod = "DecodePostIncStoreInstruction";
+    }
+
+    // ST.W reg3, [reg1]- — word store, post-decrement
+    def STW_PostDec : FormatXI_PostInc<0b00100, 0b11010,
+      (outs GPR:$wb), (ins GPR:$reg3, GPR:$reg1),
+      "st.w\t$reg3, [$reg1]-", []> {
+      let Constraints = "$wb = $reg1";
+      let DecoderMethod = "DecodePostIncStoreInstruction";
+    }
+  } // mayStore
+
 } // Predicates = [HasRH850G4MH], DecoderNamespace = "RH850G4MH"
 
 // Intrinsic patterns for RH850G4MH CLIP instructions

@@ -265,6 +265,56 @@ static DecodeStatus decodeBranchTarget32(MCInst &Inst, uint32_t Imm,
 }
 
 //===----------------------------------------------------------------------===//
+// Post-Increment Load/Store Decoders (RH850G4MH+)
+//===----------------------------------------------------------------------===//
+
+// Custom decoder for post-increment/decrement load instructions.
+// These have 2 outputs: reg3 (loaded data) and wb (writeback = reg1).
+// Format: dir[15:11] 111111[10:5] reg1[4:0] | reg3[31:27] 011011[26:21]
+// subid[20:16]
+static DecodeStatus
+DecodePostIncLoadInstruction(MCInst &MI, uint32_t Insn, uint64_t Address,
+                             const MCDisassembler *Decoder) {
+  unsigned Reg3 = (Insn >> 27) & 0x1F;
+  unsigned Reg1 = Insn & 0x1F;
+
+  if (Reg3 >= 32 || Reg1 >= 32)
+    return MCDisassembler::Fail;
+
+  // Output 0: reg3 (loaded data)
+  MI.addOperand(MCOperand::createReg(GPRDecoderTable[Reg3]));
+  // Output 1: wb (writeback, tied to reg1)
+  MI.addOperand(MCOperand::createReg(GPRDecoderTable[Reg1]));
+  // Input 0: reg1 (base address)
+  MI.addOperand(MCOperand::createReg(GPRDecoderTable[Reg1]));
+
+  return MCDisassembler::Success;
+}
+
+// Custom decoder for post-increment/decrement store instructions.
+// These have 1 output: wb (writeback = reg1), and 2 inputs: reg3, reg1.
+// Format: dir[15:11] 111111[10:5] reg1[4:0] | reg3[31:27] 011011[26:21]
+// subid[20:16]
+static DecodeStatus
+DecodePostIncStoreInstruction(MCInst &MI, uint32_t Insn, uint64_t Address,
+                              const MCDisassembler *Decoder) {
+  unsigned Reg3 = (Insn >> 27) & 0x1F;
+  unsigned Reg1 = Insn & 0x1F;
+
+  if (Reg3 >= 32 || Reg1 >= 32)
+    return MCDisassembler::Fail;
+
+  // Output 0: wb (writeback, tied to reg1)
+  MI.addOperand(MCOperand::createReg(GPRDecoderTable[Reg1]));
+  // Input 0: reg3 (data to store)
+  MI.addOperand(MCOperand::createReg(GPRDecoderTable[Reg3]));
+  // Input 1: reg1 (base address)
+  MI.addOperand(MCOperand::createReg(GPRDecoderTable[Reg1]));
+
+  return MCDisassembler::Success;
+}
+
+//===----------------------------------------------------------------------===//
 // Decoder Table
 // Note: V850MCTargetDesc.h already includes GET_SUBTARGETINFO_ENUM
 //===----------------------------------------------------------------------===//
@@ -675,9 +725,10 @@ DecodeStatus V850Disassembler::getInstruction(MCInst &MI, uint64_t &Size,
   // equals 0b1011 (branch opcode), so we need to prefer 32-bit for Format V.
 
   unsigned Opcode5 = (Insn16 >> 6) & 0x1F; // bits[10:6]
-  bool Prefer32 = (Opcode6 == 0x3F) ||     // Extended opcode
-                  (Opcode6 == 0x2F) ||      // JR/JARL (Format V)
-                  (Reg2 == 0 && Opcode5 == 0x19); // PREPARE/DISPOSE (FormatXIII)
+  bool Prefer32 =
+      (Opcode6 == 0x3F) ||            // Extended opcode
+      (Opcode6 == 0x2F) ||            // JR/JARL (Format V)
+      (Reg2 == 0 && Opcode5 == 0x19); // PREPARE/DISPOSE (FormatXIII)
 
   if (Prefer32 && Bytes.size() >= 4) {
     DecodeStatus R = getInstruction32(MI, Size, Bytes, Address, CS);

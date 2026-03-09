@@ -620,6 +620,15 @@ ParseStatus V850AsmParser::parseMemoryOperand(OperandVector &Operands) {
   Operands.push_back(V850Operand::createToken("]", Parser.getTok().getLoc()));
   Parser.Lex(); // Consume ']'
 
+  // Check for post-increment/decrement suffix: [reg]+ or [reg]-
+  if (Parser.getTok().is(AsmToken::Plus)) {
+    Operands.push_back(V850Operand::createToken("+", Parser.getTok().getLoc()));
+    Parser.Lex(); // Consume '+'
+  } else if (Parser.getTok().is(AsmToken::Minus)) {
+    Operands.push_back(V850Operand::createToken("-", Parser.getTok().getLoc()));
+    Parser.Lex(); // Consume '-'
+  }
+
   return ParseStatus::Success;
 }
 
