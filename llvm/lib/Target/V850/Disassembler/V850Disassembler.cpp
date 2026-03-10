@@ -354,6 +354,36 @@ static DecodeStatus DecodeMPUInstruction(MCInst &MI, uint32_t Insn,
   return MCDisassembler::Success;
 }
 
+/// DecodeVirtInstruction - Custom decoder for RH850G4MH2 virtualization
+/// instructions: HVTRAP, LDM.GSR, STM.GSR.
+/// These share opcode=111111 with bits[15:11]=0 but differ in the second
+/// halfword.
+static DecodeStatus DecodeVirtInstruction(MCInst &MI, uint32_t Insn,
+                                          uint64_t Address,
+                                          const MCDisassembler *Decoder) {
+  unsigned Operand = Insn & 0x1F; // bits[4:0]: vector5 or reg1
+  unsigned SecondHalf = (Insn >> 16) & 0xFFFF;
+
+  switch (SecondHalf) {
+  case 0x0110:
+    // HVTRAP vector5
+    MI.addOperand(MCOperand::createImm(Operand));
+    break;
+  case 0x9960:
+    // LDM.GSR [reg1]
+    MI.addOperand(MCOperand::createReg(GPRDecoderTable[Operand]));
+    break;
+  case 0x9160:
+    // STM.GSR [reg1]
+    MI.addOperand(MCOperand::createReg(GPRDecoderTable[Operand]));
+    break;
+  default:
+    return MCDisassembler::Fail;
+  }
+
+  return MCDisassembler::Success;
+}
+
 //===----------------------------------------------------------------------===//
 // Decoder Table
 // Note: V850MCTargetDesc.h already includes GET_SUBTARGETINFO_ENUM

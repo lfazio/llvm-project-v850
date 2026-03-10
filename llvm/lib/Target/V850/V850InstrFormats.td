@@ -661,6 +661,47 @@ class FormatXI_MPU<bits<11> subop_subid, dag outs, dag ins,
   let Inst{26 -16} = subop_subid;    // subop + subid
 }
 
+//===----------------------------------------------------------------------===//
+// Format X-HVTRAP: Hypervisor trap (32-bit)
+// First halfword:  00000 111111 vector5[4:0]
+// Second halfword: 00000 00100 0 10000
+//
+// Used for: HVTRAP (RH850G4MH2)
+//===----------------------------------------------------------------------===//
+
+class FormatX_HVTRAP<dag outs, dag ins, string asmstr, list<dag> pattern>
+    : V850Inst32<outs, ins, asmstr, pattern> {
+  bits<5> vector;
+
+  let Inst{15 -11} = 0;
+  let Inst{10 -5} = 0b111111;
+  let Inst{4 -0} = vector;
+  let Inst{31 -16} = 0b0000000100010000;
+}
+
+//===----------------------------------------------------------------------===//
+// Format X-GSR: Guest system register bulk load/store (32-bit)
+// First halfword:  00000 111111 reg1[4:0]
+// Second halfword: disc[31:27] 001011 00000[20:16]
+//
+// disc = 10011 for LDM.GSR, 10010 for STM.GSR
+//
+// Used for: LDM.GSR, STM.GSR (RH850G4MH2)
+//===----------------------------------------------------------------------===//
+
+class FormatX_GSR<bits<5> disc, dag outs, dag ins, string asmstr,
+                  list<dag> pattern>
+    : V850Inst32<outs, ins, asmstr, pattern> {
+  bits<5> reg1;
+
+  let Inst{15 -11} = 0;
+  let Inst{10 -5} = 0b111111;
+  let Inst{4 -0} = reg1;
+  let Inst{31 -27} = disc;
+  let Inst{26 -21} = 0b001011;
+  let Inst{20 -16} = 0;
+}
+
 // FPU comparison instructions: FPCC[fcbit] = reg2 cmp reg1
 // Used for: CMPF.S, CMPF.D
 // Encoding: reg2[15:11], 111111[10:5], reg1[4:0] | 0fcond[31:27],

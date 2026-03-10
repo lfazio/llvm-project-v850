@@ -1025,6 +1025,15 @@ bool V850AsmParser::parseInstruction(ParseInstructionInfo &Info, StringRef Name,
     return false;
   }
 
+  // LDM.GSR/STM.GSR use [reg1] indirect syntax (no displacement, no comma)
+  if (Name.equals_insensitive("ldm.gsr") ||
+      Name.equals_insensitive("stm.gsr")) {
+    if (!parseMemoryOperand(Operands).isSuccess())
+      return Error(Parser.getTok().getLoc(),
+                   "expected '[reg]' for ldm.gsr/stm.gsr");
+    return false;
+  }
+
   // Parse first operand
   if (!parseOperand(Operands, Name).isSuccess())
     return true;

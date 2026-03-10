@@ -3707,6 +3707,44 @@ let Predicates = [HasRH850G4MH2], DecoderNamespace = "RH850G4MH2" in {
 } // Predicates = [HasRH850G4MH2], DecoderNamespace = "RH850G4MH2"
 
 //===----------------------------------------------------------------------===//
+// RH850G4MH2 Virtualization Instructions
+//===----------------------------------------------------------------------===//
+
+let Predicates = [HasRH850G4MH2], DecoderNamespace = "RH850G4MH2" in {
+
+  // HVTRAP - Hypervisor EI-level trap
+  // Saves PC in HMEIPC, PSW in HMEIPSW, transitions guest→host mode
+  // Requires HVCFG.HVE=1 and PSW.UM=0 (SV privilege)
+  let hasSideEffects = 1, mayLoad = 0, mayStore = 0 in
+  def HVTRAP : FormatX_HVTRAP<
+    (outs), (ins uimm5:$vector),
+    "hvtrap\t$vector", []> {
+    let DecoderMethod = "DecodeVirtInstruction";
+  }
+
+  // LDM.GSR - Load Multiple Guest System Registers
+  // Loads predefined guest system registers from memory at [reg1]
+  // Requires HVCFG.HVE=1, PSWH.GM=0 (host mode), PSW.UM=0 (SV privilege)
+  let hasSideEffects = 1, mayLoad = 1, mayStore = 0 in
+  def LDM_GSR : FormatX_GSR<0b10011,
+    (outs), (ins GPR:$reg1),
+    "ldm.gsr\t[$reg1]", []> {
+    let DecoderMethod = "DecodeVirtInstruction";
+  }
+
+  // STM.GSR - Store Multiple Guest System Registers
+  // Stores predefined guest system registers to memory at [reg1]
+  // Requires HVCFG.HVE=1, PSWH.GM=0 (host mode), PSW.UM=0 (SV privilege)
+  let hasSideEffects = 1, mayLoad = 0, mayStore = 1 in
+  def STM_GSR : FormatX_GSR<0b10010,
+    (outs), (ins GPR:$reg1),
+    "stm.gsr\t[$reg1]", []> {
+    let DecoderMethod = "DecodeVirtInstruction";
+  }
+
+} // Predicates = [HasRH850G4MH2], DecoderNamespace = "RH850G4MH2"
+
+//===----------------------------------------------------------------------===//
 // Intrinsic patterns for RH850G3M instructions
 // Note: Patterns don't need DecoderNamespace, only Predicates
 //===----------------------------------------------------------------------===//
