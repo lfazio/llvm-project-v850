@@ -138,6 +138,91 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
   SDLoc DL(Node);
 
   switch (Node->getOpcode()) {
+  case ISD::LOAD: {
+    LoadSDNode *LD = cast<LoadSDNode>(Node);
+    ISD::MemIndexedMode AM = LD->getAddressingMode();
+    if (AM != ISD::POST_INC && AM != ISD::POST_DEC)
+      break;
+
+    // Select post-increment/decrement load instruction based on memory type
+    // and sign extension.
+    EVT MemVT = LD->getMemoryVT();
+    ISD::LoadExtType ExtType = LD->getExtensionType();
+    bool IsInc = (AM == ISD::POST_INC);
+    unsigned Opc;
+
+    if (MemVT == MVT::i8) {
+      if (ExtType == ISD::SEXTLOAD)
+        Opc = IsInc ? V850::LDB_PostInc : V850::LDB_PostDec;
+      else
+        Opc = IsInc ? V850::LDBU_PostInc : V850::LDBU_PostDec;
+    } else if (MemVT == MVT::i16) {
+      if (ExtType == ISD::SEXTLOAD)
+        Opc = IsInc ? V850::LDH_PostInc : V850::LDH_PostDec;
+      else
+        Opc = IsInc ? V850::LDHU_PostInc : V850::LDHU_PostDec;
+    } else if (MemVT == MVT::i32) {
+      Opc = IsInc ? V850::LDW_PostInc : V850::LDW_PostDec;
+    } else {
+      break;
+    }
+
+    SDValue Base = LD->getBasePtr();
+    SDValue Chain = LD->getChain();
+
+    // Emit: (data, updated_base, chain) = LD_PostInc/Dec base, chain
+    SDValue Ops[] = {Base, Chain};
+    SDNode *ResNode =
+        CurDAG->getMachineNode(Opc, DL, MVT::i32, MVT::i32, MVT::Other, Ops);
+
+    // Transfer memory operand for alias analysis.
+    CurDAG->setNodeMemRefs(cast<MachineSDNode>(ResNode), {LD->getMemOperand()});
+
+    ReplaceUses(SDValue(Node, 0), SDValue(ResNode, 0)); // data
+    ReplaceUses(SDValue(Node, 1), SDValue(ResNode, 1)); // updated base
+    ReplaceUses(SDValue(Node, 2), SDValue(ResNode, 2)); // chain
+    CurDAG->RemoveDeadNode(Node);
+    return;
+  }
+
+  case ISD::STORE: {
+    StoreSDNode *ST = cast<StoreSDNode>(Node);
+    ISD::MemIndexedMode AM = ST->getAddressingMode();
+    if (AM != ISD::POST_INC && AM != ISD::POST_DEC)
+      break;
+
+    // Select post-increment/decrement store instruction based on memory type.
+    EVT MemVT = ST->getMemoryVT();
+    bool IsInc = (AM == ISD::POST_INC);
+    unsigned Opc;
+
+    if (MemVT == MVT::i8)
+      Opc = IsInc ? V850::STB_PostInc : V850::STB_PostDec;
+    else if (MemVT == MVT::i16)
+      Opc = IsInc ? V850::STH_PostInc : V850::STH_PostDec;
+    else if (MemVT == MVT::i32)
+      Opc = IsInc ? V850::STW_PostInc : V850::STW_PostDec;
+    else
+      break;
+
+    SDValue Data = ST->getValue();
+    SDValue Base = ST->getBasePtr();
+    SDValue Chain = ST->getChain();
+
+    // Emit: (updated_base, chain) = ST_PostInc/Dec data, base, chain
+    SDValue Ops[] = {Data, Base, Chain};
+    SDNode *ResNode =
+        CurDAG->getMachineNode(Opc, DL, MVT::i32, MVT::Other, Ops);
+
+    // Transfer memory operand for alias analysis.
+    CurDAG->setNodeMemRefs(cast<MachineSDNode>(ResNode), {ST->getMemOperand()});
+
+    ReplaceUses(SDValue(Node, 0), SDValue(ResNode, 0)); // updated base
+    ReplaceUses(SDValue(Node, 1), SDValue(ResNode, 1)); // chain
+    CurDAG->RemoveDeadNode(Node);
+    return;
+  }
+
   case ISD::BITCAST: {
     // Handle bitcast between i32 and f32 (GPR and FPR share physical regs)
     SDValue Src = Node->getOperand(0);

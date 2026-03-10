@@ -155,6 +155,11 @@ public:
                               AtomicOrdering Ord) const override;
   void emitAtomicCmpXchgNoStoreLLBalance(IRBuilderBase &Builder) const override;
 
+  // Post-indexed addressing support (RH850G4MH+)
+  bool getPostIndexedAddressParts(SDNode *N, SDNode *Op, SDValue &Base,
+                                  SDValue &Offset, ISD::MemIndexedMode &AM,
+                                  SelectionDAG &DAG) const override;
+
   // Custom instruction insertion for pseudo instructions
   MachineBasicBlock *
   EmitInstrWithCustomInserter(MachineInstr &MI,

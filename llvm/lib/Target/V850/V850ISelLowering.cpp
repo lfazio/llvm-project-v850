@@ -313,6 +313,17 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
   setMinFunctionAlignment(Align(2));
   setPrefFunctionAlignment(Align(4));
 
+  // Post-increment/decrement load/store (RH850G4MH+)
+  // V850 post-increment has fixed step sizes: ±1 (byte), ±2 (half), ±4 (word)
+  if (STI.hasRH850G4MH()) {
+    for (auto VT : {MVT::i8, MVT::i16, MVT::i32}) {
+      setIndexedLoadAction(ISD::POST_INC, VT, Legal);
+      setIndexedLoadAction(ISD::POST_DEC, VT, Legal);
+      setIndexedStoreAction(ISD::POST_INC, VT, Legal);
+      setIndexedStoreAction(ISD::POST_DEC, VT, Legal);
+    }
+  }
+
   // Enable DAG combining for MAC pattern recognition (V850E2M+)
   // We check both ADD (for legacy pattern) and ADDE (when ADDC/ADDE are Legal)
   if (STI.hasV850E2M()) {
@@ -1706,6 +1717,79 @@ static SDValue performORCombine(SDNode *N, SelectionDAG &DAG,
   // The SASF consumes the glue from CMP to use PSW flags
   SDValue CCVal = DAG.getConstant(V850CC, DL, MVT::i32);
   return DAG.getNode(V850ISD::SASF, DL, MVT::i32, ShiftInput, CCVal, Cmp);
+}
+
+bool V850TargetLowering::getPostIndexedAddressParts(SDNode *N, SDNode *Op,
+                                                    SDValue &Base,
+                                                    SDValue &Offset,
+                                                    ISD::MemIndexedMode &AM,
+                                                    SelectionDAG &DAG) const {
+  if (!Subtarget.hasRH850G4MH())
+    return false;
+
+  // Op must be an ADD or SUB that updates the base pointer.
+  if (Op->getOpcode() != ISD::ADD && Op->getOpcode() != ISD::SUB)
+    return false;
+
+  // Get the memory access type to determine the required step size.
+  EVT VT;
+  SDValue BasePtr;
+  if (LoadSDNode *LD = dyn_cast<LoadSDNode>(N)) {
+    VT = LD->getMemoryVT();
+    BasePtr = LD->getBasePtr();
+  } else if (StoreSDNode *ST = dyn_cast<StoreSDNode>(N)) {
+    VT = ST->getMemoryVT();
+    BasePtr = ST->getBasePtr();
+  } else {
+    return false;
+  }
+
+  // Determine required step size based on access width.
+  unsigned StepSize;
+  if (VT == MVT::i8)
+    StepSize = 1;
+  else if (VT == MVT::i16)
+    StepSize = 2;
+  else if (VT == MVT::i32)
+    StepSize = 4;
+  else
+    return false;
+
+  // Find which operand of Op is the base pointer.
+  SDValue OpOther;
+  if (Op->getOperand(0) == BasePtr) {
+    OpOther = Op->getOperand(1);
+  } else if (Op->getOperand(1) == BasePtr) {
+    OpOther = Op->getOperand(0);
+  } else {
+    return false;
+  }
+
+  // The other operand must be a constant matching the step size.
+  ConstantSDNode *COffset = dyn_cast<ConstantSDNode>(OpOther);
+  if (!COffset)
+    return false;
+
+  int64_t OffsetVal = COffset->getSExtValue();
+
+  if (Op->getOpcode() == ISD::ADD) {
+    if (OffsetVal == (int64_t)StepSize)
+      AM = ISD::POST_INC;
+    else if (OffsetVal == -(int64_t)StepSize)
+      AM = ISD::POST_DEC;
+    else
+      return false;
+  } else {
+    // SUB: base - step = post-decrement
+    if (OffsetVal == (int64_t)StepSize)
+      AM = ISD::POST_DEC;
+    else
+      return false;
+  }
+
+  Base = BasePtr;
+  Offset = OpOther;
+  return true;
 }
 
 SDValue V850TargetLowering::PerformDAGCombine(SDNode *N,
