@@ -3679,6 +3679,34 @@ let Predicates = [HasRH850G4MH] in {
 } // Predicates = [HasRH850G4MH]
 
 //===----------------------------------------------------------------------===//
+// RH850G4MH2 MPU bulk load/store instructions
+//===----------------------------------------------------------------------===//
+
+let Predicates = [HasRH850G4MH2], DecoderNamespace = "RH850G4MH2" in {
+
+  // LDM.MP [reg1], eh-et — Load multiple MPU entries from memory
+  // Loads MPLA/MPUA/MPAT for entries eh through et from [reg1]
+  // SV privilege instruction
+  let mayLoad = 1, hasSideEffects = 1 in
+  def LDM_MP : FormatXI_MPU<0b00101100110,
+    (outs), (ins GPR:$reg1, uimm5:$eh, uimm5:$et),
+    "ldm.mp\t[$reg1], ${eh}-${et}", []> {
+    let DecoderMethod = "DecodeMPUInstruction";
+  }
+
+  // STM.MP eh-et, [reg1] — Store multiple MPU entries to memory
+  // Stores MPLA/MPUA/MPAT for entries eh through et to [reg1]
+  // SV privilege instruction
+  let mayStore = 1, hasSideEffects = 1 in
+  def STM_MP : FormatXI_MPU<0b00101100100,
+    (outs), (ins uimm5:$eh, uimm5:$et, GPR:$reg1),
+    "stm.mp\t${eh}-${et}, [$reg1]", []> {
+    let DecoderMethod = "DecodeMPUInstruction";
+  }
+
+} // Predicates = [HasRH850G4MH2], DecoderNamespace = "RH850G4MH2"
+
+//===----------------------------------------------------------------------===//
 // Intrinsic patterns for RH850G3M instructions
 // Note: Patterns don't need DecoderNamespace, only Predicates
 //===----------------------------------------------------------------------===//

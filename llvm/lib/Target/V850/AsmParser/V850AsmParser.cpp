@@ -950,6 +950,81 @@ bool V850AsmParser::parseInstruction(ParseInstructionInfo &Info, StringRef Name,
     return false;
   }
 
+  // LDM.MP/STM.MP use special "eh-et" range syntax that conflicts with
+  // expression parsing (parseExpression would consume "0-7" as subtraction).
+  // Handle them entirely here.
+  if (Name.equals_insensitive("ldm.mp")) {
+    // ldm.mp [reg1], eh-et
+    // Parse [reg1]
+    if (!parseMemoryOperand(Operands).isSuccess())
+      return Error(Parser.getTok().getLoc(), "expected '[reg]' for ldm.mp");
+    if (!Parser.getTok().is(AsmToken::Comma))
+      return Error(Parser.getTok().getLoc(), "expected ',' after [reg]");
+    Parser.Lex(); // Consume ','
+    // Parse eh (integer, not expression — to avoid consuming "eh-et" as sub)
+    if (Parser.getTok().getKind() != AsmToken::Integer)
+      return Error(Parser.getTok().getLoc(), "expected entry number for eh");
+    int64_t EH = Parser.getTok().getIntVal();
+    SMLoc EHLoc = Parser.getTok().getLoc();
+    if (!isUInt<5>(EH))
+      return Error(EHLoc, "entry number must be in range [0, 31]");
+    Parser.Lex(); // Consume eh
+    Operands.push_back(V850Operand::createImm(
+        MCConstantExpr::create(EH, getContext()), EHLoc, EHLoc));
+    // Parse '-' as token (must match asmstr literal)
+    if (!Parser.getTok().is(AsmToken::Minus))
+      return Error(Parser.getTok().getLoc(), "expected '-' in eh-et range");
+    Operands.push_back(V850Operand::createToken("-", Parser.getTok().getLoc()));
+    Parser.Lex(); // Consume '-'
+    // Parse et
+    if (Parser.getTok().getKind() != AsmToken::Integer)
+      return Error(Parser.getTok().getLoc(), "expected entry number for et");
+    int64_t ET = Parser.getTok().getIntVal();
+    SMLoc ETLoc = Parser.getTok().getLoc();
+    if (!isUInt<5>(ET))
+      return Error(ETLoc, "entry number must be in range [0, 31]");
+    Parser.Lex(); // Consume et
+    Operands.push_back(V850Operand::createImm(
+        MCConstantExpr::create(ET, getContext()), ETLoc, ETLoc));
+    return false;
+  }
+
+  if (Name.equals_insensitive("stm.mp")) {
+    // stm.mp eh-et, [reg1]
+    // Parse eh (integer, not expression)
+    if (Parser.getTok().getKind() != AsmToken::Integer)
+      return Error(Parser.getTok().getLoc(), "expected entry number for eh");
+    int64_t EH = Parser.getTok().getIntVal();
+    SMLoc EHLoc = Parser.getTok().getLoc();
+    if (!isUInt<5>(EH))
+      return Error(EHLoc, "entry number must be in range [0, 31]");
+    Parser.Lex(); // Consume eh
+    Operands.push_back(V850Operand::createImm(
+        MCConstantExpr::create(EH, getContext()), EHLoc, EHLoc));
+    // Parse '-' as token
+    if (!Parser.getTok().is(AsmToken::Minus))
+      return Error(Parser.getTok().getLoc(), "expected '-' in eh-et range");
+    Operands.push_back(V850Operand::createToken("-", Parser.getTok().getLoc()));
+    Parser.Lex(); // Consume '-'
+    // Parse et
+    if (Parser.getTok().getKind() != AsmToken::Integer)
+      return Error(Parser.getTok().getLoc(), "expected entry number for et");
+    int64_t ET = Parser.getTok().getIntVal();
+    SMLoc ETLoc = Parser.getTok().getLoc();
+    if (!isUInt<5>(ET))
+      return Error(ETLoc, "entry number must be in range [0, 31]");
+    Parser.Lex(); // Consume et
+    Operands.push_back(V850Operand::createImm(
+        MCConstantExpr::create(ET, getContext()), ETLoc, ETLoc));
+    // Parse ',' and [reg1]
+    if (!Parser.getTok().is(AsmToken::Comma))
+      return Error(Parser.getTok().getLoc(), "expected ',' before [reg]");
+    Parser.Lex(); // Consume ','
+    if (!parseMemoryOperand(Operands).isSuccess())
+      return Error(Parser.getTok().getLoc(), "expected '[reg]' for stm.mp");
+    return false;
+  }
+
   // Parse first operand
   if (!parseOperand(Operands, Name).isSuccess())
     return true;

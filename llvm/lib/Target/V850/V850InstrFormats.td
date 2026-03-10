@@ -634,6 +634,33 @@ class FormatXI_PostInc<bits<5> dir, bits<5> subid, dag outs, dag ins,
   let Inst{20 -16} = subid;     // Data type
 }
 
+//===----------------------------------------------------------------------===//
+// Format XI-MPU: MPU bulk load/store (32-bit)
+// First halfword: eh[15:11] 111111[10:5] reg1[4:0]
+// Second halfword: et[31:27] 00101[26:22] subid[21:16]
+//
+// Used for: LDM.MP, STM.MP (RH850G4MH2)
+//
+// LDM.MP: rrrrr111111RRRRR wwwww00101100110
+// STM.MP: rrrrr111111RRRRR wwwww00101100100
+//
+// rrrrr = eh (start entry), wwwww = et (end entry), RRRRR = reg1 (base addr)
+//===----------------------------------------------------------------------===//
+
+class FormatXI_MPU<bits<11> subop_subid, dag outs, dag ins,
+                   string asmstr, list<dag> pattern>
+    : V850Inst32<outs, ins, asmstr, pattern> {
+  bits<5> reg1;
+  bits<5> eh;
+  bits<5> et;
+
+  let Inst{15 -11} = eh;             // Start entry number
+  let Inst{10 -5} = 0b111111;        // opcode (always)
+  let Inst{4 -0} = reg1;             // Base address register
+  let Inst{31 -27} = et;             // End entry number
+  let Inst{26 -16} = subop_subid;    // subop + subid
+}
+
 // FPU comparison instructions: FPCC[fcbit] = reg2 cmp reg1
 // Used for: CMPF.S, CMPF.D
 // Encoding: reg2[15:11], 111111[10:5], reg1[4:0] | 0fcond[31:27],

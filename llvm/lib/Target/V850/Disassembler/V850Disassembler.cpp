@@ -315,6 +315,46 @@ DecodePostIncStoreInstruction(MCInst &MI, uint32_t Insn, uint64_t Address,
 }
 
 //===----------------------------------------------------------------------===//
+// MPU Instruction Decoder (RH850G4MH2)
+//===----------------------------------------------------------------------===//
+
+// Custom decoder for LDM.MP/STM.MP instructions.
+// Format XI: eh[15:11] 111111[10:5] reg1[4:0] | et[31:27] subop_subid[26:16]
+// LDM.MP has operands: reg1, eh, et
+// STM.MP has operands: eh, et, reg1
+static DecodeStatus DecodeMPUInstruction(MCInst &MI, uint32_t Insn,
+                                         uint64_t Address,
+                                         const MCDisassembler *Decoder) {
+  unsigned EH = (Insn >> 11) & 0x1F;
+  unsigned ET = (Insn >> 27) & 0x1F;
+  unsigned Reg1 = Insn & 0x1F;
+
+  if (Reg1 >= 32)
+    return MCDisassembler::Fail;
+
+  // Determine if this is LDM.MP or STM.MP from subop_subid bits
+  // LDM.MP: bits[26:16] = 00101100110
+  // STM.MP: bits[26:16] = 00101100100
+  unsigned SubopSubid = (Insn >> 16) & 0x7FF;
+
+  if (SubopSubid == 0x166) {
+    // LDM.MP [reg1], eh-et — operand order: reg1, eh, et
+    MI.addOperand(MCOperand::createReg(GPRDecoderTable[Reg1]));
+    MI.addOperand(MCOperand::createImm(EH));
+    MI.addOperand(MCOperand::createImm(ET));
+  } else if (SubopSubid == 0x164) {
+    // STM.MP eh-et, [reg1] — operand order: eh, et, reg1
+    MI.addOperand(MCOperand::createImm(EH));
+    MI.addOperand(MCOperand::createImm(ET));
+    MI.addOperand(MCOperand::createReg(GPRDecoderTable[Reg1]));
+  } else {
+    return MCDisassembler::Fail;
+  }
+
+  return MCDisassembler::Success;
+}
+
+//===----------------------------------------------------------------------===//
 // Decoder Table
 // Note: V850MCTargetDesc.h already includes GET_SUBTARGETINFO_ENUM
 //===----------------------------------------------------------------------===//
@@ -456,6 +496,17 @@ DecodeStatus V850Disassembler::getInstruction32(MCInst &MI, uint64_t &Size,
     }
     Size = 4;
     return MCDisassembler::Success;
+  }
+
+  // Try RH850G4MH2-specific instructions (superset of G4MH)
+  if (STI.hasFeature(V850::FeatureRH850G4MH2)) {
+    MI.clear();
+    DecodeStatus Result = decodeInstruction(DecoderTableRH850G4MH232, MI,
+                                            Insn32, Address, this, STI);
+    if (Result != MCDisassembler::Fail) {
+      Size = 4;
+      return Result;
+    }
   }
 
   // Try RH850G4MH-specific instructions (superset of G3M)
