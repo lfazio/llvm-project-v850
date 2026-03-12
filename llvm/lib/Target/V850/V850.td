@@ -95,6 +95,7 @@ include "V850Schedule.td"
 include "V850SchedV850E1.td"
 include "V850SchedV850E2M.td"
 include "V850SchedRH850G3M.td"
+include "V850SchedRH850G4MH.td"
 
 def V850InstrInfo : InstrInfo;
 
@@ -126,8 +127,8 @@ def : ProcessorModel<"v850e3v5", V850E2MModel, [FeatureV850E3]>;
 // RH850 processors (use RH850G3MModel - improved timings over V850E2M)
 def : ProcessorModel<"g3m", RH850G3MModel, [FeatureRH850G3M, FeatureV850FPIPR]>;
 def : ProcessorModel<"g3mh", RH850G3MModel, [FeatureRH850G3MH]>;
-def : ProcessorModel<"g4mh", RH850G3MModel, [FeatureRH850G4MH, FeatureV850FPU]>;
-def : ProcessorModel<"g4mh2", RH850G3MModel, [FeatureRH850G4MH2, FeatureV850FPU]>;
+def : ProcessorModel<"g4mh", RH850G4MHModel, [FeatureRH850G4MH, FeatureV850FPU]>;
+def : ProcessorModel<"g4mh2", RH850G4MHModel, [FeatureRH850G4MH2, FeatureV850FPU]>;
 
 //===----------------------------------------------------------------------===//
 // V850 assembly writer
