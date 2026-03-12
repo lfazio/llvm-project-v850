@@ -568,17 +568,27 @@ to properly unwind the stack during debugging or exception handling.
 
 ---
 
-### 4.5 RH850G4MH Scheduling [TODO]
+### 4.5 RH850G4MH Scheduling [IMPLEMENTED]
 
-**Description:** Scheduling model for G4MH with:
-- Post-increment load/store timings (1 cycle pipe, same as base load/store)
-- CLIP instruction timings (1 cycle)
-- FXU SIMD instruction latencies (ADDF.S4: 4, DIVF.S4: 14, SQRTF.S4: 14, etc.)
-- MPU bulk operations (LDM.MP: N+8 cycles, STM.MP: N+2 cycles)
+**File:** `llvm/lib/Target/V850/V850SchedRH850G4MH.td`
 
-**See:** [plan-v850-g4m-g4mh.md](plan-v850-g4m-g4mh.md) Phase 7 for full details.
+**Description:** Scheduling model for G4MH derived from G3M with G4MH-specific timings:
+- Post-increment load/store: 3 cycles (load), 1 cycle (store) — same as regular LD/ST
+- CLIP instructions: 1 cycle (either pipe)
+- FXU SIMD (separate FXU unit + FXU divide unit):
+  - Arithmetic/FMA/conversion: 4 cycles
+  - Divide/sqrt: 14 cycles (blocking)
+  - Reciprocal: 10 cycles (blocking)
+  - Load: 2 cycles, Store: 1 cycle
+- MPU bulk: LDM.MP: 12 cycles, STM.MP: 6 cycles (conservative estimates)
+- Virtualization: HVTRAP: 10 cycles, LDM/STM.GSR: 10 cycles
 
-**Priority:** Low
+**Processor Resources:**
+- G4MHLpipe, G4MHRpipe, G4MHAnyPipe (dual-issue, same as G3M)
+- G4MHUnitFPALU (scalar FPU), G4MHUnitFPDiv (scalar FP divide/sqrt)
+- G4MHUnitFXU (SIMD ALU), G4MHUnitFXUDiv (SIMD divide/sqrt)
+
+**Status:** Fully implemented
 
 ---
 

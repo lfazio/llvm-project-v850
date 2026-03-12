@@ -682,9 +682,9 @@ def : ProcessorModel<"g4mh", RH850G4MHModel, [FeatureRH850G4MH, FeatureFPU]>;
 23. [6.3] Builtins (deferred — privileged instructions, low priority)
 24. [6.4] ~~Tests~~ ✓
 
-### Sprint 7: Scheduling Model [TODO]
-25. [7.2] Create V850SchedRH850G4MH.td
-26. [7.3] Tests
+### Sprint 7: Scheduling Model [DONE]
+25. [7.2] ~~Create V850SchedRH850G4MH.td~~ ✓
+26. [7.3] ~~Tests (all 261 MC + 152 CodeGen pass, no regressions)~~ ✓
 
 ---
 
@@ -723,3 +723,4 @@ For each sprint:
 | 2026-03-10 | 1.3 | Phase 4 (MPU) DONE: LDM.MP/STM.MP MC layer with FormatXI_MPU class, custom asm parsing, G4MH2 decoder namespace |
 | 2026-03-10 | 1.4 | Phase 6 (Virtualization) DONE: HVTRAP, LDM.GSR, STM.GSR with FormatX_HVTRAP/FormatX_GSR classes, custom decoder |
 | 2026-03-12 | 1.5 | Phase 5 (FXU) DONE: 59 SIMD instructions with VGPR register class, Format M formats, FXURH850G4MH decoder namespace, 10 test files |
+| 2026-03-12 | 1.6 | Phase 7 (Scheduling) DONE: V850SchedRH850G4MH.td with FXU/post-inc/CLIP/MPU/virtualization timings, G4MH processor model updated |
