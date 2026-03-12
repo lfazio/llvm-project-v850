@@ -58,6 +58,26 @@ void v850::getV850TargetFeatures(const Driver &D, const ArgList &Args,
     else
       Features.push_back("-soft-float");
   }
+
+  // Derive FXU (128-bit SIMD vector unit) capability from CPU.
+  // FXU is available on RH850G4MH and G4MH2.
+  bool CPUHasFXU = false;
+  if (const Arg *A = Args.getLastArg(options::OPT_mcpu_EQ)) {
+    StringRef CPU = A->getValue();
+    CPUHasFXU = llvm::StringSwitch<bool>(CPU)
+                    .Cases("g4mh", "g4mh2", true)
+                    .Default(false);
+  }
+
+  // Explicit -mfxu / -mno-fxu override the CPU default.
+  if (const Arg *A = Args.getLastArg(options::OPT_mfxu, options::OPT_mno_fxu)) {
+    CPUHasFXU = A->getOption().matches(options::OPT_mfxu);
+  }
+
+  if (CPUHasFXU)
+    Features.push_back("+v850fxu");
+  else
+    Features.push_back("-v850fxu");
 }
 
 /// V850 Toolchain

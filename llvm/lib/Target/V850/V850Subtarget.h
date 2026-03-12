@@ -41,6 +41,7 @@ class V850Subtarget : public V850GenSubtargetInfo {
   bool HasRH850G3M = false;
   bool HasV850FPIPR = false;
   bool HasRH850G3MH = false;
+  bool HasV850FXU = false;
   bool HasRH850G4MH = false;
   bool HasRH850G4MH2 = false;
 
@@ -88,6 +89,7 @@ public:
   bool hasRH850G3M() const { return HasRH850G3M; }
   bool hasV850FPIPR() const { return HasV850FPIPR; }
   bool hasRH850G3MH() const { return HasRH850G3MH; }
+  bool hasV850FXU() const { return HasV850FXU; }
   bool hasRH850G4MH() const { return HasRH850G4MH; }
   bool hasRH850G4MH2() const { return HasRH850G4MH2; }
 

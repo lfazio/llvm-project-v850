@@ -73,6 +73,12 @@ def FeatureRH850G3MH : SubtargetFeature<"rh850g3mh", "HasRH850G3MH", "true",
                                          "Enable RH850G3MH extensions",
                                          [FeatureRH850G3M]>;
 
+// V850 FXU feature - 128-bit SIMD vector unit (4 x f32)
+// Separate from G4MH CPU feature to allow explicit -mfxu/-mno-fxu control
+def FeatureV850FXU : SubtargetFeature<"v850fxu", "HasV850FXU", "true",
+                                       "Enable V850 FXU vector unit",
+                                       []>;
+
 // RH850G4MH feature - adds post-increment load/store, CLIP, FXU vector unit
 def FeatureRH850G4MH : SubtargetFeature<"rh850g4mh", "HasRH850G4MH", "true",
                                           "Enable RH850G4MH extensions",
