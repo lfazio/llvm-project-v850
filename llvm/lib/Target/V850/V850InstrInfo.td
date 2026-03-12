@@ -3785,3 +3785,9 @@ let Predicates = [HasRH850G3M] in {
             (ST_DW_F DPR:$src, GPR:$base, simm23:$off)>;
 
 } // Predicates = [HasRH850G3M]
+
+//===----------------------------------------------------------------------===//
+// RH850G4MH FXU (Extended Floating-point Unit) Instructions
+//===----------------------------------------------------------------------===//
+
+include "V850InstrFXU.td"

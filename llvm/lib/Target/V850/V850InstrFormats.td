@@ -723,3 +723,170 @@ class FormatFPU_CMP<bit dbl, dag outs, dag ins, string asmstr,
   let Inst{19 -17} = fcbit;
   let Inst{16} = dbl;
 }
+
+//===----------------------------------------------------------------------===//
+// Format M: FXU (Extended Floating-point Unit) Instruction Formats
+// RH850G4MH+ only.  These use a separate opcode (111111 for 32-bit,
+// 111101 for 48-bit) and operate on wreg0-wreg31 (128-bit vector registers).
+//
+// Bit layout overview (from ISA documentation):
+//   32-bit (2OP/3OP):
+//     bits[15:11] = wreg2
+//     bits[10:5]  = opcode (111111)
+//     bits[4:0]   = sub-opcode (2OP) or wreg1 (3OP)
+//     bits[31:27] = wreg3
+//     bits[26:16] = sub-opcode (11 bits)
+//
+//   48-bit (4OP / imm12 / D):
+//     bits[15:11] = sub-opcode (5 bits)  [or reg2 for Format D]
+//     bits[10:5]  = opcode (111101)
+//     bits[4:0]   = wreg1                [or reg1 for Format D]
+//     bits[31:27] = wreg3
+//     bits[26:16] = sub-opcode (11 bits)
+//     bits[47:43] = wreg2                [or disp16[15:11] for Format D]
+//     bits[42:37] = sub-opcode (6 bits)  [or disp16[10:5] for Format D]
+//     bits[36:32] = wreg4                [or disp16[4:0] for Format D]
+//===----------------------------------------------------------------------===//
+
+// Format M: 2OP (32-bit)
+// wreg3 = op(wreg2)
+// Used for: ABSF.S4, NEGF.S4, SQRTF.S4, RECIPF.S4, RSQRTF.S4, MOVV.W4,
+//           TRFSRV.W4, FLPV.S4, and all 14 conversion/rounding instructions.
+//
+// subop5[4:0] differentiates instructions when subop11 is shared (0x5a0).
+// For FLPV.S4: subop5 = 0b110xx (bits[1:0] = imm2).
+// For TRFSRV.W4: subop5 = 0b11111, wreg2 encodes imm3 in bits[2:0].
+class FormatM_2OP<bits<5> subop5, bits<11> subop11,
+                  dag outs, dag ins, string asmstr, list<dag> pattern>
+    : V850Inst32<outs, ins, asmstr, pattern> {
+  bits<5> wreg2;
+  bits<5> wreg3;
+
+  let Inst{15 -11} = wreg2;
+  let Inst{10 -5}  = 0b111111;  // opcode
+  let Inst{4  -0}  = subop5;
+  let Inst{31 -27} = wreg3;
+  let Inst{26 -16} = subop11;
+}
+
+// Format M: 3OP (32-bit)
+// wreg3 = op(wreg2, wreg1)
+// Used for: ADDF.S4, SUBF.S4, MULF.S4, DIVF.S4, MAXF.S4, MINF.S4,
+//           FMAF.S4, FMSF.S4, FNMAF.S4, FNMSF.S4, reduction ops,
+//           compound ops, exchange ops, CMPF.S4.
+//
+// subop11 differentiates all 3OP instructions.
+// For CMPF.S4: subop11 = 0b101100xxxx0 (4-bit fcond occupies bits[20:17]).
+class FormatM_3OP<bits<11> subop11,
+                  dag outs, dag ins, string asmstr, list<dag> pattern>
+    : V850Inst32<outs, ins, asmstr, pattern> {
+  bits<5> wreg1;
+  bits<5> wreg2;
+  bits<5> wreg3;
+
+  let Inst{15 -11} = wreg2;
+  let Inst{10 -5}  = 0b111111;  // opcode
+  let Inst{4  -0}  = wreg1;
+  let Inst{31 -27} = wreg3;
+  let Inst{26 -16} = subop11;
+}
+
+// Format M: 4OP (48-bit)
+// wreg4 = op(wreg3, wreg2, wreg1)
+// Used for: FMAF.S4, FMSF.S4, FNMAF.S4, FNMSF.S4, CMOVF.W4.
+//
+// First 32-bit word:
+//   bits[15:11] = subop5a (5-bit sub-opcode)
+//   bits[10:5]  = opcode (111101)
+//   bits[4:0]   = wreg1
+//   bits[31:27] = wreg3
+//   bits[26:16] = subop11
+//
+// Second 16-bit word (bits[47:32]):
+//   bits[47:43] = wreg2
+//   bits[42:37] = subop6  (6-bit sub-opcode)
+//   bits[36:32] = wreg4
+class FormatM_4OP<bits<5> subop5a, bits<11> subop11, bits<6> subop6,
+                  dag outs, dag ins, string asmstr, list<dag> pattern>
+    : V850Inst48<outs, ins, asmstr, pattern> {
+  bits<5> wreg1;
+  bits<5> wreg2;
+  bits<5> wreg3;
+  bits<5> wreg4;
+
+  let Inst{15 -11} = subop5a;
+  let Inst{10 -5}  = 0b111101;  // opcode (48-bit)
+  let Inst{4  -0}  = wreg1;
+  let Inst{31 -27} = wreg3;
+  let Inst{26 -16} = subop11;
+  let Inst{47 -43} = wreg2;
+  let Inst{42 -37} = subop6;
+  let Inst{36 -32} = wreg4;
+}
+
+// Format M: imm12 (48-bit)
+// wreg3 = op(wreg2, wreg1, imm12)  [or op(wreg2, imm12, wreg3)]
+// Used for: SHFLV.W4.
+//
+// The highest bit of the immediate (bit 12) is encoded in the sub-opcode.
+// The remaining 11 bits occupy bits[42:32].
+//
+// First 32-bit word:
+//   bits[15:11] = subop5a (5-bit sub-opcode; for SHFLV: contains imm12[11])
+//   bits[10:5]  = opcode (111101)
+//   bits[4:0]   = wreg1
+//   bits[31:27] = wreg3
+//   bits[26:16] = subop11 (11-bit sub-opcode; for SHFLV: bits[26:22] fixed,
+//                          bit[21] = imm12[11] MSB)
+//
+// Second 16-bit word (bits[47:32]):
+//   bits[47:43] = wreg2
+//   bits[42:32] = imm12[10:0] (lower 11 bits of immediate)
+class FormatM_Imm12<bits<5> subop5a, bits<11> subop11,
+                    dag outs, dag ins, string asmstr, list<dag> pattern>
+    : V850Inst48<outs, ins, asmstr, pattern> {
+  bits<5>  wreg1;
+  bits<5>  wreg2;
+  bits<5>  wreg3;
+  bits<12> imm12;
+
+  let Inst{15 -11} = subop5a;
+  let Inst{10 -5}  = 0b111101;    // opcode (48-bit)
+  let Inst{4  -0}  = wreg1;
+  let Inst{31 -27} = wreg3;
+  let Inst{26 -16} = subop11;
+  let Inst{47 -43} = wreg2;
+  let Inst{42 -32} = imm12{10 -0}; // lower 11 bits
+}
+
+// Format M: D (48-bit, memory load/store)
+// wreg3 = op(disp16[reg1])  or  op(wreg3, disp16[reg1])
+// Used for: LDV.W, LDV.DW, LDV.QW, LDVZ.H4, STV.W, STV.DW, STV.QW, STVZ.H4.
+//
+// First 32-bit word:
+//   bits[15:11] = reg2 (GPR, base address register for stores; 00000 for loads)
+//   bits[10:5]  = opcode (111101)
+//   bits[4:0]   = reg1 (GPR, base address register)
+//   bits[31:27] = wreg3 (vector register)
+//   bits[26:16] = subop11 (11-bit sub-opcode)
+//
+// Second 16-bit word (bits[47:32]):
+//   bits[47:32] = disp16 (16-bit signed displacement)
+//
+// Note: For LDV.W, the imm4 field encoding bits[25:22] in subop11 selects
+// which of the 4 elements to load into.
+class FormatM_D<bits<11> subop11,
+                dag outs, dag ins, string asmstr, list<dag> pattern>
+    : V850Inst48<outs, ins, asmstr, pattern> {
+  bits<5>  reg1;
+  bits<5>  reg2;
+  bits<5>  wreg3;
+  bits<16> disp16;
+
+  let Inst{15 -11} = reg2;
+  let Inst{10 -5}  = 0b111101;  // opcode (48-bit)
+  let Inst{4  -0}  = reg1;
+  let Inst{31 -27} = wreg3;
+  let Inst{26 -16} = subop11;
+  let Inst{47 -32} = disp16;
+}

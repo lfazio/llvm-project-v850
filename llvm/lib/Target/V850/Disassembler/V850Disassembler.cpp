@@ -118,6 +118,27 @@ static DecodeStatus DecodeDPRRegisterClass(MCInst &Inst, uint32_t RegNo,
   return MCDisassembler::Success;
 }
 
+// VGPR (FXU vector register) decoder table
+static const MCPhysReg VGPRDecoderTable[] = {
+    V850::WREG0,  V850::WREG1,  V850::WREG2,  V850::WREG3,  V850::WREG4,
+    V850::WREG5,  V850::WREG6,  V850::WREG7,  V850::WREG8,  V850::WREG9,
+    V850::WREG10, V850::WREG11, V850::WREG12, V850::WREG13, V850::WREG14,
+    V850::WREG15, V850::WREG16, V850::WREG17, V850::WREG18, V850::WREG19,
+    V850::WREG20, V850::WREG21, V850::WREG22, V850::WREG23, V850::WREG24,
+    V850::WREG25, V850::WREG26, V850::WREG27, V850::WREG28, V850::WREG29,
+    V850::WREG30, V850::WREG31};
+
+static DecodeStatus DecodeVGPRRegisterClass(MCInst &Inst, uint32_t RegNo,
+                                            uint64_t Address,
+                                            const MCDisassembler *Decoder) {
+  if (RegNo >= 32)
+    return MCDisassembler::Fail;
+
+  MCRegister Reg = VGPRDecoderTable[RegNo];
+  Inst.addOperand(MCOperand::createReg(Reg));
+  return MCDisassembler::Success;
+}
+
 static DecodeStatus decodeSystemRegister(MCInst &Inst, uint32_t Enc,
                                          int64_t Address,
                                          const MCDisassembler *Decoder) {
@@ -539,6 +560,17 @@ DecodeStatus V850Disassembler::getInstruction32(MCInst &MI, uint64_t &Size,
     }
   }
 
+  // Try RH850G4MH FXU vector instructions (FXURH850G4MH decoder namespace)
+  if (STI.hasFeature(V850::FeatureRH850G4MH)) {
+    MI.clear();
+    DecodeStatus Result = decodeInstruction(DecoderTableFXURH850G4MH32, MI,
+                                            Insn32, Address, this, STI);
+    if (Result != MCDisassembler::Fail) {
+      Size = 4;
+      return Result;
+    }
+  }
+
   // Try RH850G4MH-specific instructions (superset of G3M)
   if (STI.hasFeature(V850::FeatureRH850G4MH)) {
     MI.clear();
@@ -653,6 +685,22 @@ DecodeStatus V850Disassembler::getInstruction48(MCInst &MI, uint64_t &Size,
     MI.addOperand(MCOperand::createImm(Offset));
     Size = 6;
     return MCDisassembler::Success;
+  }
+
+  // FXU 48-bit instructions (opcode=0x3D, RH850G4MH+)
+  // These share the same opcode as LD.DW/ST.DW but use different sub-opcodes.
+  // Try FXU decoder first since it's more specific.
+  if (Opcode6 == 0x3D && STI.hasFeature(V850::FeatureRH850G4MH)) {
+    // Build 48-bit instruction value for the auto-generated decoder.
+    uint64_t Insn48 =
+        (uint64_t)HW0 | ((uint64_t)HW1 << 16) | ((uint64_t)HW2 << 32);
+    MI.clear();
+    DecodeStatus Result = decodeInstruction(DecoderTableFXURH850G4MH48, MI,
+                                            Insn48, Address, this, STI);
+    if (Result != MCDisassembler::Fail) {
+      Size = 6;
+      return Result;
+    }
   }
 
   // Format XIV: LD.DW / ST.DW (opcode=0b111101=0x3D, RH850G3M+)

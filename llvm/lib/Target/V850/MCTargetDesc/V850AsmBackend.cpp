@@ -46,14 +46,10 @@ public:
         // name                    offset  bits  flags
         // PC-relative fixups use full instruction width because displacement
         // bits are scattered across the encoding (not contiguous).
-        {"fixup_v850_9_pcrel", 0, 16, 0},
-        {"fixup_v850_16_pcrel", 0, 16, 0},
-        {"fixup_v850_17_pcrel", 0, 32, 0},
-        {"fixup_v850_22_pcrel", 0, 32, 0},
-        {"fixup_v850_16", 16, 16, 0},
-        {"fixup_v850_32", 0, 32, 0},
-        {"fixup_v850_hi16", 16, 16, 0},
-        {"fixup_v850_lo16", 16, 16, 0},
+        {"fixup_v850_9_pcrel", 0, 16, 0},  {"fixup_v850_16_pcrel", 0, 16, 0},
+        {"fixup_v850_17_pcrel", 0, 32, 0}, {"fixup_v850_22_pcrel", 0, 32, 0},
+        {"fixup_v850_16", 16, 16, 0},      {"fixup_v850_32", 0, 32, 0},
+        {"fixup_v850_hi16", 16, 16, 0},    {"fixup_v850_lo16", 16, 16, 0},
         {"fixup_v850_sda_16", 16, 16, 0},
     };
 

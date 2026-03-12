@@ -227,6 +227,36 @@ def DPR : RegisterClass<"V850", [f64], 64,
     )>;
 
 //===----------------------------------------------------------------------===//
+// FXU Vector Registers (RH850G4MH+)
+//
+// The FXU (Extended Floating-point Unit) has 32 dedicated 128-bit vector
+// registers (wreg0-wreg31), each holding 4 x single-precision floats.
+// These are independent from the GPR-based FPR/DPR register files.
+//
+// Register encoding: 5-bit field (0-31) directly encodes the register number.
+// Requires PSW.CU1=1 (Coprocessor 1 Use Permission).
+//===----------------------------------------------------------------------===//
+
+class VGPRReg<bits<5> Enc, string n> : Register<n> {
+  let HWEncoding{4-0} = Enc;
+  let Namespace = "V850";
+}
+
+// wreg0-wreg31: 32 x 128-bit FXU vector registers
+foreach i = 0-31 in
+  def WREG#i : VGPRReg<!cast<bits<5>>(i), "wreg"#i>;
+
+// VGPR - 128-bit vector register class for FXU (RH850G4MH+)
+// All 32 vector registers are caller-saved (no callee-save convention defined).
+// v4f32: 4 x single-precision float (primary FXU type)
+def VGPR : RegisterClass<"V850", [v4f32], 128,
+    (add WREG0, WREG1, WREG2, WREG3, WREG4, WREG5, WREG6, WREG7,
+         WREG8, WREG9, WREG10, WREG11, WREG12, WREG13, WREG14, WREG15,
+         WREG16, WREG17, WREG18, WREG19, WREG20, WREG21, WREG22, WREG23,
+         WREG24, WREG25, WREG26, WREG27, WREG28, WREG29, WREG30, WREG31
+    )>;
+
+//===----------------------------------------------------------------------===//
 // System Registers
 //===----------------------------------------------------------------------===//
 
