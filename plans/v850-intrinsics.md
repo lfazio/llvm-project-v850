@@ -27,8 +27,11 @@ This document catalogs all V850 intrinsics, their implementation status, and pro
 | Atomic Operations | 4 | 0 | 4 |
 | Special Instructions | 6 | 0 | 6 |
 | Cache Control | 0 | 2 | 2 |
+| CLIP Saturation (G4MH) | 0 | 4 | 4 |
+| MPU Load/Store (G4MH2) | 0 | 2 | 2 |
+| Virtualization (G4MH2) | 0 | 3 | 3 |
 | FXU Vector (G4MH) | 0 | 59 | 59 |
-| **Total** | **84** | **69+** | **153+** |
+| **Total** | **84** | **78+** | **162+** |
 
 ### G3M-Specific Instructions (All Implemented)
 
@@ -971,40 +974,226 @@ unsigned int __builtin_v850_rotl(unsigned int x, unsigned int count);
 
 ---
 
-## 15. FXU Vector Intrinsics (RH850G4MH+) [FUTURE]
+## 15. CLIP Saturation Intrinsics (RH850G4MH+) [TODO]
+
+### 15.1 CLIP.B — Clip to Signed Byte [TODO]
+
+**Architecture:** RH850G4MH+
+
+```c
+int __builtin_v850_clip_b(int x);
+```
+
+**Description:** Saturates x to signed byte range (-128 to 127).
+
+### 15.2 CLIP.BU — Clip to Unsigned Byte [TODO]
+
+```c
+unsigned int __builtin_v850_clip_bu(int x);
+```
+
+**Description:** Saturates x to unsigned byte range (0 to 255).
+
+### 15.3 CLIP.H — Clip to Signed Halfword [TODO]
+
+```c
+int __builtin_v850_clip_h(int x);
+```
+
+**Description:** Saturates x to signed halfword range (-32768 to 32767).
+
+### 15.4 CLIP.HU — Clip to Unsigned Halfword [TODO]
+
+```c
+unsigned int __builtin_v850_clip_hu(int x);
+```
+
+**Description:** Saturates x to unsigned halfword range (0 to 65535).
+
+**Feature Required:** `rh850g4mh`
+
+---
+
+## 16. MPU Load/Store Intrinsics (RH850G4MH2+) [TODO]
+
+### 16.1 LDM.MP — Load Multiple MPU Entries [TODO]
+
+```c
+void __builtin_v850_ldm_mp(void *addr, unsigned int eh, unsigned int et);
+```
+
+**Description:** Loads MPU entries (MPLA/MPUA/MPAT) from memory for entries eh through et.
+SV privilege required.
+
+### 16.2 STM.MP — Store Multiple MPU Entries [TODO]
+
+```c
+void __builtin_v850_stm_mp(unsigned int eh, unsigned int et, void *addr);
+```
+
+**Description:** Stores MPU entries to memory. SV privilege required.
+
+**Feature Required:** `rh850g4mh2`
+
+---
+
+## 17. Virtualization Intrinsics (RH850G4MH2+) [TODO]
+
+### 17.1 HVTRAP — Hypervisor Trap [TODO]
+
+```c
+void __builtin_v850_hvtrap(unsigned int vector);
+```
+
+**Description:** Hypervisor EI-level trap (vector 0-31). Saves PC, PSW, enters host mode.
+SV privilege, requires HVCFG.HVE=1.
+
+### 17.2 LDM.GSR — Load Multiple Guest System Registers [TODO]
+
+```c
+void __builtin_v850_ldm_gsr(void *addr);
+```
+
+**Description:** Loads pre-defined guest system registers from memory. HV privilege.
+
+### 17.3 STM.GSR — Store Multiple Guest System Registers [TODO]
+
+```c
+void __builtin_v850_stm_gsr(void *addr);
+```
+
+**Description:** Stores pre-defined guest system registers to memory. HV privilege.
+
+**Feature Required:** `rh850g4mh2`
+
+---
+
+## 18. FXU Vector Intrinsics (RH850G4MH+) [FUTURE]
 
 The FXU provides SIMD operations on 128-bit vectors (4 × single-precision floats).
+See [plan-v850-g4m-g4mh.md](plan-v850-g4m-g4mh.md) Phase 5 for full implementation plan.
 
-### 15.1 FXU Vector Types
+### 18.1 FXU Vector Types
 
 ```c
 typedef float v4sf __attribute__((vector_size(16)));
 ```
 
-### 15.2 FXU Intrinsics Summary
+### 18.2 FXU Intrinsics — Full Instruction List (59 Total)
 
-| Category | Instructions | Priority |
-|----------|--------------|----------|
-| Load/Store | LDV.W, LDV.DW, LDV.QW, STV.* | High |
-| Arithmetic | ADDF.S4, SUBF.S4, MULF.S4, DIVF.S4 | High |
-| FMA | FMAF.S4, FMSF.S4, FNMAF.S4, FNMSF.S4 | High |
-| Min/Max | MINF.S4, MAXF.S4 | Medium |
-| Conversion | CVTF.*, TRNCF.*, CEILF.*, FLOORF.* | Medium |
-| Shuffle | SHFLV.W4, FLPV.S4 | Medium |
-| Comparison | CMPF.S4, CMOVF.W4 | Medium |
-| Reduction | ADDRF.S4, MULRF.S4, MAXRF.S4, MINRF.S4 | Low |
-| Advanced | ADDSUBF.S4, ADDXF.S4, etc. | Low |
+#### Manipulation (3)
 
-**Total FXU Intrinsics:** 59
+| Builtin | Instruction | Description |
+|---------|-------------|-------------|
+| `__builtin_v850_movv_w4(v4sf src)` | MOVV.W4 | Move vector register |
+| `__builtin_v850_flpv_s4(v4sf a, v4sf b)` | FLPV.S4 | Flip (exchange) elements |
+| `__builtin_v850_shflv_w4(int imm12, v4sf a, v4sf b)` | SHFLV.W4 | Shuffle elements |
+
+#### Load/Store (8)
+
+| Builtin | Instruction | Description |
+|---------|-------------|-------------|
+| `__builtin_v850_ldv_w(void *addr)` | LDV.W | Load single word to element |
+| `__builtin_v850_ldv_dw(void *addr)` | LDV.DW | Load double-word |
+| `__builtin_v850_ldv_qw(void *addr)` | LDV.QW | Load quad-word (full 128-bit) |
+| `__builtin_v850_ldvz_h4(void *addr)` | LDVZ.H4 | Load 4 halfwords, zero-extend |
+| `__builtin_v850_stv_w(v4sf src, void *addr)` | STV.W | Store single word |
+| `__builtin_v850_stv_dw(v4sf src, void *addr)` | STV.DW | Store double-word |
+| `__builtin_v850_stv_qw(v4sf src, void *addr)` | STV.QW | Store quad-word |
+| `__builtin_v850_stvz_h4(v4sf src, void *addr)` | STVZ.H4 | Store truncated to halfwords |
+
+#### Arithmetic (11)
+
+| Builtin | Instruction | Description |
+|---------|-------------|-------------|
+| `__builtin_v850_absf_s4(v4sf a)` | ABSF.S4 | Absolute value (4x) |
+| `__builtin_v850_negf_s4(v4sf a)` | NEGF.S4 | Negate (4x) |
+| `__builtin_v850_addf_s4(v4sf a, v4sf b)` | ADDF.S4 | Add (4x) |
+| `__builtin_v850_subf_s4(v4sf a, v4sf b)` | SUBF.S4 | Subtract (4x) |
+| `__builtin_v850_mulf_s4(v4sf a, v4sf b)` | MULF.S4 | Multiply (4x) |
+| `__builtin_v850_divf_s4(v4sf a, v4sf b)` | DIVF.S4 | Divide (4x) |
+| `__builtin_v850_maxf_s4(v4sf a, v4sf b)` | MAXF.S4 | Maximum (4x) |
+| `__builtin_v850_minf_s4(v4sf a, v4sf b)` | MINF.S4 | Minimum (4x) |
+| `__builtin_v850_sqrtf_s4(v4sf a)` | SQRTF.S4 | Square root (4x) |
+| `__builtin_v850_recipf_s4(v4sf a)` | RECIPF.S4 | Reciprocal (4x) |
+| `__builtin_v850_rsqrtf_s4(v4sf a)` | RSQRTF.S4 | Reciprocal sqrt (4x) |
+
+#### FMA (4)
+
+| Builtin | Instruction | Description |
+|---------|-------------|-------------|
+| `__builtin_v850_fmaf_s4(v4sf a, v4sf b, v4sf c)` | FMAF.S4 | c = b*a + c |
+| `__builtin_v850_fmsf_s4(v4sf a, v4sf b, v4sf c)` | FMSF.S4 | c = b*a - c |
+| `__builtin_v850_fnmaf_s4(v4sf a, v4sf b, v4sf c)` | FNMAF.S4 | c = -(b*a) + c |
+| `__builtin_v850_fnmsf_s4(v4sf a, v4sf b, v4sf c)` | FNMSF.S4 | c = -(b*a) - c |
+
+#### Compound Arithmetic (4)
+
+| Builtin | Instruction | Description |
+|---------|-------------|-------------|
+| `__builtin_v850_addsubf_s4(v4sf a, v4sf b)` | ADDSUBF.S4 | [3:2]=add, [1:0]=sub |
+| `__builtin_v850_addsubnf_s4(v4sf a, v4sf b)` | ADDSUBNF.S4 | [3:2]=add, [1:0]=sub (neg) |
+| `__builtin_v850_subaddf_s4(v4sf a, v4sf b)` | SUBADDF.S4 | [3:2]=sub, [1:0]=add |
+| `__builtin_v850_subaddnf_s4(v4sf a, v4sf b)` | SUBADDNF.S4 | [3:2]=sub, [1:0]=add (neg) |
+
+#### Exchange Arithmetic (7)
+
+| Builtin | Instruction | Description |
+|---------|-------------|-------------|
+| `__builtin_v850_addxf_s4(v4sf a, v4sf b)` | ADDXF.S4 | Add with exchange |
+| `__builtin_v850_subxf_s4(v4sf a, v4sf b)` | SUBXF.S4 | Sub with exchange |
+| `__builtin_v850_mulxf_s4(v4sf a, v4sf b)` | MULXF.S4 | Mul with exchange |
+| `__builtin_v850_addsubxf_s4(v4sf a, v4sf b)` | ADDSUBXF.S4 | Add-sub with exchange |
+| `__builtin_v850_addsubnxf_s4(v4sf a, v4sf b)` | ADDSUBNXF.S4 | Add-sub neg with exchange |
+| `__builtin_v850_subaddxf_s4(v4sf a, v4sf b)` | SUBADDXF.S4 | Sub-add with exchange |
+| `__builtin_v850_subaddnxf_s4(v4sf a, v4sf b)` | SUBADDNXF.S4 | Sub-add neg with exchange |
+
+#### Reduction (5)
+
+| Builtin | Instruction | Description |
+|---------|-------------|-------------|
+| `__builtin_v850_addrf_s4(v4sf a)` | ADDRF.S4 | Reduction add |
+| `__builtin_v850_subrf_s4(v4sf a)` | SUBRF.S4 | Reduction subtract |
+| `__builtin_v850_mulrf_s4(v4sf a)` | MULRF.S4 | Reduction multiply |
+| `__builtin_v850_maxrf_s4(v4sf a)` | MAXRF.S4 | Reduction maximum |
+| `__builtin_v850_minrf_s4(v4sf a)` | MINRF.S4 | Reduction minimum |
+
+#### Conversion (14)
+
+| Builtin | Instruction | Description |
+|---------|-------------|-------------|
+| `__builtin_v850_cvtf_hs4(v4sf a)` | CVTF.HS4 | 4x half → 4x single |
+| `__builtin_v850_cvtf_sh4(v4sf a)` | CVTF.SH4 | 4x single → 4x half |
+| `__builtin_v850_cvtf_sw4(v4sf a)` | CVTF.SW4 | 4x single → 4x int |
+| `__builtin_v850_cvtf_ws4(v4sf a)` | CVTF.WS4 | 4x int → 4x single |
+| `__builtin_v850_cvtf_suw4(v4sf a)` | CVTF.SUW4 | 4x single → 4x uint |
+| `__builtin_v850_cvtf_uws4(v4sf a)` | CVTF.UWS4 | 4x uint → 4x single |
+| `__builtin_v850_trncf_sw4(v4sf a)` | TRNCF.SW4 | Truncate 4x single → int |
+| `__builtin_v850_trncf_suw4(v4sf a)` | TRNCF.SUW4 | Truncate 4x single → uint |
+| `__builtin_v850_ceilf_sw4(v4sf a)` | CEILF.SW4 | Ceiling 4x single → int |
+| `__builtin_v850_ceilf_suw4(v4sf a)` | CEILF.SUW4 | Ceiling 4x single → uint |
+| `__builtin_v850_floorf_sw4(v4sf a)` | FLOORF.SW4 | Floor 4x single → int |
+| `__builtin_v850_floorf_suw4(v4sf a)` | FLOORF.SUW4 | Floor 4x single → uint |
+| `__builtin_v850_roundf_sw4(v4sf a)` | ROUNDF.SW4 | Round 4x single → int |
+| `__builtin_v850_roundf_suw4(v4sf a)` | ROUNDF.SUW4 | Round 4x single → uint |
+
+#### Comparison (3)
+
+| Builtin | Instruction | Description |
+|---------|-------------|-------------|
+| `__builtin_v850_cmpf_s4(int fcond, v4sf a, v4sf b)` | CMPF.S4 | Compare 4x, store mask |
+| `__builtin_v850_cmovf_w4(int fcond4, v4sf a, v4sf b)` | CMOVF.W4 | Conditional move |
+| `__builtin_v850_trfsrv_w4(int imm3, v4sf a)` | TRFSRV.W4 | Transfer FXU status |
 
 **Implementation Notes:**
 - Requires new vector register class (wreg0-wreg31)
 - Requires PSW.CU1 coprocessor enable
-- Consider auto-vectorization support
+- Consider auto-vectorization support via TargetTransformInfo
+- See [plan-v850-g4m-g4mh.md](plan-v850-g4m-g4mh.md) Phase 5 for implementation details
 
 ---
 
-## 16. Implementation Guidelines
+## 19. Implementation Guidelines
 
 ### 16.1 Adding a New Builtin
 
@@ -1063,7 +1252,7 @@ def : Pat<(int_v850_xxx args), (XXX args)>;
 
 ---
 
-## 17. Implementation Priority
+## 20. Implementation Priority
 
 ### Phase 1 (High Priority) - COMPLETE
 1. ~~Bit search: SCH1L, SCH1R, SCH0L, SCH0R~~ [DONE]
@@ -1083,14 +1272,15 @@ def : Pat<(int_v850_xxx args), (XXX args)>;
 3. ~~SNOOZE~~ [DONE], ~~FETRAP~~ [DONE]
 4. ~~CLL (clear load link)~~ [DONE]
 
-### Phase 4 (Future)
-1. FXU vector intrinsics (59 total)
-2. RH850G4MH2 virtualization registers
-3. MPU load/store intrinsics
+### Phase 4 (G4MH — see [plan-v850-g4m-g4mh.md](plan-v850-g4m-g4mh.md))
+1. CLIP saturation intrinsics: clip_b, clip_bu, clip_h, clip_hu (4 total)
+2. MPU load/store intrinsics: ldm_mp, stm_mp (2 total, G4MH2)
+3. Virtualization intrinsics: hvtrap, ldm_gsr, stm_gsr (3 total, G4MH2)
+4. FXU vector intrinsics (59 total)
 
 ---
 
-## 18. Test Coverage
+## 21. Test Coverage
 
 ### Existing Tests
 - `clang/test/CodeGen/V850/builtins.c`
@@ -1110,6 +1300,7 @@ def : Pat<(int_v850_xxx args), (XXX args)>;
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-03-08 | 1.7 | Added G4MH intrinsic sections: CLIP saturation (§15), MPU load/store (§16), virtualization (§17); expanded FXU section (§18) with full 59-instruction builtin list; updated priority table (Phase 4 now references plan-v850-g4m-g4mh.md) |
 | 2026-02-11 | 1.6 | Updated G3M intrinsics status: SYNCI, SNOOZE, CLL, LDL.W, STC.W all DONE; created plan-v850-g3m-g3mh.md for remaining features |
 | 2026-01-18 | 1.5 | Added special instruction intrinsics (HALT, TRAP, SYSCALL, FETRAP) |
 | 2026-01-18 | 1.4 | Added HSH, SATADD3, SATSUB3 intrinsics |

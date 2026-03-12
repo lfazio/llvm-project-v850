@@ -699,6 +699,112 @@ Advanced scheduling for V850E2/V850E2M:
 
 ---
 
+### Phase 10: RH850G4MH Extension (Patches 25-27)
+
+See `plan-v850-g4m-g4mh.md` for full implementation details.
+
+---
+
+#### Patch 25: [V850] Add RH850G4MH post-increment load/store and CLIP instructions
+
+**Files:**
+- `llvm/lib/Target/V850/V850.td` (add `FeatureRH850G4MH`, `FeatureRH850G4MH2`)
+- `llvm/lib/Target/V850/V850Subtarget.h` (`HasRH850G4MH`, `HasRH850G4MH2`)
+- `llvm/lib/Target/V850/V850Subtarget.cpp`
+- `llvm/lib/Target/V850/V850InstrInfo.td` (post-increment + CLIP instructions)
+- `llvm/lib/Target/V850/V850InstrFormats.td` (Format XI updates)
+- `llvm/lib/Target/V850/V850ISelLowering.cpp` (`setIndexedLoadAction`, `setIndexedStoreAction`)
+- `llvm/lib/Target/V850/V850ISelDAGToDAG.cpp` (POST_INC/POST_DEC matching)
+- `llvm/lib/Target/V850/MCTargetDesc/V850MCCodeEmitter.cpp`
+- `llvm/lib/Target/V850/Disassembler/V850Disassembler.cpp`
+- `clang/lib/Basic/Targets/V850.cpp` (`__rh850g4mh__`, `__rh850g4mh2__`)
+
+**Content:**
+RH850G4MH adds post-increment/decrement addressing and value clamping:
+- `FeatureRH850G4MH` implies `FeatureRH850G3MH`
+- `FeatureRH850G4MH2` implies `FeatureRH850G4MH`
+- **Post-increment loads** (10): LD.B/BU/H/HU/W with [reg1]+/[reg1]-
+- **Post-increment stores** (6): ST.B/H/W with [reg1]+/[reg1]-
+- **CLIP saturation** (4): CLIP.B, CLIP.BU, CLIP.H, CLIP.HU
+- Format XI encoding (32-bit, bits[10:5]=111111)
+- Constraint: reg1 != reg3 for post-increment
+- ISel: `ISD::POST_INC` / `ISD::POST_DEC` DAG patterns
+- Clang: `-mcpu=g4mh`, `-mcpu=g4mh2`
+
+**Tests:**
+- `llvm/test/MC/V850/g4mh/post-increment.s`
+- `llvm/test/MC/V850/g4mh/clip.s`
+- `llvm/test/MC/Disassembler/V850/g4mh.txt`
+- `llvm/test/CodeGen/V850/g4mh/post-increment.ll`
+- `llvm/test/CodeGen/V850/g4mh/clip.ll`
+- `clang/test/Driver/v850-g4mh.c`
+- `clang/test/Preprocessor/v850-g4mh.c`
+
+---
+
+#### Patch 26: [V850] Add RH850G4MH FXU vector unit
+
+**Files:**
+- `llvm/lib/Target/V850/V850RegisterInfo.td` (VGPR wreg0-wreg31)
+- `llvm/lib/Target/V850/V850InstrFXU.td` (new file, 59 FXU instructions)
+- `llvm/lib/Target/V850/V850InstrInfo.td` (include FXU)
+- `llvm/lib/Target/V850/V850InstrFormats.td` (FormatM_2OP/3OP/4OP/D)
+- `llvm/lib/Target/V850/Disassembler/V850Disassembler.cpp` (new decoder namespace)
+- `clang/include/clang/Basic/BuiltinsV850.def` (59 FXU builtins)
+- `clang/lib/CodeGen/TargetBuiltins/V850.cpp` (FXU builtin codegen)
+- `llvm/include/llvm/IR/IntrinsicsV850.td` (FXU intrinsics)
+
+**Content:**
+FXU 128-bit SIMD vector unit (4 × f32):
+- New `VGPR` register class (wreg0-wreg31, 128-bit)
+- **59 instructions** across 9 categories:
+  - Manipulation (3): MOVV.W4, FLPV.S4, SHFLV.W4
+  - Load/Store (8): LDV.W/DW/QW, LDVZ.H4, STV.W/DW/QW, STVZ.H4
+  - Arithmetic (11): ABSF/NEGF/ADDF/SUBF/MULF/DIVF/MAXF/MINF/SQRTF/RECIPF/RSQRTF.S4
+  - FMA (4): FMAF/FMSF/FNMAF/FNMSF.S4
+  - Compound (4): ADDSUBF/ADDSUBNF/SUBADDF/SUBADDNF.S4
+  - Exchange (7): ADDXF/SUBXF/MULXF/ADDSUBXF/ADDSUBNXF/SUBADDXF/SUBADDNXF.S4
+  - Reduction (5): ADDRF/SUBRF/MULRF/MAXRF/MINRF.S4
+  - Conversion (14): CVTF/TRNCF/CEILF/FLOORF/ROUNDF variants
+  - Comparison (3): CMPF.S4, CMOVF.W4, TRFSRV.W4
+- MC layer (assembler, encoder, decoder) + builtins
+- Auto-vectorization support deferred to future work
+
+**Tests:**
+- `llvm/test/MC/V850/g4mh/fxu-arithmetic.s`
+- `llvm/test/MC/V850/g4mh/fxu-load-store.s`
+- `llvm/test/MC/V850/g4mh/fxu-convert.s`
+- `llvm/test/MC/Disassembler/V850/g4mh-fxu.txt`
+- `clang/test/CodeGen/V850/builtins-g4mh-fxu.c`
+
+---
+
+#### Patch 27: [V850] Add RH850G4MH2 virtualization and MPU support
+
+**Files:**
+- `llvm/lib/Target/V850/V850InstrInfo.td` (HVTRAP, LDM.GSR, STM.GSR, LDM.MP, STM.MP)
+- `llvm/lib/Target/V850/V850RegisterInfo.td` (guest system registers)
+- `clang/include/clang/Basic/BuiltinsV850.def` (virtualization + MPU builtins)
+- `clang/lib/CodeGen/TargetBuiltins/V850.cpp` (builtin codegen)
+- `llvm/include/llvm/IR/IntrinsicsV850.td` (virtualization + MPU intrinsics)
+
+**Content:**
+RH850G4MH2 adds virtualization and MPU bulk operations:
+- **Virtualization** (3): HVTRAP, LDM.GSR, STM.GSR
+- **MPU bulk** (2): LDM.MP, STM.MP
+- **Guest system registers**: GMEIPC, GMEIPSW, GMFEPC, GMFEPSW, GMPSW, etc.
+- Enhanced EIRET/FERET (guest-mode aware)
+- MC layer only (privileged instructions) + builtins for direct access
+
+**Tests:**
+- `llvm/test/MC/V850/g4mh2/virtualization.s`
+- `llvm/test/MC/V850/g4mh2/mpu.s`
+- `llvm/test/MC/Disassembler/V850/g4mh2.txt`
+- `clang/test/CodeGen/V850/builtins-g4mh2-virt.c`
+- `clang/test/CodeGen/V850/builtins-g4mh2-mpu.c`
+
+---
+
 ## Summary: Patch Series Overview
 
 | # | Patch Title | CPU Variant | Component |
@@ -727,6 +833,9 @@ Advanced scheduling for V850E2/V850E2M:
 | 22 | Add tail call optimization | All | Optimization |
 | 23 | Add machine outliner support | All | Optimization |
 | 24 | Add V850E2M dual-issue scheduling model | V850E2M | Optimization |
+| 25 | Add RH850G4MH post-increment load/store and CLIP | RH850G4MH | Extension |
+| 26 | Add RH850G4MH FXU vector unit | RH850G4MH | Extension |
+| 27 | Add RH850G4MH2 virtualization and MPU support | RH850G4MH2 | Extension |
 
 ---
 
@@ -883,7 +992,7 @@ The backend supports:
 
 ## Patch Series
 
-The backend is submitted as 24 patches with incremental CPU variant and optimization support:
+The backend is submitted as 27 patches with incremental CPU variant and optimization support:
 
 **Infrastructure (1-4):**
 1. [V850] Add V850 triple support
@@ -918,6 +1027,11 @@ The backend is submitted as 24 patches with incremental CPU variant and optimiza
 22. [V850] Add tail call optimization
 23. [V850] Add machine outliner support
 24. [V850] Add V850E2M dual-issue scheduling model
+
+**RH850G4MH Extensions (25-27):**
+25. [V850] Add RH850G4MH post-increment load/store and CLIP
+26. [V850] Add RH850G4MH FXU vector unit
+27. [V850] Add RH850G4MH2 virtualization and MPU support
 
 ## Testing
 
@@ -974,6 +1088,7 @@ The backend is submitted as 24 patches with incremental CPU variant and optimiza
 - [V850 Instruction Reference](V850InstructionReference.md)
 - [V850 Builtins Plan](plan-v850-builtins.md)
 - [V850 Verification Report](plan-verification.md)
+- [RH850G4MH Implementation Plan](plan-v850-g4m-g4mh.md)
 
 ---
 
@@ -987,6 +1102,10 @@ The backend is submitted as 24 patches with incremental CPU variant and optimiza
 | V850E2 | `HasV850E2` | `HasV850E1` |
 | V850E2M | `HasV850E2M` | `HasV850E2` |
 | FPU | `HasFPU` | `HasV850E2M` |
+| RH850G3M | `HasRH850G3M` | `HasV850E2M`, `HasFPU` |
+| RH850G3MH | `HasRH850G3MH` | `HasRH850G3M` |
+| RH850G4MH | `HasRH850G4MH` | `HasRH850G3MH` |
+| RH850G4MH2 | `HasRH850G4MH2` | `HasRH850G4MH` |
 
 ---
 

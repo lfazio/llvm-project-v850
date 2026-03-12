@@ -509,57 +509,14 @@ VFPv2 double-precision; MIPS uses `AFGR64` for similar even/odd FPR pairs.
 
 ---
 
-## Phase 6: Post-Increment Addressing (Low Priority - G4MH Only)
+## Phase 6: Post-Increment Addressing (G4MH Only)
 
-### 6.1 Post-Increment Load/Store
+**See [plan-v850-g4m-g4mh.md](plan-v850-g4m-g4mh.md) Phase 2** for full implementation details.
 
-**Goal:** Use post-increment addressing for loop optimization.
-
-**NOTE:** Post-increment/decrement load/store instructions are **RH850G4MH only**.
-They are NOT available on G3M or G3MH (verified against docs/rh850g3m.txt and
-docs/rh850g3mh.txt — the addressing mode concept is described but no instructions
-implement it). The instructions are first defined in docs/rh850g4mh.txt.
-
-**G4MH adds post-increment/decrement forms (Format XI, 32-bit):**
-
-| Instruction | Encoding bits[15:11] | sub-op bits[26:16] | Inc/Dec |
-|-------------|---------------------|--------------------|---------|
-| LD.B [reg1]+, reg3 | 00010 | 01101110000 | +1 |
-| LD.B [reg1]-, reg3 | 00100 | 01101110000 | -1 |
-| LD.BU [reg1]+, reg3 | 00011 | 01101110000 | +1 |
-| LD.BU [reg1]-, reg3 | 00101 | 01101110000 | -1 |
-| LD.H [reg1]+, reg3 | 00010 | 01101110100 | +2 |
-| LD.H [reg1]-, reg3 | 00100 | 01101110100 | -2 |
-| LD.HU [reg1]+, reg3 | 00011 | 01101110100 | +2 |
-| LD.HU [reg1]-, reg3 | 00101 | 01101110100 | -2 |
-| LD.W [reg1]+, reg3 | 00010 | 01101111000 | +4 |
-| LD.W [reg1]-, reg3 | 00100 | 01101111000 | -4 |
-| ST.B reg3, [reg1]+ | 00010 | 01101110010 | +1 |
-| ST.B reg3, [reg1]- | 00100 | 01101110010 | -1 |
-| ST.H reg3, [reg1]+ | 00010 | 01101110110 | +2 |
-| ST.H reg3, [reg1]- | 00100 | 01101110110 | -2 |
-| ST.W reg3, [reg1]+ | 00010 | 01101111010 | +4 |
-| ST.W reg3, [reg1]- | 00100 | 01101111010 | -4 |
-
-All use bits[10:5] = 111111, RRRRR = reg1, wwwww = reg3.
-Constraint: reg1 != reg3 (same register causes undefined behavior).
-
-**Implementation:**
-
-1. **Add instruction definitions** in V850InstrInfo.td (Format XI)
-2. **Add encoding/decoding** in MCCodeEmitter and Disassembler
-3. **Add ISel patterns** for `ISD::POST_INC`/`ISD::POST_DEC`
-4. **Set `setIndexedLoadAction()` / `setIndexedStoreAction()`** in ISelLowering
-5. **Add assembler/disassembler tests**
+Post-increment/decrement load/store instructions are **RH850G4MH only** (16 instructions).
+They are NOT available on G3M or G3MH.
 
 **Requires:** `HasRH850G4MH` feature flag (NOT G3M)
-
-**Complexity:** Medium-High (requires LSR integration)
-
-**Files:**
-- `llvm/lib/Target/V850/V850InstrInfo.td` - Instruction defs
-- `llvm/lib/Target/V850/V850ISelLowering.cpp` - ISD configuration
-- `llvm/lib/Target/V850/V850ISelDAGToDAG.cpp` - Pattern matching
 
 ---
 
@@ -584,25 +541,15 @@ Constraint: reg1 != reg3 (same register causes undefined behavior).
 
 ## Phase 8: G4MH Features (Future)
 
-### 8.1 Virtualization Instructions
+**See [plan-v850-g4m-g4mh.md](plan-v850-g4m-g4mh.md)** for full G4MH/G4MH2 implementation plan.
 
-**G4MH adds hypervisor support:**
-- `HVTRAP vector5` - Hypervisor trap
-- `LDM.GSR [reg1]` - Load multiple guest system registers
-- `STM.GSR [reg1]` - Store multiple guest system registers
-- `LDM.MP [reg1], eh-et` - Load MPU entries
-- `STM.MP eh-et, [reg1]` - Store MPU entries
-
-**Priority:** Future (requires G4MH subtarget)
-
-### 8.2 FXU Vector Unit
-
-**G4MH adds 128-bit SIMD (FXU):**
-- 32 vector registers (wreg0-wreg31), 128-bit each
-- 59 vector instructions (ADDF.S4, SUBF.S4, MULF.S4, etc.)
-- Requires PSW.CU1 coprocessor enable
-
-**Priority:** Future (significant effort, requires new register class)
+G4MH features include:
+- Post-increment/decrement load/store (16 instructions) — Phase 2
+- CLIP saturation instructions (4 instructions) — Phase 3
+- MPU bulk load/store: LDM.MP, STM.MP (G4MH2 only) — Phase 4
+- FXU 128-bit SIMD vector unit (59 instructions) — Phase 5
+- Virtualization: HVTRAP, LDM.GSR, STM.GSR (G4MH2 only) — Phase 6
+- G4MH scheduling model — Phase 7
 
 ---
 
@@ -640,8 +587,8 @@ Constraint: reg1 != reg3 (same register causes undefined behavior).
 16. [7.1] LOOP instruction pass (if feasible)
 17. ~~[5.1] G3MH register differences (FPIPR deleted)~~ DONE — MCFG0, MCTL, PID, FPIPR, HTCFG0 added to system register table; FPIPR deletion documented in builtin comment
 
-### Sprint 8: Post-Increment (G4MH Only)
-18. [6.1] Post-increment load/store instructions and ISel patterns (requires G4MH subtarget)
+### Sprint 8: G4MH Features (see plan-v850-g4m-g4mh.md)
+18. Post-increment, CLIP, MPU, FXU, virtualization — see [plan-v850-g4m-g4mh.md](plan-v850-g4m-g4mh.md)
 
 ---
 
@@ -663,3 +610,4 @@ For each sprint:
 | 2026-02-11 | 1.1 | Sprints 1-4 complete; Added Phase 4b: SysReg refactoring (replace pseudo regs with immediates); Updated sprint order; Fixed LoadStoreOptimizer volatile crash |
 | 2026-02-21 | 1.2 | Sprint 5 complete: unified 10-bit encoding `(selID<<5)\|regID` for LDSR/STSR, named banked register syntax (ebase, intbp, mea, etc.), removed LDSR_sel/STSR_sel; Added Phase 4c: Double-Precision FPU CodeGen (all f64 ops currently fall back to libcalls — no DPR register class, no ISel patterns) |
 | 2026-03-01 | 1.3 | Sprint 6 mostly complete: DPR register class, f64 type legalization, ISel patterns (arith/convert/compare/load/store), CMOV_F64 pseudo for SELECT_CC (splits DPR→lo/hi CMOVr→REG_SEQUENCE), f64 calling convention (D6/D8 args, D10 return), setLoadExtAction EXTLOAD f32→f64 Expand, setTruncStoreAction f64→f32 Expand, LD_DW_F/ST_DW_F codegen-only pseudos for G3M f64 memory ops. Remaining: scheduling rules, fpu-double-compare.ll test. |
+| 2026-03-08 | 1.4 | Phases 6/8 condensed to reference new plan-v850-g4m-g4mh.md for all G4MH/G4MH2 features (post-increment, CLIP, MPU, FXU, virtualization) |

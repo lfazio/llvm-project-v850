@@ -571,9 +571,12 @@ to properly unwind the stack during debugging or exception handling.
 ### 4.5 RH850G4MH Scheduling [TODO]
 
 **Description:** Scheduling model for G4MH with:
-- Improved FPU timing
-- Virtualization overhead
-- Extended register file
+- Post-increment load/store timings (1 cycle pipe, same as base load/store)
+- CLIP instruction timings (1 cycle)
+- FXU SIMD instruction latencies (ADDF.S4: 4, DIVF.S4: 14, SQRTF.S4: 14, etc.)
+- MPU bulk operations (LDM.MP: N+8 cycles, STM.MP: N+2 cycles)
+
+**See:** [plan-v850-g4m-g4mh.md](plan-v850-g4m-g4mh.md) Phase 7 for full details.
 
 **Priority:** Low
 
@@ -704,8 +707,12 @@ return_float_const:
 **Description:** Use post-increment load/store where available.
 
 **Hardware Support:**
-- **V850/V850E1/V850E2/V850E2M:** NOT AVAILABLE
-- **RH850G3M/G3MH/G4MH:** Available (`LD.W [reg]+, reg3`, `ST.W reg3, [reg]+`)
+- **V850/V850E1/V850E2/V850E2M/RH850G3M/G3MH:** NOT AVAILABLE
+- **RH850G4MH/G4MH2:** Available — 16 instructions (Format XI encoding)
+  - `LD.B/BU/H/HU/W [reg1]+, reg3` (post-increment loads)
+  - `LD.B/BU/H/HU/W [reg1]-, reg3` (post-decrement loads)
+  - `ST.B/H/W reg3, [reg1]+` (post-increment stores)
+  - `ST.B/H/W reg3, [reg1]-, reg3` (post-decrement stores)
 
 **Current Implementation:**
 The V850 backend generates optimal code for array/pointer iteration patterns:
@@ -714,23 +721,26 @@ ld.w  0[r7], r10     ; load from ptr
 add   4, r7          ; increment ptr
 ```
 
-With hardware post-increment (RH850 only), this could be:
+With hardware post-increment (RH850G4MH only), this could be:
 ```asm
 ld.w  [r7]+, r10     ; load and increment in one instruction
 ```
 
 **Analysis:**
-- Current code generation is OPTIMAL for V850E2M given available instructions
+- Current code generation is OPTIMAL for V850E2M/G3M given available instructions
 - Loop strength reduction is working (uses pointer increment, not index multiply)
-- Hardware post-increment requires RH850 subtarget support
+- Hardware post-increment requires RH850G4MH subtarget support
 
-**Future Work:**
-- Add RH850G3M/G4MH processor definitions
-- Implement Format XI post-increment load/store instructions
+**Future Work (see `plan-v850-g4m-g4mh.md` Phase 2):**
+- Add RH850G4MH processor definitions
+- Implement Format XI post-increment/decrement load/store instructions
 - Add DAG patterns for ISD::POST_INC/POST_DEC
+- `setIndexedLoadAction(ISD::POST_INC, ...)` / `setIndexedStoreAction(ISD::POST_INC, ...)`
+- DAGToDAG matching for `ISD::POST_INC` / `ISD::POST_DEC` nodes
+- Constraint: reg1 != reg3
 
-**Status:** No optimization possible for V850E2M (hardware limitation)
-**Priority:** Low (requires RH850 backend work)
+**Status:** No optimization possible for V850E2M/G3M (hardware limitation); available on G4MH
+**Priority:** Medium (requires G4MH backend work, see `plan-v850-g4m-g4mh.md`)
 
 ---
 
@@ -1092,8 +1102,9 @@ varargs_receiver:
 ### Medium Priority
 - f64 scheduling rules (V850SchedV850E2M.td, V850SchedRH850G3M.td) — latencies for ADDFD/MULFD/DIVFD/SQRTFD
 
-### Hardware Limitations (Requires RH850 Backend)
-1. Post-Increment Addressing (6.2) - RH850 only, not available on V850E2M
+### Hardware Limitations (Requires RH850G4MH Backend)
+1. Post-Increment Addressing (6.2) - RH850G4MH only, not available on V850E2M/G3M (see `plan-v850-g4m-g4mh.md` Phase 2)
+2. FXU Auto-Vectorization - RH850G4MH only, 128-bit SIMD via wreg0-wreg31 (see `plan-v850-g4m-g4mh.md` Phase 5)
 
 ### Low Priority / Future
 1. RH850G4MH Scheduling (4.5)
@@ -1183,6 +1194,7 @@ Metrics to track:
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-03-08 | 1.9 | Updated G4MH entries: section 4.5 (G4MH scheduling with post-increment/CLIP/FXU/MPU timings), section 6.2 (post-increment addressing corrected to G4MH-only, not G3M), Hardware Limitations updated with FXU auto-vectorization entry. All reference plan-v850-g4m-g4mh.md. |
 | 2026-03-01 | 1.8 | f64 CodeGen complete: DPR register class, FADD/FSUB/FMUL/FDIV/FABS/FNEG/FSQRT/FMINNUM/FMAXNUM Legal, CVTFDS/CVTFSD/CVTFWD/TRNCFDW patterns, CMOV_F64 pseudo (SELECT_CC f64 via split CMOVr), LD_DW_F/ST_DW_F for G3M f64 memory, f64 calling convention (D6/D8 args, D10 return), setTruncStoreAction/setLoadExtAction for f32↔f64 interop. f64 scheduling rules remain TODO. |
 | 2026-02-11 | 1.7 | Added atomic load/store/fence custom lowering (SYNCP fences, shouldInsertFencesForAtomic, MaxAtomicInlineWidth) |
 | 2026-02-11 | 1.6 | Added RH850G3M scheduling model (faster div/FPU, branch prediction, G3M-specific instructions) |

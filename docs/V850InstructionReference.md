@@ -517,6 +517,154 @@ Unlike HALT, SNOOZE is typically used for spin-wait optimization.
 
 ---
 
+## RH850G4MH/G4MH2 Instructions
+
+The RH850G4MH extends the G3MH with post-increment/decrement load/store addressing,
+CLIP (saturation clipping) instructions, and the FXU 128-bit SIMD vector unit.
+The RH850G4MH2 further adds MPU bulk load/store and virtualization support.
+
+### Post-Increment/Decrement Load Instructions (RH850G4MH+)
+
+| Mnemonic | Operands | Format | Arch | CY | OV | S | Z | SAT | Description |
+|----------|----------|--------|------|----|----|---|---|-----|-------------|
+| LD.B | [reg1]+, reg3 | XI | RH850G4MH | - | - | - | - | - | Load signed byte, reg1 += 1 |
+| LD.B | [reg1]-, reg3 | XI | RH850G4MH | - | - | - | - | - | Load signed byte, reg1 -= 1 |
+| LD.BU | [reg1]+, reg3 | XI | RH850G4MH | - | - | - | - | - | Load unsigned byte, reg1 += 1 |
+| LD.BU | [reg1]-, reg3 | XI | RH850G4MH | - | - | - | - | - | Load unsigned byte, reg1 -= 1 |
+| LD.H | [reg1]+, reg3 | XI | RH850G4MH | - | - | - | - | - | Load signed halfword, reg1 += 2 |
+| LD.H | [reg1]-, reg3 | XI | RH850G4MH | - | - | - | - | - | Load signed halfword, reg1 -= 2 |
+| LD.HU | [reg1]+, reg3 | XI | RH850G4MH | - | - | - | - | - | Load unsigned halfword, reg1 += 2 |
+| LD.HU | [reg1]-, reg3 | XI | RH850G4MH | - | - | - | - | - | Load unsigned halfword, reg1 -= 2 |
+| LD.W | [reg1]+, reg3 | XI | RH850G4MH | - | - | - | - | - | Load word, reg1 += 4 |
+| LD.W | [reg1]-, reg3 | XI | RH850G4MH | - | - | - | - | - | Load word, reg1 -= 4 |
+
+**Operation:** Load the data at the address in reg1, store in reg3 (with sign/zero extension
+for byte/halfword), then increment/decrement reg1 by the data size (1/2/4 bytes).
+
+**Encoding (Format XI, 32-bit):**
+
+| Instruction | bits[15:0] | bits[31:16] |
+|-------------|------------|-------------|
+| LD.B [reg1]+, reg3 | `00010111111RRRRR` | `wwwww01101110000` |
+| LD.B [reg1]-, reg3 | `00100111111RRRRR` | `wwwww01101110000` |
+| LD.BU [reg1]+, reg3 | `00011111111RRRRR` | `wwwww01101110000` |
+| LD.BU [reg1]-, reg3 | `00101111111RRRRR` | `wwwww01101110000` |
+| LD.H [reg1]+, reg3 | `00010111111RRRRR` | `wwwww01101110100` |
+| LD.H [reg1]-, reg3 | `00100111111RRRRR` | `wwwww01101110100` |
+| LD.HU [reg1]+, reg3 | `00011111111RRRRR` | `wwwww01101110100` |
+| LD.HU [reg1]-, reg3 | `00101111111RRRRR` | `wwwww01101110100` |
+| LD.W [reg1]+, reg3 | `00010111111RRRRR` | `wwwww01101111000` |
+| LD.W [reg1]-, reg3 | `00100111111RRRRR` | `wwwww01101111000` |
+
+Where RRRRR = reg1, wwwww = reg3.
+
+**Constraint:** reg1 must not be the same as reg3. If the same register is specified,
+the result of updating reg1 is stored (implementation-defined behavior).
+
+### Post-Increment/Decrement Store Instructions (RH850G4MH+)
+
+| Mnemonic | Operands | Format | Arch | CY | OV | S | Z | SAT | Description |
+|----------|----------|--------|------|----|----|---|---|-----|-------------|
+| ST.B | reg3, [reg1]+ | XI | RH850G4MH | - | - | - | - | - | Store byte, reg1 += 1 |
+| ST.B | reg3, [reg1]- | XI | RH850G4MH | - | - | - | - | - | Store byte, reg1 -= 1 |
+| ST.H | reg3, [reg1]+ | XI | RH850G4MH | - | - | - | - | - | Store halfword, reg1 += 2 |
+| ST.H | reg3, [reg1]- | XI | RH850G4MH | - | - | - | - | - | Store halfword, reg1 -= 2 |
+| ST.W | reg3, [reg1]+ | XI | RH850G4MH | - | - | - | - | - | Store word, reg1 += 4 |
+| ST.W | reg3, [reg1]- | XI | RH850G4MH | - | - | - | - | - | Store word, reg1 -= 4 |
+
+**Operation:** Store the data from reg3 to the address in reg1, then increment/decrement
+reg1 by the data size (1/2/4 bytes).
+
+**Encoding (Format XI, 32-bit):**
+
+| Instruction | bits[15:0] | bits[31:16] |
+|-------------|------------|-------------|
+| ST.B reg3, [reg1]+ | `00010111111RRRRR` | `wwwww01101110010` |
+| ST.B reg3, [reg1]- | `00100111111RRRRR` | `wwwww01101110010` |
+| ST.H reg3, [reg1]+ | `00010111111RRRRR` | `wwwww01101110110` |
+| ST.H reg3, [reg1]- | `00100111111RRRRR` | `wwwww01101110110` |
+| ST.W reg3, [reg1]+ | `00010111111RRRRR` | `wwwww01101111010` |
+| ST.W reg3, [reg1]- | `00100111111RRRRR` | `wwwww01101111010` |
+
+Where RRRRR = reg1, wwwww = reg3.
+
+### CLIP Instructions (RH850G4MH+)
+
+| Mnemonic | Operands | Format | Arch | CY | OV | S | Z | SAT | Description |
+|----------|----------|--------|------|----|----|---|---|-----|-------------|
+| CLIP.B | reg1, reg2 | IX | RH850G4MH | * | 0 | * | * | * | Clip to signed byte (-128 to 127) |
+| CLIP.BU | reg1, reg2 | IX | RH850G4MH | * | 0 | * | * | * | Clip to unsigned byte (0 to 255) |
+| CLIP.H | reg1, reg2 | IX | RH850G4MH | * | 0 | * | * | * | Clip to signed halfword (-32768 to 32767) |
+| CLIP.HU | reg1, reg2 | IX | RH850G4MH | * | 0 | * | * | * | Clip to unsigned halfword (0 to 65535) |
+
+**Operation:** Saturates (clamps) the value in reg1 to the specified range and stores in reg2.
+CY is set if saturation occurred (value was clamped). SAT is ORed with CY (sticky flag).
+
+**Encoding (Format IX, 32-bit):**
+
+| Instruction | bits[15:0] | bits[31:16] |
+|-------------|------------|-------------|
+| CLIP.B | `rrrrr111111RRRRR` | `0000000000010000` |
+| CLIP.BU | `rrrrr111111RRRRR` | `0000000010010000` |
+| CLIP.H | `rrrrr111111RRRRR` | `0000000000010010` |
+| CLIP.HU | `rrrrr111111RRRRR` | `0000000010010010` |
+
+Where RRRRR = reg1, rrrrr = reg2.
+
+### MPU Bulk Load/Store Instructions (RH850G4MH2+)
+
+| Mnemonic | Operands | Format | Arch | CY | OV | S | Z | SAT | Description |
+|----------|----------|--------|------|----|----|---|---|-----|-------------|
+| LDM.MP | [reg1], eh-et | XI | RH850G4MH2 | - | - | - | - | - | Load MPU entries (MPLA/MPUA/MPAT) |
+| STM.MP | eh-et, [reg1] | XI | RH850G4MH2 | - | - | - | - | - | Store MPU entries (MPLA/MPUA/MPAT) |
+
+**Operation (LDM.MP):** Loads word data from the address in reg1 into MPU protection
+area registers (MPLA, MPUA, MPAT) for entries from `eh` to `et` in ascending order.
+Three words are read per entry (MPLA, MPUA, MPAT), advancing the address by 4 each time.
+The reg1 value is unchanged after execution.
+
+**Operation (STM.MP):** Stores MPU protection area registers to memory, reverse of LDM.MP.
+
+**Encoding (Format XI, 32-bit):**
+
+| Instruction | bits[15:0] | bits[31:16] |
+|-------------|------------|-------------|
+| LDM.MP | `rrrrr111111RRRRR` | `wwwww00101100110` |
+| STM.MP | `rrrrr111111RRRRR` | `wwwww00101100100` |
+
+Where RRRRR = reg1, rrrrr = eh (start entry), wwwww = et (end entry).
+
+**Privilege:** SV privilege required (PIE exception if PSW.UM=1).
+
+### Virtualization Instructions (RH850G4MH2+)
+
+| Mnemonic | Operands | Format | Arch | CY | OV | S | Z | SAT | Description |
+|----------|----------|--------|------|----|----|---|---|-----|-------------|
+| HVTRAP | vector5 | X | RH850G4MH2 | - | - | - | - | - | Hypervisor EI-level trap |
+| LDM.GSR | [reg1] | X | RH850G4MH2 | - | - | - | - | - | Load multiple guest system registers |
+| STM.GSR | [reg1] | X | RH850G4MH2 | - | - | - | - | - | Store multiple guest system registers |
+
+**HVTRAP:** Saves return PC in HMEIPC, HMPSW in HMEIPSW, PSWH in EIPSWH, stores
+vector5 as cause code in HMEIIC. Clears PSWH.GM to enter host mode. SV privilege,
+requires HVCFG.HVE=1.
+
+**LDM.GSR:** Loads pre-defined guest system registers from memory starting at the
+word-aligned address in reg1. HV privilege instruction.
+
+**STM.GSR:** Stores pre-defined guest system registers to memory. HV privilege instruction.
+
+**Encoding:**
+
+| Instruction | bits[15:0] | bits[31:16] |
+|-------------|------------|-------------|
+| HVTRAP | `00000111111vvvvv` | `0000000100010000` |
+| LDM.GSR | `00000111111RRRRR` | `1001100101100000` |
+| STM.GSR | `00000111111RRRRR` | `1001000101100000` |
+
+Where vvvvv = vector5, RRRRR = reg1.
+
+---
+
 ## Floating-Point Instructions
 
 The V850E2M and later CPUs include a floating-point unit (FPU) supporting IEEE 754
