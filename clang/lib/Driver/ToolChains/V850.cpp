@@ -38,10 +38,15 @@ void v850::getV850TargetFeatures(const Driver &D, const ArgList &Args,
                     .Default(false);
   }
 
-  // Explicit -mv850-fpu / -mno-v850-fpu override the CPU default.
-  if (const Arg *A =
-          Args.getLastArg(options::OPT_mv850_fpu, options::OPT_mno_v850_fpu)) {
-    CPUHasFPU = A->getOption().matches(options::OPT_mv850_fpu);
+  // -mhard-float / -msoft-float / -mno-soft-float / -msingle-float
+  // override the CPU default.  Last flag wins.
+  if (const Arg *A = Args.getLastArg(
+          options::OPT_msoft_float, options::OPT_mno_soft_float,
+          options::OPT_mhard_float, options::OPT_msingle_float)) {
+    if (A->getOption().matches(options::OPT_msoft_float))
+      CPUHasFPU = false;
+    else
+      CPUHasFPU = true; // -mhard-float, -mno-soft-float, -msingle-float
   }
 
   if (CPUHasFPU)
@@ -49,14 +54,21 @@ void v850::getV850TargetFeatures(const Driver &D, const ArgList &Args,
   else
     Features.push_back("-v850fpu");
 
-  // Soft-float overrides FPU: FPU instructions are still available, but
-  // the ABI uses integer registers for floating-point arguments.
-  if (const Arg *A = Args.getLastArg(options::OPT_mv850_soft_float,
-                                     options::OPT_mno_v850_soft_float)) {
-    if (A->getOption().matches(options::OPT_mv850_soft_float))
+  // -msoft-float also sets the soft-float ABI feature (use integer
+  // registers for floating-point arguments).
+  if (const Arg *A = Args.getLastArg(
+          options::OPT_msoft_float, options::OPT_mno_soft_float,
+          options::OPT_mhard_float, options::OPT_msingle_float)) {
+    if (A->getOption().matches(options::OPT_msoft_float))
       Features.push_back("+soft-float");
-    else
-      Features.push_back("-soft-float");
+  }
+
+  // -msingle-float restricts to single-precision FPU only (no double).
+  if (const Arg *A = Args.getLastArg(
+          options::OPT_msoft_float, options::OPT_mno_soft_float,
+          options::OPT_mhard_float, options::OPT_msingle_float)) {
+    if (A->getOption().matches(options::OPT_msingle_float))
+      Features.push_back("+single-float-only");
   }
 
   // Derive FXU (128-bit SIMD vector unit) capability from CPU.
@@ -78,6 +90,26 @@ void v850::getV850TargetFeatures(const Driver &D, const ArgList &Args,
     Features.push_back("+v850fxu");
   else
     Features.push_back("-v850fxu");
+
+  // Derive virtualization capability from CPU.
+  // Virtualization is available on RH850G4MH2.
+  bool CPUHasVirt = false;
+  if (const Arg *A = Args.getLastArg(options::OPT_mcpu_EQ)) {
+    StringRef CPU = A->getValue();
+    CPUHasVirt =
+        llvm::StringSwitch<bool>(CPU).Case("g4mh2", true).Default(false);
+  }
+
+  // Explicit -mvirt / -mno-virt override the CPU default.
+  if (const Arg *A =
+          Args.getLastArg(options::OPT_mvirt, options::OPT_mno_virt)) {
+    CPUHasVirt = A->getOption().matches(options::OPT_mvirt);
+  }
+
+  if (CPUHasVirt)
+    Features.push_back("+rh850g4mh2");
+  else
+    Features.push_back("-rh850g4mh2");
 }
 
 /// V850 Toolchain

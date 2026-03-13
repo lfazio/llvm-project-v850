@@ -57,7 +57,7 @@
 // V850E3-NOT: #define __v850e2v3__
 
 // Test soft-float disables FPU macros
-// RUN: %clang -target v850 -mcpu=v850e2m -mv850-soft-float -E -dM %s -o - | FileCheck -check-prefix=V850E2M-SOFT %s
+// RUN: %clang -target v850 -mcpu=v850e2m -msoft-float -E -dM %s -o - | FileCheck -check-prefix=V850E2M-SOFT %s
 // V850E2M-SOFT: #define __V850_SOFT_FLOAT__ 1
 // V850E2M-SOFT: #define __v850e2m__ 1
 // V850E2M-SOFT-NOT: #define __V850_FPU__
@@ -65,14 +65,15 @@
 // V850E2M-SOFT-NOT: #define __V850_FEATURE_FMA__
 
 // Test enabling FPU on base V850
-// RUN: %clang -target v850 -mcpu=v850 -mv850-fpu -E -dM %s -o - | FileCheck -check-prefix=V850-FPU %s
+// RUN: %clang -target v850 -mcpu=v850 -mhard-float -E -dM %s -o - | FileCheck -check-prefix=V850-FPU %s
 // V850-FPU: #define __V850_FPU__ 1
 // V850-FPU: #define __V850_FP__ 0x6
 // V850-FPU: #define __V850__ 1
 // V850-FPU-NOT: #define __v850e__
 
-// Test disabling FPU on V850E2M
-// RUN: %clang -target v850 -mcpu=v850e2m -mno-v850-fpu -E -dM %s -o - | FileCheck -check-prefix=V850E2M-NOFPU %s
+// Test disabling FPU on V850E2M (uses -msoft-float which also sets soft-float ABI)
+// RUN: %clang -target v850 -mcpu=v850e2m -msoft-float -E -dM %s -o - | FileCheck -check-prefix=V850E2M-NOFPU %s
+// V850E2M-NOFPU: #define __V850_SOFT_FLOAT__ 1
 // V850E2M-NOFPU: #define __v850e2m__ 1
 // V850E2M-NOFPU-NOT: #define __V850_FPU__
 // V850E2M-NOFPU-NOT: #define __V850_FP__

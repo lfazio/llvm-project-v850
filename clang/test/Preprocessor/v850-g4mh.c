@@ -25,7 +25,7 @@
 // G4MH2: #define __v850e__ 1
 
 // Verify soft-float disables FPU macros on G4MH
-// RUN: %clang -target v850 -mcpu=g4mh -mv850-soft-float -E -dM %s -o - | FileCheck -check-prefix=G4MH-SOFT %s
+// RUN: %clang -target v850 -mcpu=g4mh -msoft-float -E -dM %s -o - | FileCheck -check-prefix=G4MH-SOFT %s
 // G4MH-SOFT: #define __V850_SOFT_FLOAT__ 1
 // G4MH-SOFT: #define __rh850g4mh__ 1
 // G4MH-SOFT-NOT: #define __V850_FPU__

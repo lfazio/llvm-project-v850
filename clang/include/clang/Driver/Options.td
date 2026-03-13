@@ -6529,14 +6529,6 @@ foreach i = 0 ... 5 in
 
 // V850 feature flags
 let Flags = [TargetSpecific] in {
-def mv850_fpu : Flag<["-"], "mv850-fpu">, Group<m_v850_Features_Group>,
-  HelpText<"Enable V850 floating-point unit">;
-def mno_v850_fpu : Flag<["-"], "mno-v850-fpu">, Group<m_v850_Features_Group>,
-  HelpText<"Disable V850 floating-point unit">;
-def mv850_soft_float : Flag<["-"], "mv850-soft-float">, Group<m_v850_Features_Group>,
-  HelpText<"Use software floating-point emulation for V850">;
-def mno_v850_soft_float : Flag<["-"], "mno-v850-soft-float">, Group<m_v850_Features_Group>,
-  HelpText<"Use hardware floating-point for V850">;
 def mfxu : Flag<["-"], "mfxu">, Group<m_v850_Features_Group>,
   HelpText<"Enable V850 FXU vector unit (RH850G4MH)">;
 def mno_fxu : Flag<["-"], "mno-fxu">, Group<m_v850_Features_Group>,
