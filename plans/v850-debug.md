@@ -796,11 +796,22 @@ struct > 8 bytes   | Return via hidden pointer in r6
 - ✅ Software breakpoint via `__builtin_v850_dbtrap()`
 - ✅ Hardware breakpoint configuration via BPC/BPAV/BPAM intrinsics
 
-### Phase 5: Hardware Debug Support (Low Priority)
+### Phase 5: Hardware Debug Support [COMPLETE]
 
-1. Document hardware breakpoint setup procedure
-2. Create helper library for breakpoint management
-3. Test with actual hardware/simulator
+**Status:** Implemented.
+
+1. ✅ Document hardware breakpoint setup procedure → `docs/V850HardwareDebug.md`
+2. ✅ Create helper header for breakpoint management → `clang/lib/Headers/v850_debug.h`
+3. Test with actual hardware/simulator (deferred — requires hardware)
+
+**Files Created:**
+- `clang/lib/Headers/v850_debug.h` — Convenience macros/inline functions over raw builtins
+- `docs/V850HardwareDebug.md` — Practical documentation with examples
+
+**Deliverables:**
+- ✅ `v850_debug.h` header with software breakpoint, channel selection, address breakpoint, data watchpoint helpers
+- ✅ BPC bit constants (`V850_BPC_EN`, `V850_BPC_ADDR_MATCH`, etc.)
+- ✅ Documentation with register layout, examples for all use cases
 
 ---
 
@@ -928,3 +939,4 @@ llvm-readelf -r test.o
 | 2026-01-27 | 2.4 | LLDB architecture plugin implemented (ArchitectureV850.cpp) |
 | 2026-01-27 | 2.5 | LLDB instruction emulation implemented (PREPARE/DISPOSE/ADD/ADDI/ST.W/LD.W/MOV) |
 | 2026-01-31 | 2.6 | GDB remote stub support implemented (GDBRemoteRegisterFallback.cpp) |
+| 2026-03-15 | 2.7 | Phase 5 complete: created v850_debug.h helper header and V850HardwareDebug.md documentation |

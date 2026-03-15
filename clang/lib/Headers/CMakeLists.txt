@@ -147,6 +147,10 @@ set(ve_files
   velintrin_approx.h
   )
 
+set(v850_files
+  v850_debug.h
+  )
+
 set(webassembly_files
   wasm_simd128.h
   )
@@ -325,6 +329,7 @@ set(files
   ${riscv_files}
   ${spirv_files}
   ${systemz_files}
+  ${v850_files}
   ${ve_files}
   ${x86_files}
   ${gpu_files}
