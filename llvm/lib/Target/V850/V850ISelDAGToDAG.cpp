@@ -680,6 +680,53 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
     return;
   }
 
+  case V850ISD::SMUL:
+  case V850ISD::UMUL: {
+    // Check if one operand is a constant that fits in simm9/uimm9.
+    // If so, use MULi/MULUi (immediate form) instead of MUL/MULU.
+    if (!Subtarget->hasV850E1())
+      break;
+
+    SDValue LHS = Node->getOperand(0);
+    SDValue RHS = Node->getOperand(1);
+    bool IsSigned = (Node->getOpcode() == V850ISD::SMUL);
+
+    // Try to find a constant operand
+    ConstantSDNode *ConstOp = nullptr;
+    SDValue RegOp;
+    if (auto *C = dyn_cast<ConstantSDNode>(RHS)) {
+      ConstOp = C;
+      RegOp = LHS;
+    } else if (auto *C = dyn_cast<ConstantSDNode>(LHS)) {
+      ConstOp = C;
+      RegOp = RHS;
+    }
+
+    if (ConstOp) {
+      int64_t Val = ConstOp->getSExtValue();
+      uint64_t UVal = ConstOp->getZExtValue();
+
+      if (IsSigned && isInt<9>(Val)) {
+        // Use MULi: mul imm9, reg2, reg3
+        // Mask to 32 bits for getTargetConstant (avoids APInt assertion)
+        SDValue Imm = CurDAG->getTargetConstant(Val & 0xFFFFFFFF, DL, MVT::i32);
+        SDNode *Mul = CurDAG->getMachineNode(V850::MULi, DL, MVT::i32, MVT::i32,
+                                             RegOp, Imm);
+        ReplaceNode(Node, Mul);
+        return;
+      }
+      if (!IsSigned && isUInt<9>(UVal)) {
+        // Use MULUi: mulu imm9, reg2, reg3
+        SDValue Imm = CurDAG->getTargetConstant(UVal, DL, MVT::i32);
+        SDNode *Mul = CurDAG->getMachineNode(V850::MULUi, DL, MVT::i32,
+                                             MVT::i32, RegOp, Imm);
+        ReplaceNode(Node, Mul);
+        return;
+      }
+    }
+    break;
+  }
+
   default:
     break;
   }
