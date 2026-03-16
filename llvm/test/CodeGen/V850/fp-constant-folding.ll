@@ -6,11 +6,10 @@
 
 ;; Pure constant operations - folded at compile time
 
+; 1.0 + 2.0 = 3.0 (0x40400000) - folded to constant, materialized via MOVHI
 ; CHECK-LABEL: test_const_add:
 ; CHECK-NOT: addf.s
 ; CHECK: movhi
-; CHECK: movea
-; CHECK: ld.w
 ; CHECK-NEXT: jmp [r31]
 define float @test_const_add() {
   ; 1.0 + 2.0 = 3.0 - folded to constant
@@ -18,11 +17,10 @@ define float @test_const_add() {
   ret float %result
 }
 
+; 2.0 * 3.0 = 6.0 (0x40C00000) - folded to constant, materialized via MOVHI
 ; CHECK-LABEL: test_const_mul:
 ; CHECK-NOT: mulf.s
 ; CHECK: movhi
-; CHECK: movea
-; CHECK: ld.w
 ; CHECK-NEXT: jmp [r31]
 define float @test_const_mul() {
   ; 2.0 * 3.0 = 6.0 - folded to constant
@@ -30,11 +28,10 @@ define float @test_const_mul() {
   ret float %result
 }
 
+; fma(2.0, 3.0, 1.0) = 7.0 (0x40E00000) - folded, materialized via MOVHI
 ; CHECK-LABEL: test_const_fma:
 ; CHECK-NOT: maddf.s
 ; CHECK: movhi
-; CHECK: movea
-; CHECK: ld.w
 ; CHECK-NEXT: jmp [r31]
 define float @test_const_fma() {
   ; fma(2.0, 3.0, 1.0) = 7.0 - folded to constant

@@ -258,6 +258,12 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::FP_TO_SINT, MVT::i32, Legal);
     setOperationAction(ISD::FP_TO_UINT, MVT::i32, Legal);
 
+    // Materialize f32 constants via integer MOV/MOVHI/MOVEA in ISel
+    // instead of loading from constant pool (saves 1-2 instructions).
+    // Handled in V850ISelDAGToDAG::Select() to avoid DAG combiner
+    // folding BITCAST(i32_const) back into ConstantFP.
+    setOperationAction(ISD::ConstantFP, MVT::f32, Legal);
+
     // FP comparisons - CMPF.S + TRFSR + SETF/CMOV/BR sequence
     // SETCC f32 is Legal (handled in ISel via CMPF.S + TRFSR + SETF)
     // SELECT_CC f32 and BR_CC f32 are Custom (lowered via V850ISD::FP_CMP)

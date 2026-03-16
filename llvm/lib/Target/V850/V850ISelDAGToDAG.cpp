@@ -138,6 +138,71 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
   SDLoc DL(Node);
 
   switch (Node->getOpcode()) {
+  case ISD::ConstantFP: {
+    // Materialize f32 constants via integer MOV/MOVHI/MOVEA instructions
+    // instead of loading from the constant pool (saves 1-2 insn + memory).
+    // On V850, GPR and FPR share the same physical registers, so we just
+    // need COPY to change the register class.
+    if (Node->getValueType(0) != MVT::f32)
+      break;
+
+    ConstantFPSDNode *CFP = cast<ConstantFPSDNode>(Node);
+    uint32_t Bits = CFP->getValueAPF().bitcastToAPInt().getZExtValue();
+
+    // Emit integer constant materialization.
+    SDNode *IntNode;
+    int32_t SBits = static_cast<int32_t>(Bits);
+
+    if (Bits == 0) {
+      // Use r0 (always zero) directly.
+      IntNode = CurDAG->getMachineNode(TargetOpcode::COPY, DL, MVT::i32,
+                                       CurDAG->getRegister(V850::R0, MVT::i32));
+    } else if (SBits >= -16 && SBits <= 15) {
+      // MOV imm5, reg (1 insn, 16-bit)
+      SDValue Imm = CurDAG->getTargetConstant(SBits, DL, MVT::i32);
+      IntNode = CurDAG->getMachineNode(V850::MOVi, DL, MVT::i32, Imm);
+    } else if (SBits >= -32768 && SBits <= 32767) {
+      // MOVEA imm16, r0, reg (1 insn, 32-bit)
+      SDValue Imm = CurDAG->getTargetConstant(SBits, DL, MVT::i32);
+      SDValue Zero = CurDAG->getRegister(V850::R0, MVT::i32);
+      IntNode = CurDAG->getMachineNode(V850::MOVEA, DL, MVT::i32, Zero, Imm);
+    } else if ((Bits & 0xFFFF) == 0) {
+      // Upper 16 bits only: MOVHI imm16, r0, reg (1 insn, 32-bit)
+      // Common: 1.0f=0x3F800000, -1.0f=0xBF800000, 0.5f=0x3F000000, etc.
+      SDValue Hi = CurDAG->getTargetConstant(Bits >> 16, DL, MVT::i32);
+      SDValue Zero = CurDAG->getRegister(V850::R0, MVT::i32);
+      IntNode = CurDAG->getMachineNode(V850::MOVHI, DL, MVT::i32, Zero, Hi);
+    } else if (Subtarget->hasV850E1()) {
+      // MOV imm32, reg (48-bit instruction, V850E1+)
+      SDValue Imm = CurDAG->getTargetConstant(Bits, DL, MVT::i32);
+      IntNode = CurDAG->getMachineNode(V850::MOVi32, DL, MVT::i32, Imm);
+    } else {
+      // MOVHI + MOVEA (2 insn, 64-bit total)
+      uint16_t Lo = Bits & 0xFFFF;
+      uint16_t Hi = (Bits >> 16) & 0xFFFF;
+      // MOVHI adds (sext(imm16) << 16), MOVEA adds sext(imm16).
+      // If Lo has bit 15 set, MOVEA sign-extends it, subtracting 0x10000.
+      // Compensate by incrementing Hi.
+      if (Lo & 0x8000)
+        Hi++;
+      SDValue HiImm = CurDAG->getTargetConstant(Hi, DL, MVT::i32);
+      SDValue LoImm =
+          CurDAG->getTargetConstant(static_cast<int16_t>(Lo), DL, MVT::i32);
+      SDValue Zero = CurDAG->getRegister(V850::R0, MVT::i32);
+      SDNode *HiNode =
+          CurDAG->getMachineNode(V850::MOVHI, DL, MVT::i32, Zero, HiImm);
+      IntNode = CurDAG->getMachineNode(V850::MOVEA, DL, MVT::i32,
+                                       SDValue(HiNode, 0), LoImm);
+    }
+
+    // COPY from GPR (i32) to FPR (f32) - same physical register, different
+    // class.
+    SDNode *Result = CurDAG->getMachineNode(TargetOpcode::COPY, DL, MVT::f32,
+                                            SDValue(IntNode, 0));
+    ReplaceNode(Node, Result);
+    return;
+  }
+
   case ISD::LOAD: {
     LoadSDNode *LD = cast<LoadSDNode>(Node);
     ISD::MemIndexedMode AM = LD->getAddressingMode();
