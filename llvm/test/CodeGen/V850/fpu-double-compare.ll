@@ -38,12 +38,10 @@ define i1 @test_dcmp_ne(double %a, double %b) {
   ret i1 %r
 }
 
-; Test SELECT_CC with f64 result — should use CMOV_F64 (two cmov instructions).
+; Test SELECT_CC with f64 result — uses CMOVF.D (single instruction).
 ; CHECK-LABEL: test_dselect:
 ; CHECK:       cmpf.d
-; CHECK:       trfsr
-; CHECK:       cmov
-; CHECK:       cmov
+; CHECK-NEXT:  cmovf.d
 ; CHECK:       jmp [r31]
 define double @test_dselect(double %a, double %b) {
   %cond = fcmp olt double %a, %b

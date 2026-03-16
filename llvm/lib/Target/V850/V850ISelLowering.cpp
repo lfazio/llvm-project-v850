@@ -439,6 +439,8 @@ const char *V850TargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "V850ISD::SASF";
   case V850ISD::FP_CMP:
     return "V850ISD::FP_CMP";
+  case V850ISD::FP_SELECT_CC:
+    return "V850ISD::FP_SELECT_CC";
   }
   return nullptr;
 }
@@ -625,20 +627,24 @@ SDValue V850TargetLowering::LowerSELECT_CC(SDValue Op,
 
   EVT LVTS = LHS.getValueType();
   if (LVTS == MVT::f32 || LVTS == MVT::f64) {
-    // Floating-point comparison: CMPF.S/D + TRFSR → PSW.Z
+    // Use CMOVF.S/D: CMPF + CMOVF (2 insn instead of CMPF+TRFSR+CMOV = 3)
     FPCondResult FPC = getFPCondCode(CC);
     if (FPC.NeedSwap)
       std::swap(LHS, RHS);
-    Cmp = DAG.getNode(V850ISD::FP_CMP, DL, MVT::Glue,
-                      DAG.getConstant(FPC.FCond, DL, MVT::i32), LHS, RHS);
-    // After TRFSR: Z=1 if comparison true → use SETEQ for CMOV condition
-    SelCC = FPC.NeedNegate ? ISD::SETNE : ISD::SETEQ;
+    // When NeedNegate, swap true/false values instead of using a different
+    // condition code. CMOVF selects reg1 when FPCC==1, reg2 when FPCC==0.
+    // If NeedNegate, the comparison result is inverted, so swap operands.
+    if (FPC.NeedNegate)
+      std::swap(TrueV, FalseV);
+    return DAG.getNode(V850ISD::FP_SELECT_CC, DL, ResultVT,
+                       DAG.getConstant(FPC.FCond, DL, MVT::i32), LHS, RHS,
+                       TrueV, FalseV);
   } else {
     // Integer comparison
     Cmp = DAG.getNode(V850ISD::CMP, DL, MVT::Glue, LHS, RHS);
   }
 
-  // For f32 result, bitcast to i32 for CMOV, then bitcast back
+  // For f32 result with integer comparison, bitcast to i32 for CMOV
   if (ResultVT == MVT::f32) {
     TrueV = DAG.getNode(ISD::BITCAST, DL, MVT::i32, TrueV);
     FalseV = DAG.getNode(ISD::BITCAST, DL, MVT::i32, FalseV);
@@ -647,10 +653,6 @@ SDValue V850TargetLowering::LowerSELECT_CC(SDValue Op,
     return DAG.getNode(ISD::BITCAST, DL, MVT::f32, Sel);
   }
 
-  // For f64 result: emit V850ISD::SELECT_CC with f64 type.
-  // V850 has no f64 CMOV instruction; the DAGToDAG ISel handles this by
-  // splitting the DPR register into sub_lo/sub_hi GPR halves via
-  // EXTRACT_SUBREG, applying two CMOVr (one per half), then INSERT_SUBREG.
   return DAG.getNode(V850ISD::SELECT_CC, DL, ResultVT, TrueV, FalseV,
                      DAG.getConstant(SelCC, DL, MVT::i32), Cmp);
 }

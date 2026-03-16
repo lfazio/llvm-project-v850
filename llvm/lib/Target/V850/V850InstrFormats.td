@@ -600,6 +600,32 @@ class FormatFPU_TRFSR<dag outs, dag ins, string asmstr, list<dag> pattern>
   let Inst{16} = 0;
 }
 
+// CMOVF.S / CMOVF.D - Floating-point conditional move
+// If FPCC[fcbit] == 1: reg3 = reg1, else reg3 = reg2
+// Encoding:
+//   CMOVF.S: reg2[15:11] 111111[10:5] reg1[4:0] |
+//            reg3[31:27] 1_000_00_0_fff_0
+//   CMOVF.D: reg2[15:11] 111111[10:5] reg1[4:0] |
+//            reg3[31:27] 1_000_00_1_fff_0
+// dbl=0 for single, dbl=1 for double
+class FormatFPU_CMOV<bit dbl, dag outs, dag ins, string asmstr,
+                     list<dag> pattern> : FormatFI<outs, ins, asmstr, pattern> {
+  bits<5> reg1;
+  bits<5> reg2;
+  bits<5> reg3;
+  bits<3> fcbit;
+
+  let Inst{15 -11} = reg2;
+  let Inst{4 -0} = reg1;
+  let Inst{31 -27} = reg3;
+  let Inst{26} = 1;
+  let Inst{25 -23} = 0b000;
+  let Inst{22 -21} = 0b00;
+  let Inst{20} = dbl;
+  let Inst{19 -17} = fcbit;
+  let Inst{16} = 0;
+}
+
 //===----------------------------------------------------------------------===//
 // Format XI-PostInc: Post-increment/decrement load/store (32-bit)
 // RH850G4MH+

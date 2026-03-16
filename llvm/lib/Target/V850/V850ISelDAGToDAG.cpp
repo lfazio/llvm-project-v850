@@ -415,6 +415,37 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
     return;
   }
 
+  case V850ISD::FP_SELECT_CC: {
+    // V850ISD::FP_SELECT_CC fcond, cmp_lhs, cmp_rhs, true_val, false_val
+    // Emits CMPF.S/D + CMOVF.S/D (2 insn instead of CMPF+TRFSR+CMOV = 3)
+    SDValue FCondOp = Node->getOperand(0);
+    SDValue CmpLHS = Node->getOperand(1);
+    SDValue CmpRHS = Node->getOperand(2);
+    SDValue TrueVal = Node->getOperand(3);
+    SDValue FalseVal = Node->getOperand(4);
+    unsigned FCond = cast<ConstantSDNode>(FCondOp)->getZExtValue();
+    EVT ResultVT = Node->getValueType(0);
+
+    bool IsDouble = CmpLHS.getValueType() == MVT::f64;
+    SDValue FCondVal = CurDAG->getTargetConstant(FCond, DL, MVT::i32);
+    SDValue FCBit = CurDAG->getTargetConstant(0, DL, MVT::i32);
+
+    // Emit CMPF.S/D fcond, reg1(=CmpRHS), reg2(=CmpLHS), fcbit(=0)
+    // Semantics: FPCC[0] = (reg2 fcond reg1) = (CmpLHS fcond CmpRHS)
+    SDValue CmpFOps[] = {FCondVal, CmpRHS, CmpLHS, FCBit};
+    unsigned CmpFOpc = IsDouble ? V850::CMPFD : V850::CMPFS;
+    SDNode *CmpFNode = CurDAG->getMachineNode(CmpFOpc, DL, MVT::Glue, CmpFOps);
+    SDValue CmpGlue = SDValue(CmpFNode, 0);
+
+    // Emit CMOVF.S/D: if FPCC[0]==1 then reg3=TrueVal else reg3=FalseVal
+    bool ResultIsDouble = ResultVT == MVT::f64;
+    unsigned CmovOpc = ResultIsDouble ? V850::CMOVFD : V850::CMOVFS;
+    SDValue CmovOps[] = {FCBit, TrueVal, FalseVal, CmpGlue};
+    SDNode *CmovNode = CurDAG->getMachineNode(CmovOpc, DL, ResultVT, CmovOps);
+    ReplaceNode(Node, CmovNode);
+    return;
+  }
+
   case V850ISD::SELECT_CC: {
     // V850ISD::SELECT_CC trueVal, falseVal, condcode, glue
     // Use CMOV instruction: cmov cond, trueVal, falseVal, result
@@ -429,10 +460,8 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
     unsigned V850CC = getSetFCondCode(CC);
     SDValue CondVal = CurDAG->getTargetConstant(V850CC, DL, MVT::i32);
 
-    // Handle f64 result type: V850 has no native f64 CMOV instruction.
-    // Emit the CMOV_F64 pseudo which consumes the PSW glue and is later
-    // expanded by EmitInstrWithCustomInserter into two CMOVr instructions
-    // (one for the lo GPR half and one for the hi GPR half of the DPR pair).
+    // Handle f64 result type with integer comparison: use CMOV_F64 pseudo
+    // which splits into two CMOVr instructions on the GPR halves.
     if (Node->getValueType(0) == MVT::f64) {
       SDValue Ops[] = {CondVal, TrueVal, FalseVal, Glue};
       SDNode *CmovF64 =

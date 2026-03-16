@@ -86,6 +86,12 @@ enum NodeType : unsigned {
   // After execution, PSW.Z = 1 if comparison is true, 0 if false.
   // Use BZ/SETF Z for "true" branch, BNZ/SETF NZ for "false" branch.
   FP_CMP,
+
+  // FP_SELECT_CC: Floating-point conditional select using CMOVF.S/D
+  // Emits CMPF.S/D + CMOVF.S/D (2 insn instead of CMPF+TRFSR+CMOV = 3 insn).
+  // Operands: (fcond, cmp_lhs, cmp_rhs, true_val, false_val)
+  // Returns: selected value (true_val if comparison true, false_val otherwise)
+  FP_SELECT_CC,
 };
 } // namespace V850ISD
 

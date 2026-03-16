@@ -2560,6 +2560,27 @@ let Predicates = [HasV850FPU] in {
                       "cmpf.d\t$fcond, $reg1, $reg2, $fcbit", []>;
 
   //===----------------------------------------------------------------------===//
+  // V850E2M FPU Instructions - Conditional Move
+  // CMOVF.S/CMOVF.D - Floating-point conditional move
+  // If FPCC[fcbit] == 1: reg3 = reg1, else reg3 = reg2
+  // Uses FPCC flags from a preceding CMPF instruction directly,
+  // without needing TRFSR to transfer to PSW.
+  //===----------------------------------------------------------------------===//
+
+  // CMOVF.S fcbit, reg1, reg2, reg3 - Single-precision conditional move
+  let Uses = [FPCC] in def CMOVFS
+      : FormatFPU_CMOV<0, (outs FPR:$reg3),
+                        (ins uimm3:$fcbit, FPR:$reg1, FPR:$reg2),
+                        "cmovf.s\t$fcbit, $reg1, $reg2, $reg3", []>;
+
+  // CMOVF.D fcbit, reg1, reg2, reg3 - Double-precision conditional move
+  // reg1, reg2, reg3 must be even registers (register pairs)
+  let Uses = [FPCC] in def CMOVFD
+      : FormatFPU_CMOV<1, (outs DPR:$reg3),
+                        (ins uimm3:$fcbit, dprreg:$reg1, dprreg:$reg2),
+                        "cmovf.d\t$fcbit, $reg1, $reg2, $reg3", []>;
+
+  //===----------------------------------------------------------------------===//
   // V850E2M FPU Instructions - Conversion
   //
   // Conversion between floating-point formats and integer formats.

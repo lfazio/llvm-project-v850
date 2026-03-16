@@ -153,12 +153,11 @@ define i32 @fcmp_une(float %a, float %b) {
 ; Floating-point SELECT_CC tests (CMPF.S + TRFSR + CMOV)
 ;===----------------------------------------------------------------------===;
 
-; FP comparison with f32 result
+; FP comparison with f32 result (uses CMOVF.S instead of TRFSR+CMOV)
 define float @fselect_olt(float %a, float %b, float %c, float %d) {
 ; CHECK-LABEL: fselect_olt:
 ; CHECK:       cmpf.s 4, r7, r6, 0
-; CHECK-NEXT:  trfsr 0
-; CHECK-NEXT:  cmov z, r8, r9, r10
+; CHECK-NEXT:  cmovf.s 0, r8, r9, r10
   %cmp = fcmp olt float %a, %b
   %r = select i1 %cmp, float %c, float %d
   ret float %r
@@ -174,23 +173,21 @@ define float @fselect_int_cmp(i32 %x, float %a, float %b) {
   ret float %r
 }
 
-; Manual fmin via select
+; Manual fmin via select (uses CMOVF.S)
 define float @fmin_select(float %a, float %b) {
 ; CHECK-LABEL: fmin_select:
 ; CHECK:       cmpf.s 4, r7, r6, 0
-; CHECK-NEXT:  trfsr 0
-; CHECK-NEXT:  cmov z, r6, r7, r10
+; CHECK-NEXT:  cmovf.s 0, r6, r7, r10
   %cmp = fcmp olt float %a, %b
   %r = select i1 %cmp, float %a, float %b
   ret float %r
 }
 
-; Manual fmax via select
+; Manual fmax via select (uses CMOVF.S)
 define float @fmax_select(float %a, float %b) {
 ; CHECK-LABEL: fmax_select:
 ; CHECK:       cmpf.s 4, r6, r7, 0
-; CHECK-NEXT:  trfsr 0
-; CHECK-NEXT:  cmov z, r6, r7, r10
+; CHECK-NEXT:  cmovf.s 0, r6, r7, r10
   %cmp = fcmp ogt float %a, %b
   %r = select i1 %cmp, float %a, float %b
   ret float %r
@@ -220,11 +217,9 @@ else:
 define float @fclamp(float %x, float %lo, float %hi) {
 ; CHECK-LABEL: fclamp:
 ; CHECK:       cmpf.s
-; CHECK:       trfsr 0
-; CHECK:       cmov
+; CHECK-NEXT:  cmovf.s
 ; CHECK:       cmpf.s
-; CHECK:       trfsr 0
-; CHECK:       cmov
+; CHECK-NEXT:  cmovf.s
   %cmp_lo = fcmp olt float %x, %lo
   %t1 = select i1 %cmp_lo, float %lo, float %x
   %cmp_hi = fcmp ogt float %t1, %hi
