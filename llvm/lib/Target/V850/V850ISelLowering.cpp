@@ -346,6 +346,13 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
   if (STI.hasV850E1()) {
     setTargetDAGCombine(ISD::OR);
   }
+
+  // Enable DAG combining for FMA contraction (FPU targets)
+  // fadd(fmul(a, b), c) -> fma(a, b, c) when fp-contract allows
+  if (STI.hasV850FPU()) {
+    setTargetDAGCombine(ISD::FADD);
+    setTargetDAGCombine(ISD::FSUB);
+  }
 }
 
 SDValue V850TargetLowering::LowerOperation(SDValue Op,
@@ -1800,6 +1807,51 @@ bool V850TargetLowering::getPostIndexedAddressParts(SDNode *N, SDNode *Op,
   return true;
 }
 
+/// Try to combine fadd/fsub with fmul into fma when fp-contract allows.
+/// fadd(fmul(a, b), c) -> fma(a, b, c)
+/// fsub(fmul(a, b), c) -> fma(a, b, fneg(c))
+/// fsub(c, fmul(a, b)) -> fma(fneg(a), b, c)
+static SDValue performFADDFSUBCombine(SDNode *N, SelectionDAG &DAG,
+                                      const V850Subtarget *Subtarget) {
+  if (!Subtarget->hasV850FPU())
+    return SDValue();
+
+  EVT VT = N->getValueType(0);
+  if (VT != MVT::f32)
+    return SDValue();
+
+  // Check if FMA contraction is allowed by the node's flags.
+  SDNodeFlags Flags = N->getFlags();
+  if (!Flags.hasAllowContract())
+    return SDValue();
+
+  SDLoc DL(N);
+  bool IsSub = (N->getOpcode() == ISD::FSUB);
+  SDValue Op0 = N->getOperand(0);
+  SDValue Op1 = N->getOperand(1);
+
+  // fadd(fmul(a, b), c) -> fma(a, b, c)
+  // fsub(fmul(a, b), c) -> fma(a, b, -c)
+  if (Op0.getOpcode() == ISD::FMUL && Op0.hasOneUse()) {
+    SDValue A = Op0.getOperand(0);
+    SDValue B = Op0.getOperand(1);
+    SDValue C = IsSub ? DAG.getNode(ISD::FNEG, DL, VT, Op1) : Op1;
+    return DAG.getNode(ISD::FMA, DL, VT, A, B, C);
+  }
+
+  // fadd(c, fmul(a, b)) -> fma(a, b, c)
+  // fsub(c, fmul(a, b)) -> fma(-a, b, c)
+  if (Op1.getOpcode() == ISD::FMUL && Op1.hasOneUse()) {
+    SDValue A = Op1.getOperand(0);
+    SDValue B = Op1.getOperand(1);
+    if (IsSub)
+      A = DAG.getNode(ISD::FNEG, DL, VT, A);
+    return DAG.getNode(ISD::FMA, DL, VT, A, B, Op0);
+  }
+
+  return SDValue();
+}
+
 SDValue V850TargetLowering::PerformDAGCombine(SDNode *N,
                                               DAGCombinerInfo &DCI) const {
   SelectionDAG &DAG = DCI.DAG;
@@ -1815,6 +1867,9 @@ SDValue V850TargetLowering::PerformDAGCombine(SDNode *N,
     return performSTORECombine(N, DAG, Subtarget);
   case ISD::OR:
     return performORCombine(N, DAG, Subtarget);
+  case ISD::FADD:
+  case ISD::FSUB:
+    return performFADDFSUBCombine(N, DAG, &Subtarget);
   }
 
   return SDValue();

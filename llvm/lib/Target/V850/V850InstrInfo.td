@@ -272,8 +272,9 @@ def HasRH850G3MH : Predicate<"Subtarget->hasRH850G3MH()">,
                    AssemblerPredicate<(all_of FeatureRH850G3MH), "RH850G3MH">;
 def HasRH850G4MH : Predicate<"Subtarget->hasRH850G4MH()">,
                    AssemblerPredicate<(all_of FeatureRH850G4MH), "RH850G4MH">;
-def HasRH850G4MH2 : Predicate<"Subtarget->hasRH850G4MH2()">,
-                    AssemblerPredicate<(all_of FeatureRH850G4MH2), "RH850G4MH2">;
+def HasRH850G4MH2
+    : Predicate<"Subtarget->hasRH850G4MH2()">,
+      AssemblerPredicate<(all_of FeatureRH850G4MH2), "RH850G4MH2">;
 
 //===----------------------------------------------------------------------===//
 // Instruction Pattern Stuff
@@ -1759,25 +1760,26 @@ let Predicates = [HasV850E2] in {
   // (reg3:reg4) = (reg3:reg4) + sext(reg1) * sext(reg2)
   // Opcode: 111111, sub-op: 011110, reg4 in bits[20:16]
   def MAC : FormatXI_MAC<0b111111, 0b011110, (outs GPR:$reg3, GPR:$reg4),
-                          (ins GPR:$reg1, GPR:$reg2, GPR:$reg3_in, GPR:$reg4_in),
-                          "mac\t$reg1, $reg2, $reg3, $reg4",
-                          [(set GPR:$reg3, GPR:$reg4,
-                              (V850smac GPR:$reg1, GPR:$reg2, GPR:$reg3_in,
-                                  GPR:$reg4_in))]>,
-             Requires<[HasV850E2M]> {
+                         (ins GPR:$reg1, GPR:$reg2, GPR:$reg3_in, GPR:$reg4_in),
+                         "mac\t$reg1, $reg2, $reg3, $reg4",
+                         [(set GPR:$reg3, GPR:$reg4,
+                             (V850smac GPR:$reg1, GPR:$reg2, GPR:$reg3_in,
+                                 GPR:$reg4_in))]>,
+            Requires<[HasV850E2M]> {
     let Constraints = "$reg3_in = $reg3, $reg4_in = $reg4";
   }
 
   // MACU reg1, reg2, reg3, reg4 - Multiply-accumulate unsigned
   // (reg3:reg4) = (reg3:reg4) + zext(reg1) * zext(reg2)
   // Opcode: 111111, sub-op: 011111, reg4 in bits[20:16]
-  def MACU : FormatXI_MAC<0b111111, 0b011111, (outs GPR:$reg3, GPR:$reg4),
-                           (ins GPR:$reg1, GPR:$reg2, GPR:$reg3_in, GPR:$reg4_in),
-                           "macu\t$reg1, $reg2, $reg3, $reg4",
-                           [(set GPR:$reg3, GPR:$reg4,
-                               (V850umac GPR:$reg1, GPR:$reg2, GPR:$reg3_in,
-                                   GPR:$reg4_in))]>,
-              Requires<[HasV850E2M]> {
+  def MACU
+      : FormatXI_MAC<0b111111, 0b011111, (outs GPR:$reg3, GPR:$reg4),
+                     (ins GPR:$reg1, GPR:$reg2, GPR:$reg3_in, GPR:$reg4_in),
+                     "macu\t$reg1, $reg2, $reg3, $reg4",
+                     [(set GPR:$reg3, GPR:$reg4,
+                         (V850umac GPR:$reg1, GPR:$reg2, GPR:$reg3_in,
+                             GPR:$reg4_in))]>,
+        Requires<[HasV850E2M]> {
     let Constraints = "$reg3_in = $reg3, $reg4_in = $reg4";
   }
 
@@ -2492,9 +2494,12 @@ let Predicates = [HasV850FPU] in {
 
   // MSUBF.S reg1, reg2, reg3, reg4 - Floating-point multiply-subtract
   // reg4 = (reg2 * reg1) - reg3
-  def MSUBFS : FormatFPU_RRRR<0b01, (outs FPR:$reg4),
-                              (ins FPR:$reg2, FPR:$reg1, FPR:$reg3),
-                              "msubf.s\t$reg1, $reg2, $reg3, $reg4", []>;
+  // fma(a, b, fneg(c)) maps to: a=reg1, b=reg2, c=reg3
+  def MSUBFS
+      : FormatFPU_RRRR<
+            0b01, (outs FPR:$reg4), (ins FPR:$reg2, FPR:$reg1, FPR:$reg3),
+            "msubf.s\t$reg1, $reg2, $reg3, $reg4",
+            [(set FPR:$reg4, (fma FPR:$reg1, FPR:$reg2, (fneg FPR:$reg3)))]>;
 
   // NMADDF.S reg1, reg2, reg3, reg4 - Floating-point negate multiply-add
   // reg4 = -((reg2 * reg1) + reg3)
@@ -2507,9 +2512,12 @@ let Predicates = [HasV850FPU] in {
 
   // NMSUBF.S reg1, reg2, reg3, reg4 - Floating-point negate multiply-subtract
   // reg4 = -((reg2 * reg1) - reg3)
+  // fneg(fma(a, b, fneg(c))) maps to nmsubf
   def NMSUBFS : FormatFPU_RRRR<0b11, (outs FPR:$reg4),
                                (ins FPR:$reg2, FPR:$reg1, FPR:$reg3),
-                               "nmsubf.s\t$reg1, $reg2, $reg3, $reg4", []>;
+                               "nmsubf.s\t$reg1, $reg2, $reg3, $reg4",
+                               [(set FPR:$reg4, (fneg(fma FPR:$reg1, FPR:$reg2,
+                                                    (fneg FPR:$reg3))))]>;
 
   //===----------------------------------------------------------------------===//
   // V850E2M FPU Instructions - Transfer FPSR to PSW
@@ -2556,7 +2564,8 @@ let Predicates = [HasV850FPU] in {
   // Note: reg1 and reg2 must be even registers (specify lower register of pair)
   let Defs = [FPCC] in def CMPFD
       : FormatFPU_CMP<1, (outs),
-                      (ins uimm4:$fcond, dprreg:$reg1, dprreg:$reg2, uimm3:$fcbit),
+                      (ins uimm4:$fcond, dprreg:$reg1, dprreg:$reg2,
+                          uimm3:$fcbit),
                       "cmpf.d\t$fcond, $reg1, $reg2, $fcbit", []>;
 
   //===----------------------------------------------------------------------===//
@@ -2570,15 +2579,15 @@ let Predicates = [HasV850FPU] in {
   // CMOVF.S fcbit, reg1, reg2, reg3 - Single-precision conditional move
   let Uses = [FPCC] in def CMOVFS
       : FormatFPU_CMOV<0, (outs FPR:$reg3),
-                        (ins uimm3:$fcbit, FPR:$reg1, FPR:$reg2),
-                        "cmovf.s\t$fcbit, $reg1, $reg2, $reg3", []>;
+                       (ins uimm3:$fcbit, FPR:$reg1, FPR:$reg2),
+                       "cmovf.s\t$fcbit, $reg1, $reg2, $reg3", []>;
 
   // CMOVF.D fcbit, reg1, reg2, reg3 - Double-precision conditional move
   // reg1, reg2, reg3 must be even registers (register pairs)
   let Uses = [FPCC] in def CMOVFD
       : FormatFPU_CMOV<1, (outs DPR:$reg3),
-                        (ins uimm3:$fcbit, dprreg:$reg1, dprreg:$reg2),
-                        "cmovf.d\t$fcbit, $reg1, $reg2, $reg3", []>;
+                       (ins uimm3:$fcbit, dprreg:$reg1, dprreg:$reg2),
+                       "cmovf.d\t$fcbit, $reg1, $reg2, $reg3", []>;
 
   //===----------------------------------------------------------------------===//
   // V850E2M FPU Instructions - Conversion
@@ -2640,8 +2649,9 @@ let Predicates = [HasV850FPU] in {
                              (ins GPR:$reg2), "cvtf.sl\t$reg2, $reg3", []>;
 
   // CVTF.DL reg2, reg3 - Double to Long (subop2=4, cat=0, type=2, subop=10)
-  def CVTFDL : FormatFPU_CVT<0b00100, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
-                             (ins dprreg:$reg2), "cvtf.dl	$reg2, $reg3", []>;
+  def CVTFDL
+      : FormatFPU_CVT<0b00100, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
+                      (ins dprreg:$reg2), "cvtf.dl	$reg2, $reg3", []>;
 
   //--- Unsigned integer to floating-point conversions ---
 
@@ -2686,8 +2696,9 @@ let Predicates = [HasV850FPU] in {
 
   // CVTF.DUL reg2, reg3 - Double to Unsigned Long (subop2=20, cat=0, type=2,
   // subop=10)
-  def CVTFDUL : FormatFPU_CVT<0b10100, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
-                              (ins dprreg:$reg2), "cvtf.dul	$reg2, $reg3", []>;
+  def CVTFDUL
+      : FormatFPU_CVT<0b10100, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
+                      (ins dprreg:$reg2), "cvtf.dul	$reg2, $reg3", []>;
 
   //===----------------------------------------------------------------------===//
   // FPU Rounding Instructions - V850E2M
@@ -2715,8 +2726,9 @@ let Predicates = [HasV850FPU] in {
 
   // TRNCF.DL reg2, reg3 - Truncate Double to Long (subop2=1, cat=0, type=2,
   // subop=10)
-  def TRNCFDL : FormatFPU_CVT<0b00001, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
-                              (ins dprreg:$reg2), "trncf.dl	$reg2, $reg3", []>;
+  def TRNCFDL
+      : FormatFPU_CVT<0b00001, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
+                      (ins dprreg:$reg2), "trncf.dl	$reg2, $reg3", []>;
 
   // --- TRNCF (Truncate) - Unsigned ---
   // TRNCF.SUW reg2, reg3 - Truncate Single to Unsigned Word (subop2=17, cat=0,
@@ -2727,8 +2739,9 @@ let Predicates = [HasV850FPU] in {
 
   // TRNCF.DUW reg2, reg3 - Truncate Double to Unsigned Word (subop2=17, cat=0,
   // type=2, subop=8)
-  def TRNCFDUW : FormatFPU_CVT<0b10001, 0b000, 0b10, 0b1000, (outs GPR:$reg3),
-                               (ins dprreg:$reg2), "trncf.duw\t$reg2, $reg3", []>;
+  def TRNCFDUW
+      : FormatFPU_CVT<0b10001, 0b000, 0b10, 0b1000, (outs GPR:$reg3),
+                      (ins dprreg:$reg2), "trncf.duw\t$reg2, $reg3", []>;
 
   // TRNCF.SUL reg2, reg3 - Truncate Single to Unsigned Long (subop2=17, cat=0,
   // type=2, subop=2)
@@ -2737,8 +2750,9 @@ let Predicates = [HasV850FPU] in {
 
   // TRNCF.DUL reg2, reg3 - Truncate Double to Unsigned Long (subop2=17, cat=0,
   // type=2, subop=10)
-  def TRNCFDUL : FormatFPU_CVT<0b10001, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
-                               (ins dprreg:$reg2), "trncf.dul	$reg2, $reg3", []>;
+  def TRNCFDUL
+      : FormatFPU_CVT<0b10001, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
+                      (ins dprreg:$reg2), "trncf.dul	$reg2, $reg3", []>;
 
   // --- CEILF (Ceiling) - Signed ---
   // CEILF.SW reg2, reg3 - Ceiling Single to Word (subop2=2, cat=0, type=2,
@@ -2748,8 +2762,9 @@ let Predicates = [HasV850FPU] in {
 
   // CEILF.DW reg2, reg3 - Ceiling Double to Word (subop2=2, cat=0, type=2,
   // subop=8)
-  def CEILFDW : FormatFPU_CVT<0b00010, 0b000, 0b10, 0b1000, (outs GPR:$reg3),
-                              (ins dprreg:$reg2), "ceilf.dw	$reg2, $reg3", []>;
+  def CEILFDW
+      : FormatFPU_CVT<0b00010, 0b000, 0b10, 0b1000, (outs GPR:$reg3),
+                      (ins dprreg:$reg2), "ceilf.dw	$reg2, $reg3", []>;
 
   // CEILF.SL reg2, reg3 - Ceiling Single to Long (subop2=2, cat=0, type=2,
   // subop=2)
@@ -2758,8 +2773,9 @@ let Predicates = [HasV850FPU] in {
 
   // CEILF.DL reg2, reg3 - Ceiling Double to Long (subop2=2, cat=0, type=2,
   // subop=10)
-  def CEILFDL : FormatFPU_CVT<0b00010, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
-                              (ins dprreg:$reg2), "ceilf.dl	$reg2, $reg3", []>;
+  def CEILFDL
+      : FormatFPU_CVT<0b00010, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
+                      (ins dprreg:$reg2), "ceilf.dl	$reg2, $reg3", []>;
 
   // --- CEILF (Ceiling) - Unsigned ---
   // CEILF.SUW reg2, reg3 - Ceiling Single to Unsigned Word (subop2=18, cat=0,
@@ -2769,8 +2785,9 @@ let Predicates = [HasV850FPU] in {
 
   // CEILF.DUW reg2, reg3 - Ceiling Double to Unsigned Word (subop2=18, cat=0,
   // type=2, subop=8)
-  def CEILFDUW : FormatFPU_CVT<0b10010, 0b000, 0b10, 0b1000, (outs GPR:$reg3),
-                               (ins dprreg:$reg2), "ceilf.duw	$reg2, $reg3", []>;
+  def CEILFDUW
+      : FormatFPU_CVT<0b10010, 0b000, 0b10, 0b1000, (outs GPR:$reg3),
+                      (ins dprreg:$reg2), "ceilf.duw	$reg2, $reg3", []>;
 
   // CEILF.SUL reg2, reg3 - Ceiling Single to Unsigned Long (subop2=18, cat=0,
   // type=2, subop=2)
@@ -2779,8 +2796,9 @@ let Predicates = [HasV850FPU] in {
 
   // CEILF.DUL reg2, reg3 - Ceiling Double to Unsigned Long (subop2=18, cat=0,
   // type=2, subop=10)
-  def CEILFDUL : FormatFPU_CVT<0b10010, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
-                               (ins dprreg:$reg2), "ceilf.dul	$reg2, $reg3", []>;
+  def CEILFDUL
+      : FormatFPU_CVT<0b10010, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
+                      (ins dprreg:$reg2), "ceilf.dul	$reg2, $reg3", []>;
 
   // --- FLOORF (Floor) - Signed ---
   // FLOORF.SW reg2, reg3 - Floor Single to Word (subop2=3, cat=0, type=2,
@@ -2790,8 +2808,9 @@ let Predicates = [HasV850FPU] in {
 
   // FLOORF.DW reg2, reg3 - Floor Double to Word (subop2=3, cat=0, type=2,
   // subop=8)
-  def FLOORFDW : FormatFPU_CVT<0b00011, 0b000, 0b10, 0b1000, (outs GPR:$reg3),
-                               (ins dprreg:$reg2), "floorf.dw	$reg2, $reg3", []>;
+  def FLOORFDW
+      : FormatFPU_CVT<0b00011, 0b000, 0b10, 0b1000, (outs GPR:$reg3),
+                      (ins dprreg:$reg2), "floorf.dw	$reg2, $reg3", []>;
 
   // FLOORF.SL reg2, reg3 - Floor Single to Long (subop2=3, cat=0, type=2,
   // subop=2)
@@ -2800,8 +2819,9 @@ let Predicates = [HasV850FPU] in {
 
   // FLOORF.DL reg2, reg3 - Floor Double to Long (subop2=3, cat=0, type=2,
   // subop=10)
-  def FLOORFDL : FormatFPU_CVT<0b00011, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
-                               (ins dprreg:$reg2), "floorf.dl	$reg2, $reg3", []>;
+  def FLOORFDL
+      : FormatFPU_CVT<0b00011, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
+                      (ins dprreg:$reg2), "floorf.dl	$reg2, $reg3", []>;
 
   // --- FLOORF (Floor) - Unsigned ---
   // FLOORF.SUW reg2, reg3 - Floor Single to Unsigned Word (subop2=19, cat=0,
@@ -2919,40 +2939,38 @@ let Predicates = [HasV850FPU] in {
   // Double-precision arithmetic ISel patterns
   //===--------------------------------------------------------------------===//
 
-  def : Pat<(fadd (f64 DPR:$r2), (f64 DPR:$r1)), (ADDFD DPR:$r2, DPR:$r1)>;
-  def : Pat<(fsub (f64 DPR:$r2), (f64 DPR:$r1)), (SUBFD DPR:$r2, DPR:$r1)>;
-  def : Pat<(fmul (f64 DPR:$r2), (f64 DPR:$r1)), (MULFD DPR:$r2, DPR:$r1)>;
-  def : Pat<(fdiv (f64 DPR:$r2), (f64 DPR:$r1)), (DIVFD DPR:$r2, DPR:$r1)>;
-  def : Pat<(fabs (f64 DPR:$r2)), (ABSFD DPR:$r2)>;
-  def : Pat<(fneg (f64 DPR:$r2)), (NEGFD DPR:$r2)>;
-  def : Pat<(fsqrt (f64 DPR:$r2)), (SQRTFD DPR:$r2)>;
-  def : Pat<(fmaxnum (f64 DPR:$r2), (f64 DPR:$r1)),
-            (MAXFD DPR:$r2, DPR:$r1)>;
-  def : Pat<(fminnum (f64 DPR:$r2), (f64 DPR:$r1)),
-            (MINFD DPR:$r2, DPR:$r1)>;
+  def : Pat<(fadd(f64 DPR:$r2), (f64 DPR:$r1)), (ADDFD DPR:$r2, DPR:$r1)>;
+  def : Pat<(fsub(f64 DPR:$r2), (f64 DPR:$r1)), (SUBFD DPR:$r2, DPR:$r1)>;
+  def : Pat<(fmul(f64 DPR:$r2), (f64 DPR:$r1)), (MULFD DPR:$r2, DPR:$r1)>;
+  def : Pat<(fdiv(f64 DPR:$r2), (f64 DPR:$r1)), (DIVFD DPR:$r2, DPR:$r1)>;
+  def : Pat<(fabs(f64 DPR:$r2)), (ABSFD DPR:$r2)>;
+  def : Pat<(fneg(f64 DPR:$r2)), (NEGFD DPR:$r2)>;
+  def : Pat<(fsqrt(f64 DPR:$r2)), (SQRTFD DPR:$r2)>;
+  def : Pat<(fmaxnum(f64 DPR:$r2), (f64 DPR:$r1)), (MAXFD DPR:$r2, DPR:$r1)>;
+  def : Pat<(fminnum(f64 DPR:$r2), (f64 DPR:$r1)), (MINFD DPR:$r2, DPR:$r1)>;
 
   //===--------------------------------------------------------------------===//
   // Double-precision conversion ISel patterns
   //===--------------------------------------------------------------------===//
 
   // f64 <-> f32 conversions
-  def : Pat<(f32 (fpround (f64 DPR:$r2))), (CVTFDS DPR:$r2)>;
-  def : Pat<(f64 (fpextend (f32 FPR:$r2))), (CVTFSD FPR:$r2)>;
+  def : Pat<(f32(fpround(f64 DPR:$r2))), (CVTFDS DPR:$r2)>;
+  def : Pat<(f64(fpextend(f32 FPR:$r2))), (CVTFSD FPR:$r2)>;
 
   // f64 <-> i32 conversions (truncate toward zero for fp_to_sint/uint)
-  def : Pat<(i32 (fp_to_sint (f64 DPR:$r2))), (TRNCFDW DPR:$r2)>;
-  def : Pat<(i32 (fp_to_uint (f64 DPR:$r2))), (TRNCFDUW DPR:$r2)>;
-  def : Pat<(f64 (sint_to_fp (i32 GPR:$r2))), (CVTFWD GPR:$r2)>;
-  def : Pat<(f64 (uint_to_fp (i32 GPR:$r2))), (CVTFUWD GPR:$r2)>;
+  def : Pat<(i32(fp_to_sint(f64 DPR:$r2))), (TRNCFDW DPR:$r2)>;
+  def : Pat<(i32(fp_to_uint(f64 DPR:$r2))), (TRNCFDUW DPR:$r2)>;
+  def : Pat<(f64(sint_to_fp(i32 GPR:$r2))), (CVTFWD GPR:$r2)>;
+  def : Pat<(f64(uint_to_fp(i32 GPR:$r2))), (CVTFUWD GPR:$r2)>;
 
   // Pseudo f64 conditional move: expanded to two GPR CMOVr instructions.
   // V850 has no native f64 CMOV, so this pseudo splits the DPR register pair
   // into lo/hi GPR halves, applies CMOVr on each, and reassembles.
-  let usesCustomInserter = 1, Uses = [PSW], isCodeGenOnly = 1 in
-  def CMOV_F64 : V850Pseudo<(outs DPR:$dst),
-                             (ins cmov_cond:$cond, DPR:$true_val, DPR:$false_val),
-                             "# CMOV_F64 $cond, $true_val, $false_val, $dst",
-                             []>;
+  let usesCustomInserter = 1, Uses = [PSW],
+      isCodeGenOnly = 1 in def CMOV_F64
+      : V850Pseudo<(outs DPR:$dst),
+                   (ins cmov_cond:$cond, DPR:$true_val, DPR:$false_val),
+                   "# CMOV_F64 $cond, $true_val, $false_val, $dst", []>;
 
 } // Predicates = [HasV850FPU]
 
@@ -3443,8 +3461,8 @@ let Predicates = [HasRH850G3M], DecoderNamespace = "RH850G3M" in {
 
   // LD_DW_F - Load double word to f64 DPR register (same encoding as LD_DW,
   // isCodeGenOnly so the disassembler uses LD_DW; ISel uses this for f64 loads)
-  let hasSideEffects = 0, mayLoad = 1, mayStore = 0, isCodeGenOnly = 1 in
-  def LD_DW_F
+  let hasSideEffects = 0, mayLoad = 1, mayStore = 0,
+      isCodeGenOnly = 1 in def LD_DW_F
       : V850Inst48<(outs DPR:$reg3), (ins GPR:$reg1, simm23:$disp23),
                    "ld.dw $disp23[$reg1], $reg3", []> {
     bits<5> reg3;
@@ -3485,9 +3503,10 @@ let Predicates = [HasRH850G3M], DecoderNamespace = "RH850G3M" in {
   }
 
   // ST_DW_F - Store double word from f64 DPR register (same encoding as ST_DW,
-  // isCodeGenOnly so the disassembler uses ST_DW; ISel uses this for f64 stores)
-  let hasSideEffects = 0, mayLoad = 0, mayStore = 1, isCodeGenOnly = 1 in
-  def ST_DW_F
+  // isCodeGenOnly so the disassembler uses ST_DW; ISel uses this for f64
+  // stores)
+  let hasSideEffects = 0, mayLoad = 0, mayStore = 1,
+      isCodeGenOnly = 1 in def ST_DW_F
       : V850Inst48<(outs), (ins DPR:$reg3, GPR:$reg1, simm23:$disp23),
                    "st.dw $reg3, $disp23[$reg1]", []> {
     bits<5> reg3;
@@ -3558,81 +3577,81 @@ let Predicates = [HasRH850G4MH], DecoderNamespace = "RH850G4MH" in {
   // --- Post-increment loads: reg3 = mem[reg1]; reg1 += step ---
   let mayLoad = 1, hasSideEffects = 0 in {
     // LD.B [reg1]+, reg3 — signed byte load, post-increment
-    def LDB_PostInc : FormatXI_PostInc<0b00010, 0b10000,
-      (outs GPR:$reg3, GPR:$wb), (ins GPR:$reg1),
-      "ld.b\t[$reg1]+, $reg3", []> {
+    def LDB_PostInc
+        : FormatXI_PostInc<0b00010, 0b10000, (outs GPR:$reg3, GPR:$wb),
+                           (ins GPR:$reg1), "ld.b\t[$reg1]+, $reg3", []> {
       let Constraints = "$wb = $reg1";
       let DecoderMethod = "DecodePostIncLoadInstruction";
     }
 
     // LD.B [reg1]-, reg3 — signed byte load, post-decrement
-    def LDB_PostDec : FormatXI_PostInc<0b00100, 0b10000,
-      (outs GPR:$reg3, GPR:$wb), (ins GPR:$reg1),
-      "ld.b\t[$reg1]-, $reg3", []> {
+    def LDB_PostDec
+        : FormatXI_PostInc<0b00100, 0b10000, (outs GPR:$reg3, GPR:$wb),
+                           (ins GPR:$reg1), "ld.b\t[$reg1]-, $reg3", []> {
       let Constraints = "$wb = $reg1";
       let DecoderMethod = "DecodePostIncLoadInstruction";
     }
 
     // LD.BU [reg1]+, reg3 — unsigned byte load, post-increment
-    def LDBU_PostInc : FormatXI_PostInc<0b00011, 0b10000,
-      (outs GPR:$reg3, GPR:$wb), (ins GPR:$reg1),
-      "ld.bu\t[$reg1]+, $reg3", []> {
+    def LDBU_PostInc
+        : FormatXI_PostInc<0b00011, 0b10000, (outs GPR:$reg3, GPR:$wb),
+                           (ins GPR:$reg1), "ld.bu\t[$reg1]+, $reg3", []> {
       let Constraints = "$wb = $reg1";
       let DecoderMethod = "DecodePostIncLoadInstruction";
     }
 
     // LD.BU [reg1]-, reg3 — unsigned byte load, post-decrement
-    def LDBU_PostDec : FormatXI_PostInc<0b00101, 0b10000,
-      (outs GPR:$reg3, GPR:$wb), (ins GPR:$reg1),
-      "ld.bu\t[$reg1]-, $reg3", []> {
+    def LDBU_PostDec
+        : FormatXI_PostInc<0b00101, 0b10000, (outs GPR:$reg3, GPR:$wb),
+                           (ins GPR:$reg1), "ld.bu\t[$reg1]-, $reg3", []> {
       let Constraints = "$wb = $reg1";
       let DecoderMethod = "DecodePostIncLoadInstruction";
     }
 
     // LD.H [reg1]+, reg3 — signed halfword load, post-increment
-    def LDH_PostInc : FormatXI_PostInc<0b00010, 0b10100,
-      (outs GPR:$reg3, GPR:$wb), (ins GPR:$reg1),
-      "ld.h\t[$reg1]+, $reg3", []> {
+    def LDH_PostInc
+        : FormatXI_PostInc<0b00010, 0b10100, (outs GPR:$reg3, GPR:$wb),
+                           (ins GPR:$reg1), "ld.h\t[$reg1]+, $reg3", []> {
       let Constraints = "$wb = $reg1";
       let DecoderMethod = "DecodePostIncLoadInstruction";
     }
 
     // LD.H [reg1]-, reg3 — signed halfword load, post-decrement
-    def LDH_PostDec : FormatXI_PostInc<0b00100, 0b10100,
-      (outs GPR:$reg3, GPR:$wb), (ins GPR:$reg1),
-      "ld.h\t[$reg1]-, $reg3", []> {
+    def LDH_PostDec
+        : FormatXI_PostInc<0b00100, 0b10100, (outs GPR:$reg3, GPR:$wb),
+                           (ins GPR:$reg1), "ld.h\t[$reg1]-, $reg3", []> {
       let Constraints = "$wb = $reg1";
       let DecoderMethod = "DecodePostIncLoadInstruction";
     }
 
     // LD.HU [reg1]+, reg3 — unsigned halfword load, post-increment
-    def LDHU_PostInc : FormatXI_PostInc<0b00011, 0b10100,
-      (outs GPR:$reg3, GPR:$wb), (ins GPR:$reg1),
-      "ld.hu\t[$reg1]+, $reg3", []> {
+    def LDHU_PostInc
+        : FormatXI_PostInc<0b00011, 0b10100, (outs GPR:$reg3, GPR:$wb),
+                           (ins GPR:$reg1), "ld.hu\t[$reg1]+, $reg3", []> {
       let Constraints = "$wb = $reg1";
       let DecoderMethod = "DecodePostIncLoadInstruction";
     }
 
     // LD.HU [reg1]-, reg3 — unsigned halfword load, post-decrement
-    def LDHU_PostDec : FormatXI_PostInc<0b00101, 0b10100,
-      (outs GPR:$reg3, GPR:$wb), (ins GPR:$reg1),
-      "ld.hu\t[$reg1]-, $reg3", []> {
+    def LDHU_PostDec
+        : FormatXI_PostInc<0b00101, 0b10100, (outs GPR:$reg3, GPR:$wb),
+                           (ins GPR:$reg1), "ld.hu\t[$reg1]-, $reg3", []> {
       let Constraints = "$wb = $reg1";
       let DecoderMethod = "DecodePostIncLoadInstruction";
     }
 
     // LD.W [reg1]+, reg3 — word load, post-increment
-    def LDW_PostInc : FormatXI_PostInc<0b00010, 0b11000,
-      (outs GPR:$reg3, GPR:$wb), (ins GPR:$reg1),
-      "ld.w\t[$reg1]+, $reg3", []> {
+    def LDW_PostInc
+        : FormatXI_PostInc<0b00010, 0b11000, (outs GPR:$reg3, GPR:$wb),
+                           (ins GPR:$reg1), "ld.w\t[$reg1]+, $reg3", []> {
       let Constraints = "$wb = $reg1";
       let DecoderMethod = "DecodePostIncLoadInstruction";
     }
 
     // LD.W [reg1]-, reg3 — word load, post-decrement
-    def LDW_PostDec : FormatXI_PostInc<0b00100, 0b11000,
-      (outs GPR:$reg3, GPR:$wb), (ins GPR:$reg1),
-      "ld.w\t[$reg1]-, $reg3", []> {
+    def LDW_PostDec
+        : FormatXI_PostInc<0b00100, 0b11000, (outs GPR:$reg3, GPR:$wb),
+                           (ins GPR:$reg1), "ld.w\t[$reg1]-, $reg3", []> {
       let Constraints = "$wb = $reg1";
       let DecoderMethod = "DecodePostIncLoadInstruction";
     }
@@ -3641,49 +3660,49 @@ let Predicates = [HasRH850G4MH], DecoderNamespace = "RH850G4MH" in {
   // --- Post-increment stores: mem[reg1] = reg3; reg1 += step ---
   let mayStore = 1, hasSideEffects = 0 in {
     // ST.B reg3, [reg1]+ — byte store, post-increment
-    def STB_PostInc : FormatXI_PostInc<0b00010, 0b10010,
-      (outs GPR:$wb), (ins GPR:$reg3, GPR:$reg1),
-      "st.b\t$reg3, [$reg1]+", []> {
+    def STB_PostInc : FormatXI_PostInc<0b00010, 0b10010, (outs GPR:$wb),
+                                       (ins GPR:$reg3, GPR:$reg1),
+                                       "st.b\t$reg3, [$reg1]+", []> {
       let Constraints = "$wb = $reg1";
       let DecoderMethod = "DecodePostIncStoreInstruction";
     }
 
     // ST.B reg3, [reg1]- — byte store, post-decrement
-    def STB_PostDec : FormatXI_PostInc<0b00100, 0b10010,
-      (outs GPR:$wb), (ins GPR:$reg3, GPR:$reg1),
-      "st.b\t$reg3, [$reg1]-", []> {
+    def STB_PostDec : FormatXI_PostInc<0b00100, 0b10010, (outs GPR:$wb),
+                                       (ins GPR:$reg3, GPR:$reg1),
+                                       "st.b\t$reg3, [$reg1]-", []> {
       let Constraints = "$wb = $reg1";
       let DecoderMethod = "DecodePostIncStoreInstruction";
     }
 
     // ST.H reg3, [reg1]+ — halfword store, post-increment
-    def STH_PostInc : FormatXI_PostInc<0b00010, 0b10110,
-      (outs GPR:$wb), (ins GPR:$reg3, GPR:$reg1),
-      "st.h\t$reg3, [$reg1]+", []> {
+    def STH_PostInc : FormatXI_PostInc<0b00010, 0b10110, (outs GPR:$wb),
+                                       (ins GPR:$reg3, GPR:$reg1),
+                                       "st.h\t$reg3, [$reg1]+", []> {
       let Constraints = "$wb = $reg1";
       let DecoderMethod = "DecodePostIncStoreInstruction";
     }
 
     // ST.H reg3, [reg1]- — halfword store, post-decrement
-    def STH_PostDec : FormatXI_PostInc<0b00100, 0b10110,
-      (outs GPR:$wb), (ins GPR:$reg3, GPR:$reg1),
-      "st.h\t$reg3, [$reg1]-", []> {
+    def STH_PostDec : FormatXI_PostInc<0b00100, 0b10110, (outs GPR:$wb),
+                                       (ins GPR:$reg3, GPR:$reg1),
+                                       "st.h\t$reg3, [$reg1]-", []> {
       let Constraints = "$wb = $reg1";
       let DecoderMethod = "DecodePostIncStoreInstruction";
     }
 
     // ST.W reg3, [reg1]+ — word store, post-increment
-    def STW_PostInc : FormatXI_PostInc<0b00010, 0b11010,
-      (outs GPR:$wb), (ins GPR:$reg3, GPR:$reg1),
-      "st.w\t$reg3, [$reg1]+", []> {
+    def STW_PostInc : FormatXI_PostInc<0b00010, 0b11010, (outs GPR:$wb),
+                                       (ins GPR:$reg3, GPR:$reg1),
+                                       "st.w\t$reg3, [$reg1]+", []> {
       let Constraints = "$wb = $reg1";
       let DecoderMethod = "DecodePostIncStoreInstruction";
     }
 
     // ST.W reg3, [reg1]- — word store, post-decrement
-    def STW_PostDec : FormatXI_PostInc<0b00100, 0b11010,
-      (outs GPR:$wb), (ins GPR:$reg3, GPR:$reg1),
-      "st.w\t$reg3, [$reg1]-", []> {
+    def STW_PostDec : FormatXI_PostInc<0b00100, 0b11010, (outs GPR:$wb),
+                                       (ins GPR:$reg3, GPR:$reg1),
+                                       "st.w\t$reg3, [$reg1]-", []> {
       let Constraints = "$wb = $reg1";
       let DecoderMethod = "DecodePostIncStoreInstruction";
     }
@@ -3708,20 +3727,20 @@ let Predicates = [HasRH850G4MH2], DecoderNamespace = "RH850G4MH2" in {
   // LDM.MP [reg1], eh-et — Load multiple MPU entries from memory
   // Loads MPLA/MPUA/MPAT for entries eh through et from [reg1]
   // SV privilege instruction
-  let mayLoad = 1, hasSideEffects = 1 in
-  def LDM_MP : FormatXI_MPU<0b00101100110,
-    (outs), (ins GPR:$reg1, uimm5:$eh, uimm5:$et),
-    "ldm.mp\t[$reg1], ${eh}-${et}", []> {
+  let mayLoad = 1, hasSideEffects = 1 in def LDM_MP
+      : FormatXI_MPU<0b00101100110, (outs),
+                     (ins GPR:$reg1, uimm5:$eh, uimm5:$et),
+                     "ldm.mp\t[$reg1], ${eh}-${et}", []> {
     let DecoderMethod = "DecodeMPUInstruction";
   }
 
   // STM.MP eh-et, [reg1] — Store multiple MPU entries to memory
   // Stores MPLA/MPUA/MPAT for entries eh through et to [reg1]
   // SV privilege instruction
-  let mayStore = 1, hasSideEffects = 1 in
-  def STM_MP : FormatXI_MPU<0b00101100100,
-    (outs), (ins uimm5:$eh, uimm5:$et, GPR:$reg1),
-    "stm.mp\t${eh}-${et}, [$reg1]", []> {
+  let mayStore = 1, hasSideEffects = 1 in def STM_MP
+      : FormatXI_MPU<0b00101100100, (outs),
+                     (ins uimm5:$eh, uimm5:$et, GPR:$reg1),
+                     "stm.mp\t${eh}-${et}, [$reg1]", []> {
     let DecoderMethod = "DecodeMPUInstruction";
   }
 
@@ -3736,30 +3755,27 @@ let Predicates = [HasRH850G4MH2], DecoderNamespace = "RH850G4MH2" in {
   // HVTRAP - Hypervisor EI-level trap
   // Saves PC in HMEIPC, PSW in HMEIPSW, transitions guest→host mode
   // Requires HVCFG.HVE=1 and PSW.UM=0 (SV privilege)
-  let hasSideEffects = 1, mayLoad = 0, mayStore = 0 in
-  def HVTRAP : FormatX_HVTRAP<
-    (outs), (ins uimm5:$vector),
-    "hvtrap\t$vector", []> {
+  let hasSideEffects = 1, mayLoad = 0,
+      mayStore = 0 in def HVTRAP
+      : FormatX_HVTRAP<(outs), (ins uimm5:$vector), "hvtrap\t$vector", []> {
     let DecoderMethod = "DecodeVirtInstruction";
   }
 
   // LDM.GSR - Load Multiple Guest System Registers
   // Loads predefined guest system registers from memory at [reg1]
   // Requires HVCFG.HVE=1, PSWH.GM=0 (host mode), PSW.UM=0 (SV privilege)
-  let hasSideEffects = 1, mayLoad = 1, mayStore = 0 in
-  def LDM_GSR : FormatX_GSR<0b10011,
-    (outs), (ins GPR:$reg1),
-    "ldm.gsr\t[$reg1]", []> {
+  let hasSideEffects = 1, mayLoad = 1,
+      mayStore = 0 in def LDM_GSR
+      : FormatX_GSR<0b10011, (outs), (ins GPR:$reg1), "ldm.gsr\t[$reg1]", []> {
     let DecoderMethod = "DecodeVirtInstruction";
   }
 
   // STM.GSR - Store Multiple Guest System Registers
   // Stores predefined guest system registers to memory at [reg1]
   // Requires HVCFG.HVE=1, PSWH.GM=0 (host mode), PSW.UM=0 (SV privilege)
-  let hasSideEffects = 1, mayLoad = 0, mayStore = 1 in
-  def STM_GSR : FormatX_GSR<0b10010,
-    (outs), (ins GPR:$reg1),
-    "stm.gsr\t[$reg1]", []> {
+  let hasSideEffects = 1, mayLoad = 0,
+      mayStore = 1 in def STM_GSR
+      : FormatX_GSR<0b10010, (outs), (ins GPR:$reg1), "stm.gsr\t[$reg1]", []> {
     let DecoderMethod = "DecodeVirtInstruction";
   }
 
@@ -3797,12 +3813,11 @@ let Predicates = [HasRH850G3M] in {
 
   // f64 load/store patterns via LD.DW / ST.DW (G3M only)
   // Used for constant pool, stack, and heap f64 values.
-  def : Pat<(f64 (load GPR:$base)), (LD_DW_F GPR:$base, 0)>;
-  def : Pat<(f64 (load (add GPR:$base, simm23:$off))),
-            (LD_DW_F GPR:$base, simm23:$off)>;
-  def : Pat<(store (f64 DPR:$src), GPR:$base),
-            (ST_DW_F DPR:$src, GPR:$base, 0)>;
-  def : Pat<(store (f64 DPR:$src), (add GPR:$base, simm23:$off)),
+  def : Pat<(f64(load GPR:$base)), (LD_DW_F GPR:$base, 0)>;
+  def : Pat<(f64(load(add GPR:$base, simm23:$off))), (LD_DW_F GPR:$base,
+                                                         simm23:$off)>;
+  def : Pat<(store(f64 DPR:$src), GPR:$base), (ST_DW_F DPR:$src, GPR:$base, 0)>;
+  def : Pat<(store(f64 DPR:$src), (add GPR:$base, simm23:$off)),
             (ST_DW_F DPR:$src, GPR:$base, simm23:$off)>;
 
 } // Predicates = [HasRH850G3M]
