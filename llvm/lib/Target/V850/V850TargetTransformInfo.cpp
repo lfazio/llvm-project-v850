@@ -12,12 +12,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "V850TargetTransformInfo.h"
+#include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/CodeGen/TargetLowering.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Type.h"
+#include "llvm/Support/Debug.h"
 
 using namespace llvm;
 
@@ -50,4 +52,73 @@ bool V850TTIImpl::isHardwareLoopProfitable(Loop *L, ScalarEvolution &SE,
   HWLoopInfo.IsNestingLegal = false;
 
   return true;
+}
+
+void V850TTIImpl::getUnrollingPreferences(
+    Loop *L, ScalarEvolution &SE, TTI::UnrollingPreferences &UP,
+    OptimizationRemarkEmitter *ORE) const {
+
+  // Enable upper-bound unrolling universally.
+  UP.UpperBound = true;
+
+  // Disable loop unrolling for -Os and -Oz. V850 is an embedded target
+  // where code size is often critical.
+  UP.OptSizeThreshold = 0;
+  UP.PartialOptSizeThreshold = 0;
+  if (L->getHeader()->getParent()->hasOptSize())
+    return;
+
+  SmallVector<BasicBlock *, 4> ExitingBlocks;
+  L->getExitingBlocks(ExitingBlocks);
+  LLVM_DEBUG(dbgs() << "V850 Unroll: Blocks=" << L->getNumBlocks()
+                    << " ExitBlocks=" << ExitingBlocks.size() << "\n");
+
+  // Only allow the latch plus at most one early exit.
+  if (ExitingBlocks.size() > 2)
+    return;
+
+  // Limit loop body complexity: allow if-then-else diamonds (4 blocks max).
+  if (L->getNumBlocks() > 4)
+    return;
+
+  // Don't unroll vectorized loops.
+  if (getBooleanLoopAttribute(L, "llvm.loop.isvectorized"))
+    return;
+
+  // Scan loop body: bail out on calls (prevents inlining) and vectors.
+  InstructionCost Cost = 0;
+  bool HasFPOps = false;
+  for (auto *BB : L->getBlocks()) {
+    for (auto &I : *BB) {
+      if (I.getType()->isVectorTy())
+        return;
+
+      if (isa<CallInst>(I) || isa<InvokeInst>(I)) {
+        if (const Function *F = cast<CallBase>(I).getCalledFunction()) {
+          if (!isLoweredToCall(F))
+            continue;
+        }
+        return;
+      }
+
+      // Track FP operations for V850E2M+ dual-issue benefit.
+      if (I.getType()->isFloatingPointTy())
+        HasFPOps = true;
+
+      SmallVector<const Value *> Operands(I.operand_values());
+      Cost += getInstructionCost(&I, Operands,
+                                 TargetTransformInfo::TCK_SizeAndLatency);
+    }
+  }
+
+  LLVM_DEBUG(dbgs() << "V850 Unroll: Cost=" << Cost << " HasFP=" << HasFPOps
+                    << "\n");
+
+  UP.Partial = true;
+  UP.Runtime = true;
+  UP.UnrollRemainder = true;
+
+  // Force unrolling very small loops to eliminate branch overhead.
+  if (Cost < 12)
+    UP.Force = true;
 }

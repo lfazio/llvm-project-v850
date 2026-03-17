@@ -22,6 +22,7 @@ namespace llvm {
 
 class V850TTIImpl final : public BasicTTIImplBase<V850TTIImpl> {
   using BaseT = BasicTTIImplBase<V850TTIImpl>;
+  using TTI = TargetTransformInfo;
   friend BaseT;
 
   const V850Subtarget *ST;
@@ -39,6 +40,11 @@ public:
   bool isHardwareLoopProfitable(Loop *L, ScalarEvolution &SE,
                                 AssumptionCache &AC, TargetLibraryInfo *LibInfo,
                                 HardwareLoopInfo &HWLoopInfo) const override;
+
+  // Loop unrolling preferences
+  void getUnrollingPreferences(Loop *L, ScalarEvolution &SE,
+                               TTI::UnrollingPreferences &UP,
+                               OptimizationRemarkEmitter *ORE) const override;
 };
 
 } // namespace llvm
