@@ -488,7 +488,51 @@ DecodeStatus V850Disassembler::getInstruction32(MCInst &MI, uint64_t &Size,
 
   bool HasRH850G3M = STI.hasFeature(V850::FeatureRH850G3M);
   bool HasV850E2M = STI.hasFeature(V850::FeatureV850E2M);
+  bool HasV850E1 = STI.hasFeature(V850::FeatureV850E1);
   bool HasFPU = STI.hasFeature(V850::FeatureV850FPU);
+
+  // Format XIII: PREPARE/DISPOSE (V850E1+)
+  // These MUST be decoded manually because when imm5{4}=0 (bit[5]=0), the
+  // first halfword bits[10:5]=110010 matches MOVHI's opcode, causing the
+  // auto-generated decoder to mis-identify PREPARE/DISPOSE as MOVHI.
+  //
+  // Format XIII encoding:
+  //   bits[15:11] = 0 (fixed)
+  //   bits[10:6]  = 11001 (opcode)
+  //   bits[5:1]   = imm5
+  //   bit[0]      = list12{0}
+  //   bits[31:21] = list12{11:1}
+  //   bits[20:16] = reg1 (0 for PREPARE, jump reg for DISPOSEr)
+  unsigned Opcode5HW0 = (Insn32 >> 6) & 0x1F; // bits[10:6]
+  unsigned Reg2HW0 = (Insn32 >> 11) & 0x1F;   // bits[15:11]
+  // The encoding is unambiguous (bits[15:11]=0 && bits[10:6]=11001), so we
+  // decode without a feature guard. This ensures correct disassembly even when
+  // the ELF header doesn't convey the CPU variant (flags=0x0).
+  if (Reg2HW0 == 0 && Opcode5HW0 == 0x19) {
+    unsigned Imm5 = (Insn32 >> 1) & 0x1F;
+    unsigned List12Bit0 = Insn32 & 1;
+    unsigned List12High = (Insn32 >> 21) & 0x7FF; // bits[31:21]
+    unsigned List12 = (List12High << 1) | List12Bit0;
+    unsigned Reg1 = (Insn32 >> 16) & 0x1F;
+
+    MI.clear();
+    if (Reg1 != 0) {
+      // DISPOSEr: dispose imm5, list12, [reg1]
+      MI.setOpcode(V850::DISPOSEr);
+      MI.addOperand(MCOperand::createImm(Imm5));
+      MI.addOperand(MCOperand::createImm(List12));
+      MI.addOperand(MCOperand::createReg(GPRDecoderTable[Reg1]));
+    } else {
+      // PREPARE: prepare list12, imm5  (also covers DISPOSE list12, imm5)
+      // The disassembler always shows PREPARE since DISPOSE shares the same
+      // encoding (DISPOSE is isCodeGenOnly).
+      MI.setOpcode(V850::PREPARE);
+      MI.addOperand(MCOperand::createImm(List12));
+      MI.addOperand(MCOperand::createImm(Imm5));
+    }
+    Size = 4;
+    return MCDisassembler::Success;
+  }
 
   // Bit fields used by LDSR/STSR/TRFSR pattern checks below.
   unsigned Opcode6Sysreg = (Insn32 >> 5) & 0x3F; // bits[10:5]
@@ -849,14 +893,21 @@ DecodeStatus V850Disassembler::getInstruction(MCInst &MI, uint64_t &Size,
   // bits [10:5] of the first halfword (FormatIX/XI/XII/etc.). If those
   // bits are 0b111111, prefer the 32-bit decoder first.
   //
-  // Also, Format V (JR/JARL) has opcode 0b101111 in bits [10:5]. The first
-  // halfword happens to match Format III (Bcond) pattern because bits[10:7]
-  // equals 0b1011 (branch opcode), so we need to prefer 32-bit for Format V.
+  // Format V (JR/JARL) stores opcode{5:1}=10111 in bits[10:6]. bit[5] is
+  // part of the displacement (disp22{5}), NOT a fixed opcode bit. So we must
+  // check the 5-bit field bits[10:6] rather than the 6-bit field bits[10:5],
+  // otherwise zero-displacement JR/JARL (e.g., with unresolved relocations)
+  // would be mis-decoded as 16-bit Bcond.
+  //
+  // Format XIII (PREPARE/DISPOSE) has bits[15:11]=0 and bits[10:6]=11001.
+  // bit[5] is imm5{4}, which varies. The 32-bit auto-generated decoder
+  // confuses this with MOVHI (bits[10:5]=110010 when imm5{4}=0), so we
+  // handle PREPARE/DISPOSE manually in getInstruction32().
 
   unsigned Opcode5 = (Insn16 >> 6) & 0x1F; // bits[10:6]
   bool Prefer32 =
-      (Opcode6 == 0x3F) ||            // Extended opcode
-      (Opcode6 == 0x2F) ||            // JR/JARL (Format V)
+      (Opcode6 == 0x3F) ||            // Extended opcode (FormatIX/XI/XII)
+      (Opcode5 == 0x17) ||            // JR/JARL (Format V, 5-bit check)
       (Reg2 == 0 && Opcode5 == 0x19); // PREPARE/DISPOSE (FormatXIII)
 
   if (Prefer32 && Bytes.size() >= 4) {

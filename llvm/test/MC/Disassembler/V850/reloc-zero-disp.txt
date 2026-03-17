@@ -1,0 +1,62 @@
+# RUN: llvm-mc -disassemble %s -triple=v850 | FileCheck %s
+
+#------------------------------------------------------------------------------
+# Regression test: instructions with zero displacement/immediate fields.
+# These encodings appear in .o files when relocations are unresolved.
+# Previously, JARL/JR with disp=0 were misidentified as Bcond (bv),
+# and PREPARE/DISPOSE with imm5{4}=0 were misidentified as MOVHI.
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+# JR with zero displacement (relocation placeholder)
+# Encoding: reg2=0, opcode[5:1]=10111, disp22=0
+# Previously decoded as "bv -8" (Bcond with cond=0b1110)
+#------------------------------------------------------------------------------
+
+# CHECK: jr	0
+0xc0,0x05,0x00,0x00
+
+#------------------------------------------------------------------------------
+# JARL with zero displacement (relocation placeholder)
+# Encoding: reg2=r31(11111), opcode[5:1]=10111, disp22=0
+# Previously decoded as "bv -8" or similar
+#------------------------------------------------------------------------------
+
+# CHECK: jarl	0, r31
+0xc0,0xfd,0x00,0x00
+
+#------------------------------------------------------------------------------
+# PREPARE list12, imm5 — various list12/imm5 combinations
+# Format XIII: bits[15:11]=0, bits[10:6]=11001
+# When imm5{4}=0, bits[10:5]=110010 which is MOVHI's opcode.
+# Previously decoded as "movhi" instead of "prepare".
+#------------------------------------------------------------------------------
+
+# PREPARE 2, 0 (LP only, imm5=0 — worst case, overlaps MOVHI)
+# CHECK: prepare	2, 0
+0x40,0x06,0x20,0x00
+
+# PREPARE 2, 4 (LP only, imm5=4)
+# CHECK: prepare	2, 4
+0x48,0x06,0x20,0x00
+
+# PREPARE 2049, 0 (LP + r20, imm5=0)
+# CHECK: prepare	2049, 0
+0x41,0x06,0x00,0x80
+
+# PREPARE 4095, 8 (all registers, imm5=8)
+# CHECK: prepare	4095, 8
+0x51,0x06,0xe0,0xff
+
+#------------------------------------------------------------------------------
+# DISPOSE imm5, list12, [reg1] — with jump register
+# When imm5{4}=0, same MOVHI overlap issue as PREPARE.
+#------------------------------------------------------------------------------
+
+# DISPOSE 0, 2, [r31] (LP, jump to r31)
+# CHECK: dispose	0, 2, [r31]
+0x40,0x06,0x3f,0x00
+
+# DISPOSE 4, 2049, [r31] (LP+r20, imm5=4, jump to r31)
+# CHECK: dispose	4, 2049, [r31]
+0x49,0x06,0x1f,0x80
