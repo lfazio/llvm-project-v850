@@ -1937,22 +1937,24 @@ def uimm8 : Operand<i32>, ImmLeaf<i32, [{return isUInt<8>(Imm);}]> {
 
 //===----------------------------------------------------------------------===//
 // 3-operand Saturated Arithmetic Instructions (V850E2+)
+// SATADD_3 encoding matches ADF cond=SA: subop=011101, subid=11010
+// SATSUB_3 encoding matches SBF cond=SA: subop=011100, subid=11010
 // Placed in V850E2M DecoderNamespace to avoid conflict with ADF/SBF
-// (ADF cond=C has identical encoding to SATADD_3: subop=011101, subid=00010)
+// (which use the same sub-op with variable cccc condition field).
 //===----------------------------------------------------------------------===//
 
 let Predicates = [HasV850E2], DecoderNamespace = "V850E2M" in {
   // SATADD reg1, reg2, reg3 - Saturating add 3-operand
-  // Opcode: 111111, sub-op: 011101, sub-id: 00010
+  // Opcode: 111111, sub-op: 011101, sub-id: 11010 (cond=SA=1101, trailing 0)
   let Defs = [PSW], AddedComplexity = 1 in def SATADD_3
-      : FormatXI<0b111111, 0b011101, 0b00010, (outs GPR:$reg3),
+      : FormatXI<0b111111, 0b011101, 0b11010, (outs GPR:$reg3),
                  (ins GPR:$reg2, GPR:$reg1), "satadd\t$reg1, $reg2, $reg3",
                  [(set GPR:$reg3, (saddsat GPR:$reg2, GPR:$reg1))]>;
 
   // SATSUB reg1, reg2, reg3 - Saturating subtract 3-operand
-  // Opcode: 111111, sub-op: 011100, sub-id: 00010
+  // Opcode: 111111, sub-op: 011100, sub-id: 11010 (cond=SA=1101, trailing 0)
   let Defs = [PSW], AddedComplexity = 1 in def SATSUB_3
-      : FormatXI<0b111111, 0b011100, 0b00010, (outs GPR:$reg3),
+      : FormatXI<0b111111, 0b011100, 0b11010, (outs GPR:$reg3),
                  (ins GPR:$reg2, GPR:$reg1), "satsub\t$reg1, $reg2, $reg3",
                  [(set GPR:$reg3, (ssubsat GPR:$reg2, GPR:$reg1))]>;
 } // DecoderNamespace = "V850E2M"

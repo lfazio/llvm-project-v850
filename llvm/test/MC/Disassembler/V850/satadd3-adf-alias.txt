@@ -1,27 +1,30 @@
 # RUN: llvm-mc -triple=v850 -mcpu=v850e2m --disassemble %s | FileCheck %s
 
-# Test SATADD_3/ADF.C and SATSUB_3/SBF.C encoding overlap.
+# Test SATADD_3/ADF.SA and SATSUB_3/SBF.SA encoding overlap.
 #
-# SATADD_3 (V850E2+) and ADF cond=C (V850E2+) share identical encoding.
-# SATSUB_3 (V850E2+) and SBF cond=C (V850E2+) share identical encoding.
+# SATADD_3 (V850E2+) and ADF cond=SA (V850E2+) share identical encoding.
+# SATSUB_3 (V850E2+) and SBF cond=SA (V850E2+) share identical encoding.
 # The disassembler resolves these as ADF/SBF (the more general form).
-# Both ADF.C and SATADD are encoding aliases for the same machine code,
-# so either disassembly is semantically valid.
+# Both ADF.SA and SATADD are encoding aliases for the same machine code.
 
-# SATADD r1, r2, r3 == ADF c, r1, r2, r3
-# encoding: [0xe1,0x17,0xa2,0x1b]
-# CHECK: adf c, r1, r2, r3
-0xe1 0x17 0xa2 0x1b
+# SATADD r1, r2, r3 == ADF sa, r1, r2, r3
+# encoding: [0xe1,0x17,0xba,0x1b]
+# CHECK: adf sa, r1, r2, r3
+0xe1 0x17 0xba 0x1b
 
-# SATSUB r1, r2, r3 == SBF c, r1, r2, r3
-# encoding: [0xe1,0x17,0x82,0x1b]
-# CHECK: sbf c, r1, r2, r3
-0xe1 0x17 0x82 0x1b
+# SATSUB r1, r2, r3 == SBF sa, r1, r2, r3
+# encoding: [0xe1,0x17,0x9a,0x1b]
+# CHECK: sbf sa, r1, r2, r3
+0xe1 0x17 0x9a 0x1b
 
 # ADF with other condition codes (not aliases of SATADD/SATSUB)
 # ADF v, r1, r2, r3 - cond=V(0)
 # CHECK: adf v, r1, r2, r3
 0xe1 0x17 0xa0 0x1b
+
+# ADF c, r1, r2, r3 - cond=C(1) — different from SATADD_3
+# CHECK: adf c, r1, r2, r3
+0xe1 0x17 0xa2 0x1b
 
 # ADF nz, r1, r2, r3 - cond=NZ(10)
 # CHECK: adf nz, r1, r2, r3
