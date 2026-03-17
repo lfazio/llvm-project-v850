@@ -2627,14 +2627,14 @@ let Predicates = [HasV850FPU] in {
                              (ins GPR:$reg2), "cvtf.wd\t$reg2, $reg3", []>;
 
   // CVTF.LS reg2, reg3 - Long (int64) to Single (subop2=1, cat=0, type=2,
-  // subop=1)
-  def CVTFLS : FormatFPU_CVT<0b00001, 0b000, 0b10, 0b0001, (outs GPR:$reg3),
-                             (ins GPR:$reg2), "cvtf.ls\t$reg2, $reg3", []>;
+  // subop=1). reg2 is an even GPR pair (DPR) holding the i64 input.
+  def CVTFLS : FormatFPU_CVT<0b00001, 0b000, 0b10, 0b0001, (outs FPR:$reg3),
+                             (ins DPR:$reg2), "cvtf.ls\t$reg2, $reg3", []>;
 
   // CVTF.LD reg2, reg3 - Long (int64) to Double (subop2=1, cat=0, type=2,
-  // subop=9)
-  def CVTFLD : FormatFPU_CVT<0b00001, 0b000, 0b10, 0b1001, (outs GPR:$reg3),
-                             (ins GPR:$reg2), "cvtf.ld\t$reg2, $reg3", []>;
+  // subop=9). reg2 is DPR (i64 input), reg3 is DPR (f64 output).
+  def CVTFLD : FormatFPU_CVT<0b00001, 0b000, 0b10, 0b1001, (outs dprreg:$reg3),
+                             (ins DPR:$reg2), "cvtf.ld\t$reg2, $reg3", []>;
 
   //--- Floating-point to signed integer conversions ---
 
@@ -2647,13 +2647,15 @@ let Predicates = [HasV850FPU] in {
                              (ins dprreg:$reg2), "cvtf.dw\t$reg2, $reg3", []>;
 
   // CVTF.SL reg2, reg3 - Single to Long (subop2=4, cat=0, type=2, subop=2)
-  def CVTFSL : FormatFPU_CVT<0b00100, 0b000, 0b10, 0b0010, (outs GPR:$reg3),
-                             (ins GPR:$reg2), "cvtf.sl\t$reg2, $reg3", []>;
+  // reg2 is FPR (f32 input), reg3 is DPR (i64 output).
+  def CVTFSL : FormatFPU_CVT<0b00100, 0b000, 0b10, 0b0010, (outs DPR:$reg3),
+                             (ins FPR:$reg2), "cvtf.sl\t$reg2, $reg3", []>;
 
   // CVTF.DL reg2, reg3 - Double to Long (subop2=4, cat=0, type=2, subop=10)
+  // reg2 is DPR (f64 input), reg3 is DPR (i64 output).
   def CVTFDL
-      : FormatFPU_CVT<0b00100, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
-                      (ins dprreg:$reg2), "cvtf.dl	$reg2, $reg3", []>;
+      : FormatFPU_CVT<0b00100, 0b000, 0b10, 0b1010, (outs DPR:$reg3),
+                      (ins dprreg:$reg2), "cvtf.dl\t$reg2, $reg3", []>;
 
   //--- Unsigned integer to floating-point conversions ---
 
@@ -2669,14 +2671,14 @@ let Predicates = [HasV850FPU] in {
                               (ins GPR:$reg2), "cvtf.uwd\t$reg2, $reg3", []>;
 
   // CVTF.ULS reg2, reg3 - Unsigned Long to Single (subop2=17, cat=0, type=2,
-  // subop=1)
-  def CVTFULS : FormatFPU_CVT<0b10001, 0b000, 0b10, 0b0001, (outs GPR:$reg3),
-                              (ins GPR:$reg2), "cvtf.uls\t$reg2, $reg3", []>;
+  // subop=1). reg2 is DPR (unsigned i64 input), reg3 is FPR (f32 output).
+  def CVTFULS : FormatFPU_CVT<0b10001, 0b000, 0b10, 0b0001, (outs FPR:$reg3),
+                              (ins DPR:$reg2), "cvtf.uls\t$reg2, $reg3", []>;
 
   // CVTF.ULD reg2, reg3 - Unsigned Long to Double (subop2=17, cat=0, type=2,
-  // subop=9)
-  def CVTFULD : FormatFPU_CVT<0b10001, 0b000, 0b10, 0b1001, (outs GPR:$reg3),
-                              (ins GPR:$reg2), "cvtf.uld\t$reg2, $reg3", []>;
+  // subop=9). reg2 is DPR (unsigned i64 input), reg3 is DPR (f64 output).
+  def CVTFULD : FormatFPU_CVT<0b10001, 0b000, 0b10, 0b1001, (outs dprreg:$reg3),
+                              (ins DPR:$reg2), "cvtf.uld\t$reg2, $reg3", []>;
 
   //--- Floating-point to unsigned integer conversions ---
 
@@ -2693,14 +2695,14 @@ let Predicates = [HasV850FPU] in {
 
   // CVTF.SUL reg2, reg3 - Single to Unsigned Long (subop2=20, cat=0, type=2,
   // subop=2)
-  def CVTFSUL : FormatFPU_CVT<0b10100, 0b000, 0b10, 0b0010, (outs GPR:$reg3),
-                              (ins GPR:$reg2), "cvtf.sul\t$reg2, $reg3", []>;
+  def CVTFSUL : FormatFPU_CVT<0b10100, 0b000, 0b10, 0b0010, (outs DPR:$reg3),
+                              (ins FPR:$reg2), "cvtf.sul\t$reg2, $reg3", []>;
 
   // CVTF.DUL reg2, reg3 - Double to Unsigned Long (subop2=20, cat=0, type=2,
-  // subop=10)
+  // subop=10). reg2 is DPR (f64 input), reg3 is DPR (unsigned i64 output).
   def CVTFDUL
-      : FormatFPU_CVT<0b10100, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
-                      (ins dprreg:$reg2), "cvtf.dul	$reg2, $reg3", []>;
+      : FormatFPU_CVT<0b10100, 0b000, 0b10, 0b1010, (outs DPR:$reg3),
+                      (ins dprreg:$reg2), "cvtf.dul\t$reg2, $reg3", []>;
 
   //===----------------------------------------------------------------------===//
   // FPU Rounding Instructions - V850E2M
@@ -2722,15 +2724,15 @@ let Predicates = [HasV850FPU] in {
                               (ins dprreg:$reg2), "trncf.dw\t$reg2, $reg3", []>;
 
   // TRNCF.SL reg2, reg3 - Truncate Single to Long (subop2=1, cat=0, type=2,
-  // subop=2)
-  def TRNCFSL : FormatFPU_CVT<0b00001, 0b000, 0b10, 0b0010, (outs GPR:$reg3),
-                              (ins GPR:$reg2), "trncf.sl\t$reg2, $reg3", []>;
+  // subop=2). reg2 is FPR (f32 input), reg3 is DPR (i64 output).
+  def TRNCFSL : FormatFPU_CVT<0b00001, 0b000, 0b10, 0b0010, (outs DPR:$reg3),
+                              (ins FPR:$reg2), "trncf.sl\t$reg2, $reg3", []>;
 
   // TRNCF.DL reg2, reg3 - Truncate Double to Long (subop2=1, cat=0, type=2,
-  // subop=10)
+  // subop=10). reg2 is DPR (f64 input), reg3 is DPR (i64 output).
   def TRNCFDL
-      : FormatFPU_CVT<0b00001, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
-                      (ins dprreg:$reg2), "trncf.dl	$reg2, $reg3", []>;
+      : FormatFPU_CVT<0b00001, 0b000, 0b10, 0b1010, (outs DPR:$reg3),
+                      (ins dprreg:$reg2), "trncf.dl\t$reg2, $reg3", []>;
 
   // --- TRNCF (Truncate) - Unsigned ---
   // TRNCF.SUW reg2, reg3 - Truncate Single to Unsigned Word (subop2=17, cat=0,
@@ -2746,15 +2748,15 @@ let Predicates = [HasV850FPU] in {
                       (ins dprreg:$reg2), "trncf.duw\t$reg2, $reg3", []>;
 
   // TRNCF.SUL reg2, reg3 - Truncate Single to Unsigned Long (subop2=17, cat=0,
-  // type=2, subop=2)
-  def TRNCFSUL : FormatFPU_CVT<0b10001, 0b000, 0b10, 0b0010, (outs GPR:$reg3),
-                               (ins GPR:$reg2), "trncf.sul\t$reg2, $reg3", []>;
+  // type=2, subop=2). reg2 is FPR (f32 input), reg3 is DPR (unsigned i64 output).
+  def TRNCFSUL : FormatFPU_CVT<0b10001, 0b000, 0b10, 0b0010, (outs DPR:$reg3),
+                               (ins FPR:$reg2), "trncf.sul\t$reg2, $reg3", []>;
 
   // TRNCF.DUL reg2, reg3 - Truncate Double to Unsigned Long (subop2=17, cat=0,
-  // type=2, subop=10)
+  // type=2, subop=10). reg2 is DPR (f64 input), reg3 is DPR (unsigned i64 output).
   def TRNCFDUL
-      : FormatFPU_CVT<0b10001, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
-                      (ins dprreg:$reg2), "trncf.dul	$reg2, $reg3", []>;
+      : FormatFPU_CVT<0b10001, 0b000, 0b10, 0b1010, (outs DPR:$reg3),
+                      (ins dprreg:$reg2), "trncf.dul\t$reg2, $reg3", []>;
 
   // --- CEILF (Ceiling) - Signed ---
   // CEILF.SW reg2, reg3 - Ceiling Single to Word (subop2=2, cat=0, type=2,
@@ -2766,18 +2768,18 @@ let Predicates = [HasV850FPU] in {
   // subop=8)
   def CEILFDW
       : FormatFPU_CVT<0b00010, 0b000, 0b10, 0b1000, (outs GPR:$reg3),
-                      (ins dprreg:$reg2), "ceilf.dw	$reg2, $reg3", []>;
+                      (ins dprreg:$reg2), "ceilf.dw\t$reg2, $reg3", []>;
 
   // CEILF.SL reg2, reg3 - Ceiling Single to Long (subop2=2, cat=0, type=2,
   // subop=2)
-  def CEILFSL : FormatFPU_CVT<0b00010, 0b000, 0b10, 0b0010, (outs GPR:$reg3),
-                              (ins GPR:$reg2), "ceilf.sl\t$reg2, $reg3", []>;
+  def CEILFSL : FormatFPU_CVT<0b00010, 0b000, 0b10, 0b0010, (outs DPR:$reg3),
+                              (ins FPR:$reg2), "ceilf.sl\t$reg2, $reg3", []>;
 
   // CEILF.DL reg2, reg3 - Ceiling Double to Long (subop2=2, cat=0, type=2,
   // subop=10)
   def CEILFDL
-      : FormatFPU_CVT<0b00010, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
-                      (ins dprreg:$reg2), "ceilf.dl	$reg2, $reg3", []>;
+      : FormatFPU_CVT<0b00010, 0b000, 0b10, 0b1010, (outs DPR:$reg3),
+                      (ins dprreg:$reg2), "ceilf.dl\t$reg2, $reg3", []>;
 
   // --- CEILF (Ceiling) - Unsigned ---
   // CEILF.SUW reg2, reg3 - Ceiling Single to Unsigned Word (subop2=18, cat=0,
@@ -2789,18 +2791,18 @@ let Predicates = [HasV850FPU] in {
   // type=2, subop=8)
   def CEILFDUW
       : FormatFPU_CVT<0b10010, 0b000, 0b10, 0b1000, (outs GPR:$reg3),
-                      (ins dprreg:$reg2), "ceilf.duw	$reg2, $reg3", []>;
+                      (ins dprreg:$reg2), "ceilf.duw\t$reg2, $reg3", []>;
 
   // CEILF.SUL reg2, reg3 - Ceiling Single to Unsigned Long (subop2=18, cat=0,
   // type=2, subop=2)
-  def CEILFSUL : FormatFPU_CVT<0b10010, 0b000, 0b10, 0b0010, (outs GPR:$reg3),
-                               (ins GPR:$reg2), "ceilf.sul\t$reg2, $reg3", []>;
+  def CEILFSUL : FormatFPU_CVT<0b10010, 0b000, 0b10, 0b0010, (outs DPR:$reg3),
+                               (ins FPR:$reg2), "ceilf.sul\t$reg2, $reg3", []>;
 
   // CEILF.DUL reg2, reg3 - Ceiling Double to Unsigned Long (subop2=18, cat=0,
   // type=2, subop=10)
   def CEILFDUL
-      : FormatFPU_CVT<0b10010, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
-                      (ins dprreg:$reg2), "ceilf.dul	$reg2, $reg3", []>;
+      : FormatFPU_CVT<0b10010, 0b000, 0b10, 0b1010, (outs DPR:$reg3),
+                      (ins dprreg:$reg2), "ceilf.dul\t$reg2, $reg3", []>;
 
   // --- FLOORF (Floor) - Signed ---
   // FLOORF.SW reg2, reg3 - Floor Single to Word (subop2=3, cat=0, type=2,
@@ -2812,18 +2814,18 @@ let Predicates = [HasV850FPU] in {
   // subop=8)
   def FLOORFDW
       : FormatFPU_CVT<0b00011, 0b000, 0b10, 0b1000, (outs GPR:$reg3),
-                      (ins dprreg:$reg2), "floorf.dw	$reg2, $reg3", []>;
+                      (ins dprreg:$reg2), "floorf.dw\t$reg2, $reg3", []>;
 
   // FLOORF.SL reg2, reg3 - Floor Single to Long (subop2=3, cat=0, type=2,
   // subop=2)
-  def FLOORFSL : FormatFPU_CVT<0b00011, 0b000, 0b10, 0b0010, (outs GPR:$reg3),
-                               (ins GPR:$reg2), "floorf.sl\t$reg2, $reg3", []>;
+  def FLOORFSL : FormatFPU_CVT<0b00011, 0b000, 0b10, 0b0010, (outs DPR:$reg3),
+                               (ins FPR:$reg2), "floorf.sl\t$reg2, $reg3", []>;
 
   // FLOORF.DL reg2, reg3 - Floor Double to Long (subop2=3, cat=0, type=2,
   // subop=10)
   def FLOORFDL
-      : FormatFPU_CVT<0b00011, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
-                      (ins dprreg:$reg2), "floorf.dl	$reg2, $reg3", []>;
+      : FormatFPU_CVT<0b00011, 0b000, 0b10, 0b1010, (outs DPR:$reg3),
+                      (ins dprreg:$reg2), "floorf.dl\t$reg2, $reg3", []>;
 
   // --- FLOORF (Floor) - Unsigned ---
   // FLOORF.SUW reg2, reg3 - Floor Single to Unsigned Word (subop2=19, cat=0,
@@ -2836,19 +2838,19 @@ let Predicates = [HasV850FPU] in {
   // type=2, subop=8)
   def FLOORFDUW
       : FormatFPU_CVT<0b10011, 0b000, 0b10, 0b1000, (outs GPR:$reg3),
-                      (ins dprreg:$reg2), "floorf.duw	$reg2, $reg3", []>;
+                      (ins dprreg:$reg2), "floorf.duw\t$reg2, $reg3", []>;
 
   // FLOORF.SUL reg2, reg3 - Floor Single to Unsigned Long (subop2=19, cat=0,
   // type=2, subop=2)
   def FLOORFSUL
-      : FormatFPU_CVT<0b10011, 0b000, 0b10, 0b0010, (outs GPR:$reg3),
-                      (ins GPR:$reg2), "floorf.sul\t$reg2, $reg3", []>;
+      : FormatFPU_CVT<0b10011, 0b000, 0b10, 0b0010, (outs DPR:$reg3),
+                      (ins FPR:$reg2), "floorf.sul\t$reg2, $reg3", []>;
 
   // FLOORF.DUL reg2, reg3 - Floor Double to Unsigned Long (subop2=19, cat=0,
   // type=2, subop=10)
   def FLOORFDUL
-      : FormatFPU_CVT<0b10011, 0b000, 0b10, 0b1010, (outs GPR:$reg3),
-                      (ins dprreg:$reg2), "floorf.dul	$reg2, $reg3", []>;
+      : FormatFPU_CVT<0b10011, 0b000, 0b10, 0b1010, (outs DPR:$reg3),
+                      (ins dprreg:$reg2), "floorf.dul\t$reg2, $reg3", []>;
 
   //===----------------------------------------------------------------------===//
   // FPU System Register Access via BSEL Banking (V850E2M+)

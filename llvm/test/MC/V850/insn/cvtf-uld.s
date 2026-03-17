@@ -2,9 +2,9 @@
 
 // CVTF.ULD - Convert unsigned long (uint64) to double
 
-// CHECK: cvtf.uld r6, r8 ; encoding: [0xf1,0x37,0x52,0x44]
-cvtf.uld r6, r8
+// CHECK: cvtf.uld d6, r8 ; encoding: [0xf1,0x37,0x52,0x44]
+cvtf.uld d6, r8
 
-// CHECK: cvtf.uld r10, r12 ; encoding: [0xf1,0x57,0x52,0x64]
-cvtf.uld r10, r12
+// CHECK: cvtf.uld d10, r12 ; encoding: [0xf1,0x57,0x52,0x64]
+cvtf.uld d10, r12
 

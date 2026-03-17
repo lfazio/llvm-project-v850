@@ -21,14 +21,16 @@ define void @test_trncf_dw() {
 ; CHECK-LABEL: test_trncf_sl:
 ; CHECK: trncf.sl
 define void @test_trncf_sl() {
-  call void asm sideeffect "trncf.sl r6, r8", ""()
+  ; reg3 is DPR (i64 output)
+  call void asm sideeffect "trncf.sl r6, d8", ""()
   ret void
 }
 
 ; CHECK-LABEL: test_trncf_dl:
 ; CHECK: trncf.dl
 define void @test_trncf_dl() {
-  call void asm sideeffect "trncf.dl r6, r8", ""()
+  ; reg2 is dprreg (f64 input), reg3 is DPR (i64 output)
+  call void asm sideeffect "trncf.dl r6, d8", ""()
   ret void
 }
 
@@ -64,14 +66,16 @@ define void @test_ceilf_dw() {
 ; CHECK-LABEL: test_ceilf_sl:
 ; CHECK: ceilf.sl
 define void @test_ceilf_sl() {
-  call void asm sideeffect "ceilf.sl r6, r8", ""()
+  ; reg3 is DPR (i64 output)
+  call void asm sideeffect "ceilf.sl r6, d8", ""()
   ret void
 }
 
 ; CHECK-LABEL: test_ceilf_dl:
 ; CHECK: ceilf.dl
 define void @test_ceilf_dl() {
-  call void asm sideeffect "ceilf.dl r6, r8", ""()
+  ; reg2 is dprreg (f64 input), reg3 is DPR (i64 output)
+  call void asm sideeffect "ceilf.dl r6, d8", ""()
   ret void
 }
 
@@ -93,13 +97,15 @@ define void @test_floorf_dw() {
 ; CHECK-LABEL: test_floorf_sl:
 ; CHECK: floorf.sl
 define void @test_floorf_sl() {
-  call void asm sideeffect "floorf.sl r6, r8", ""()
+  ; reg3 is DPR (i64 output)
+  call void asm sideeffect "floorf.sl r6, d8", ""()
   ret void
 }
 
 ; CHECK-LABEL: test_floorf_dl:
 ; CHECK: floorf.dl
 define void @test_floorf_dl() {
-  call void asm sideeffect "floorf.dl r6, r8", ""()
+  ; reg2 is dprreg (f64 input), reg3 is DPR (i64 output)
+  call void asm sideeffect "floorf.dl r6, d8", ""()
   ret void
 }

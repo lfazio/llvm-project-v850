@@ -92,6 +92,25 @@ enum NodeType : unsigned {
   // Operands: (fcond, cmp_lhs, cmp_rhs, true_val, false_val)
   // Returns: selected value (true_val if comparison true, false_val otherwise)
   FP_SELECT_CC,
+
+  // i64 <-> FP conversion nodes (V850E2M+ FPU hardware instructions).
+  // These use i32 pair operands since i64 is not a legal type on V850.
+
+  // SINT64_TO_FP: (i32_lo, i32_hi) -> f32 or f64
+  // Maps to CVTF.LS (-> f32) or CVTF.LD (-> f64)
+  SINT64_TO_FP,
+
+  // UINT64_TO_FP: (i32_lo, i32_hi) -> f32 or f64
+  // Maps to CVTF.ULS (-> f32) or CVTF.ULD (-> f64)
+  UINT64_TO_FP,
+
+  // FP_TO_SINT64: (f32 or f64) -> (i32_lo, i32_hi)
+  // Maps to TRNCF.SL (f32 ->) or TRNCF.DL (f64 ->)
+  FP_TO_SINT64,
+
+  // FP_TO_UINT64: (f32 or f64) -> (i32_lo, i32_hi)
+  // Maps to TRNCF.SUL (f32 ->) or TRNCF.DUL (f64 ->)
+  FP_TO_UINT64,
 };
 } // namespace V850ISD
 
@@ -128,6 +147,12 @@ public:
   SDValue LowerATOMIC_FENCE(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerATOMIC_LOAD(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerATOMIC_STORE(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerSINT_TO_FP_I64(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerUINT_TO_FP_I64(SDValue Op, SelectionDAG &DAG) const;
+
+  /// ReplaceNodeResults - Replace results of illegal nodes with custom code.
+  void ReplaceNodeResults(SDNode *N, SmallVectorImpl<SDValue> &Results,
+                          SelectionDAG &DAG) const override;
 
   /// getJumpTableEncoding - Return the entry encoding for jump tables.
   /// V850E1+ uses inline jump tables with SWITCH instruction.

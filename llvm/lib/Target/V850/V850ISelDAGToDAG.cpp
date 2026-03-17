@@ -680,6 +680,69 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
     return;
   }
 
+  case V850ISD::SINT64_TO_FP:
+  case V850ISD::UINT64_TO_FP: {
+    // (i32_lo, i32_hi) -> f32 or f64
+    // Combine two i32 GPRs into a DPR via REG_SEQUENCE, then emit CVTF.LS/LD
+    // or CVTF.ULS/ULD.
+    SDValue Lo = Node->getOperand(0);
+    SDValue Hi = Node->getOperand(1);
+    EVT DstVT = Node->getValueType(0);
+    bool IsSigned = (Node->getOpcode() == V850ISD::SINT64_TO_FP);
+
+    // Build DPR from (lo, hi) pair via REG_SEQUENCE
+    SDValue SubLoIdx = CurDAG->getTargetConstant(llvm::sub_lo, DL, MVT::i32);
+    SDValue SubHiIdx = CurDAG->getTargetConstant(llvm::sub_hi, DL, MVT::i32);
+    SDValue RegClass =
+        CurDAG->getTargetConstant(V850::DPRRegClassID, DL, MVT::i32);
+    SDValue Ops[] = {RegClass, Lo, SubLoIdx, Hi, SubHiIdx};
+    SDNode *Pair = CurDAG->getMachineNode(TargetOpcode::REG_SEQUENCE, DL,
+                                          MVT::f64, Ops);
+
+    // Select instruction based on signedness and destination type
+    unsigned Opc;
+    if (IsSigned)
+      Opc = (DstVT == MVT::f64) ? V850::CVTFLD : V850::CVTFLS;
+    else
+      Opc = (DstVT == MVT::f64) ? V850::CVTFULD : V850::CVTFULS;
+
+    SDNode *Conv =
+        CurDAG->getMachineNode(Opc, DL, DstVT, SDValue(Pair, 0));
+    ReplaceNode(Node, Conv);
+    return;
+  }
+
+  case V850ISD::FP_TO_SINT64:
+  case V850ISD::FP_TO_UINT64: {
+    // (f32 or f64) -> (i32_lo, i32_hi)
+    // Emit TRNCF.SL/DL or TRNCF.SUL/DUL producing DPR, then extract lo/hi.
+    SDValue Src = Node->getOperand(0);
+    EVT SrcVT = Src.getValueType();
+    bool IsSigned = (Node->getOpcode() == V850ISD::FP_TO_SINT64);
+
+    // Select instruction based on signedness and source type
+    unsigned Opc;
+    if (IsSigned)
+      Opc = (SrcVT == MVT::f64) ? V850::TRNCFDL : V850::TRNCFSL;
+    else
+      Opc = (SrcVT == MVT::f64) ? V850::TRNCFDUL : V850::TRNCFSUL;
+
+    // Emit instruction producing DPR result
+    SDNode *Conv = CurDAG->getMachineNode(Opc, DL, MVT::f64, Src);
+
+    // Extract lo and hi halves from DPR via EXTRACT_SUBREG
+    SDValue DPRVal = SDValue(Conv, 0);
+    SDValue ResLo =
+        CurDAG->getTargetExtractSubreg(llvm::sub_lo, DL, MVT::i32, DPRVal);
+    SDValue ResHi =
+        CurDAG->getTargetExtractSubreg(llvm::sub_hi, DL, MVT::i32, DPRVal);
+
+    ReplaceUses(SDValue(Node, 0), ResLo);
+    ReplaceUses(SDValue(Node, 1), ResHi);
+    CurDAG->RemoveDeadNode(Node);
+    return;
+  }
+
   case V850ISD::SMUL:
   case V850ISD::UMUL: {
     // Check if one operand is a constant that fits in simm9/uimm9.

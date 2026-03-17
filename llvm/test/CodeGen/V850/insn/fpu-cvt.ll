@@ -36,14 +36,16 @@ define void @test_cvtf_wd() {
 ; CHECK-LABEL: test_cvtf_ls:
 ; CHECK: cvtf.ls
 define void @test_cvtf_ls() {
-  call void asm sideeffect "cvtf.ls r6, r7", ""()
+  ; reg2 is DPR (i64 input)
+  call void asm sideeffect "cvtf.ls d6, r7", ""()
   ret void
 }
 
 ; CHECK-LABEL: test_cvtf_ld:
 ; CHECK: cvtf.ld
 define void @test_cvtf_ld() {
-  call void asm sideeffect "cvtf.ld r6, r8", ""()
+  ; reg2 is DPR (i64 input), reg3 is dprreg (f64 output)
+  call void asm sideeffect "cvtf.ld d6, r8", ""()
   ret void
 }
 
@@ -65,14 +67,16 @@ define void @test_cvtf_dw() {
 ; CHECK-LABEL: test_cvtf_sl:
 ; CHECK: cvtf.sl
 define void @test_cvtf_sl() {
-  call void asm sideeffect "cvtf.sl r6, r8", ""()
+  ; reg3 is DPR (i64 output)
+  call void asm sideeffect "cvtf.sl r6, d8", ""()
   ret void
 }
 
 ; CHECK-LABEL: test_cvtf_dl:
 ; CHECK: cvtf.dl
 define void @test_cvtf_dl() {
-  call void asm sideeffect "cvtf.dl r6, r8", ""()
+  ; reg2 is dprreg (f64 input), reg3 is DPR (i64 output)
+  call void asm sideeffect "cvtf.dl r6, d8", ""()
   ret void
 }
 

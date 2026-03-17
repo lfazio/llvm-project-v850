@@ -252,11 +252,18 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::FTRUNC, MVT::f32, Expand);
     setOperationAction(ISD::FROUND, MVT::f32, Expand);
 
-    // Conversions
+    // Conversions - i32 <-> FP via hardware instructions
     setOperationAction(ISD::SINT_TO_FP, MVT::i32, Legal);
     setOperationAction(ISD::UINT_TO_FP, MVT::i32, Legal);
     setOperationAction(ISD::FP_TO_SINT, MVT::i32, Legal);
     setOperationAction(ISD::FP_TO_UINT, MVT::i32, Legal);
+
+    // i64 <-> FP via hardware instructions (CVTF.LS/LD/ULS/ULD, TRNCF.SL/DL/SUL/DUL)
+    // Custom lowering handles the i64 split into i32 pair + DPR register pair.
+    setOperationAction(ISD::SINT_TO_FP, MVT::i64, Custom);
+    setOperationAction(ISD::UINT_TO_FP, MVT::i64, Custom);
+    setOperationAction(ISD::FP_TO_SINT, MVT::i64, Custom);
+    setOperationAction(ISD::FP_TO_UINT, MVT::i64, Custom);
 
     // Materialize f32 constants via integer MOV/MOVHI/MOVEA in ISel
     // instead of loading from constant pool (saves 1-2 instructions).
@@ -401,6 +408,10 @@ SDValue V850TargetLowering::LowerOperation(SDValue Op,
     return LowerATOMIC_LOAD(Op, DAG);
   case ISD::ATOMIC_STORE:
     return LowerATOMIC_STORE(Op, DAG);
+  case ISD::SINT_TO_FP:
+    return LowerSINT_TO_FP_I64(Op, DAG);
+  case ISD::UINT_TO_FP:
+    return LowerUINT_TO_FP_I64(Op, DAG);
   }
 }
 
@@ -454,6 +465,14 @@ const char *V850TargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "V850ISD::FP_CMP";
   case V850ISD::FP_SELECT_CC:
     return "V850ISD::FP_SELECT_CC";
+  case V850ISD::SINT64_TO_FP:
+    return "V850ISD::SINT64_TO_FP";
+  case V850ISD::UINT64_TO_FP:
+    return "V850ISD::UINT64_TO_FP";
+  case V850ISD::FP_TO_SINT64:
+    return "V850ISD::FP_TO_SINT64";
+  case V850ISD::FP_TO_UINT64:
+    return "V850ISD::FP_TO_UINT64";
   }
   return nullptr;
 }
@@ -966,6 +985,90 @@ bool V850TargetLowering::shouldInsertFencesForAtomic(
   if (isa<LoadInst>(I) || isa<StoreInst>(I))
     return true;
   return false;
+}
+
+//===----------------------------------------------------------------------===//
+//                      i64 <-> FP Conversion Lowering
+//===----------------------------------------------------------------------===//
+
+SDValue V850TargetLowering::LowerSINT_TO_FP_I64(SDValue Op,
+                                                 SelectionDAG &DAG) const {
+  SDLoc DL(Op);
+  SDValue Src = Op.getOperand(0);
+  EVT DstVT = Op.getValueType();
+
+  // Only handle i64 source (i32 is Legal via CVTF.WS/CVTF.WD).
+  if (Src.getValueType() != MVT::i64)
+    return SDValue();
+
+  // Extract the lo and hi halves of the i64 value.
+  SDValue Lo = DAG.getNode(ISD::EXTRACT_ELEMENT, DL, MVT::i32, Src,
+                           DAG.getConstant(0, DL, MVT::i32));
+  SDValue Hi = DAG.getNode(ISD::EXTRACT_ELEMENT, DL, MVT::i32, Src,
+                           DAG.getConstant(1, DL, MVT::i32));
+
+  // Create V850ISD::SINT64_TO_FP node with (lo, hi) -> f32 or f64.
+  return DAG.getNode(V850ISD::SINT64_TO_FP, DL, DstVT, Lo, Hi);
+}
+
+SDValue V850TargetLowering::LowerUINT_TO_FP_I64(SDValue Op,
+                                                 SelectionDAG &DAG) const {
+  SDLoc DL(Op);
+  SDValue Src = Op.getOperand(0);
+  EVT DstVT = Op.getValueType();
+
+  if (Src.getValueType() != MVT::i64)
+    return SDValue();
+
+  SDValue Lo = DAG.getNode(ISD::EXTRACT_ELEMENT, DL, MVT::i32, Src,
+                           DAG.getConstant(0, DL, MVT::i32));
+  SDValue Hi = DAG.getNode(ISD::EXTRACT_ELEMENT, DL, MVT::i32, Src,
+                           DAG.getConstant(1, DL, MVT::i32));
+
+  return DAG.getNode(V850ISD::UINT64_TO_FP, DL, DstVT, Lo, Hi);
+}
+
+void V850TargetLowering::ReplaceNodeResults(
+    SDNode *N, SmallVectorImpl<SDValue> &Results, SelectionDAG &DAG) const {
+  SDLoc DL(N);
+
+  switch (N->getOpcode()) {
+  default:
+    return;
+  case ISD::FP_TO_SINT: {
+    SDValue Src = N->getOperand(0);
+    EVT DstVT = N->getValueType(0);
+    if (DstVT != MVT::i64)
+      return;
+
+    // Create V850ISD::FP_TO_SINT64 node: (f32 or f64) -> (i32_lo, i32_hi)
+    SDVTList VTs = DAG.getVTList(MVT::i32, MVT::i32);
+    SDValue Conv = DAG.getNode(V850ISD::FP_TO_SINT64, DL, VTs, Src);
+
+    // Combine into i64 via BUILD_PAIR. The type legalizer will expand this
+    // into the Lo/Hi pair for further processing.
+    SDValue Result =
+        DAG.getNode(ISD::BUILD_PAIR, DL, MVT::i64, Conv.getValue(0),
+                    Conv.getValue(1));
+    Results.push_back(Result);
+    return;
+  }
+  case ISD::FP_TO_UINT: {
+    SDValue Src = N->getOperand(0);
+    EVT DstVT = N->getValueType(0);
+    if (DstVT != MVT::i64)
+      return;
+
+    SDVTList VTs = DAG.getVTList(MVT::i32, MVT::i32);
+    SDValue Conv = DAG.getNode(V850ISD::FP_TO_UINT64, DL, VTs, Src);
+
+    SDValue Result =
+        DAG.getNode(ISD::BUILD_PAIR, DL, MVT::i64, Conv.getValue(0),
+                    Conv.getValue(1));
+    Results.push_back(Result);
+    return;
+  }
+  }
 }
 
 //===----------------------------------------------------------------------===//
