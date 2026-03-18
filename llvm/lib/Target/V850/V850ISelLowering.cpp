@@ -99,8 +99,8 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::MUL, MVT::i32, Custom);
     setOperationAction(ISD::MULHS, MVT::i32, Custom);
     setOperationAction(ISD::MULHU, MVT::i32, Custom);
-    setOperationAction(ISD::SMUL_LOHI, MVT::i32, Expand);
-    setOperationAction(ISD::UMUL_LOHI, MVT::i32, Expand);
+    setOperationAction(ISD::SMUL_LOHI, MVT::i32, Custom);
+    setOperationAction(ISD::UMUL_LOHI, MVT::i32, Custom);
   } else {
     // Base V850 has MULH (16x16 multiply) but no 32x32 MUL.
     // Use Custom to let LowerMUL detect 16-bit patterns and use MULH,
@@ -390,6 +390,9 @@ SDValue V850TargetLowering::LowerOperation(SDValue Op,
     return LowerMULHS(Op, DAG);
   case ISD::MULHU:
     return LowerMULHU(Op, DAG);
+  case ISD::SMUL_LOHI:
+  case ISD::UMUL_LOHI:
+    return LowerMUL_LOHI(Op, DAG);
   case ISD::SDIV:
   case ISD::UDIV:
   case ISD::SREM:
@@ -765,6 +768,24 @@ SDValue V850TargetLowering::LowerMULHU(SDValue Op, SelectionDAG &DAG) const {
   SDValue MulLoHi = DAG.getNode(V850ISD::UMUL, DL,
                                 DAG.getVTList(MVT::i32, MVT::i32), LHS, RHS);
   return MulLoHi.getValue(1); // Return the high 32 bits
+}
+
+SDValue V850TargetLowering::LowerMUL_LOHI(SDValue Op, SelectionDAG &DAG) const {
+  // SMUL_LOHI/UMUL_LOHI need both low and high 32 bits.
+  // Use a single MUL/MULU instruction instead of expanding to separate
+  // MUL + MULHS/MULHU which would emit two multiply instructions.
+  SDLoc DL(Op);
+  SDValue LHS = Op.getOperand(0);
+  SDValue RHS = Op.getOperand(1);
+
+  bool IsSigned = (Op.getOpcode() == ISD::SMUL_LOHI);
+  unsigned MulOpc = IsSigned ? V850ISD::SMUL : V850ISD::UMUL;
+
+  SDValue MulLoHi =
+      DAG.getNode(MulOpc, DL, DAG.getVTList(MVT::i32, MVT::i32), LHS, RHS);
+
+  SDValue Results[] = {MulLoHi.getValue(0), MulLoHi.getValue(1)};
+  return DAG.getMergeValues(Results, DL);
 }
 
 SDValue V850TargetLowering::LowerDivRem(SDValue Op, SelectionDAG &DAG) const {

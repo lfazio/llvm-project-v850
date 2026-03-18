@@ -140,6 +140,7 @@ public:
   SDValue LowerMUL(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerMULHS(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerMULHU(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerMUL_LOHI(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerDivRem(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerINTRINSIC_W_CHAIN(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerBR_JT(SDValue Op, SelectionDAG &DAG) const;
