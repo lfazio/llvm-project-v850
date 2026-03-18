@@ -360,6 +360,8 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
   if (STI.hasV850FPU()) {
     setTargetDAGCombine(ISD::FADD);
     setTargetDAGCombine(ISD::FSUB);
+    // fdiv 1.0, x -> RECIPF (faster than DIVF)
+    setTargetDAGCombine(ISD::FDIV);
   }
 }
 
@@ -477,6 +479,8 @@ const char *V850TargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "V850ISD::FP_TO_SINT64";
   case V850ISD::FP_TO_UINT64:
     return "V850ISD::FP_TO_UINT64";
+  case V850ISD::RECIPF:
+    return "V850ISD::RECIPF";
   }
   return nullptr;
 }
@@ -1995,6 +1999,28 @@ static SDValue performFADDFSUBCombine(SDNode *N, SelectionDAG &DAG,
   return SDValue();
 }
 
+/// performFDIVCombine - Optimize fdiv 1.0, x -> V850ISD::RECIPF
+/// RECIPF is IEEE-compliant and faster than DIVF (10 vs 14 cycles for f32,
+/// 22 vs 62 cycles for f64). This combine runs before type legalization
+/// converts the ConstantFP to a constant pool load.
+static SDValue performFDIVCombine(SDNode *N, SelectionDAG &DAG) {
+  SDValue Numerator = N->getOperand(0);
+  EVT VT = N->getValueType(0);
+
+  if (VT != MVT::f32 && VT != MVT::f64)
+    return SDValue();
+
+  // Check if numerator is constant 1.0
+  if (auto *CFP = dyn_cast<ConstantFPSDNode>(Numerator)) {
+    if (CFP->isExactlyValue(1.0)) {
+      SDLoc DL(N);
+      return DAG.getNode(V850ISD::RECIPF, DL, VT, N->getOperand(1));
+    }
+  }
+
+  return SDValue();
+}
+
 SDValue V850TargetLowering::PerformDAGCombine(SDNode *N,
                                               DAGCombinerInfo &DCI) const {
   SelectionDAG &DAG = DCI.DAG;
@@ -2013,6 +2039,8 @@ SDValue V850TargetLowering::PerformDAGCombine(SDNode *N,
   case ISD::FADD:
   case ISD::FSUB:
     return performFADDFSUBCombine(N, DAG, &Subtarget);
+  case ISD::FDIV:
+    return performFDIVCombine(N, DAG);
   }
 
   return SDValue();

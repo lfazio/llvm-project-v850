@@ -111,6 +111,11 @@ enum NodeType : unsigned {
   // FP_TO_UINT64: (f32 or f64) -> (i32_lo, i32_hi)
   // Maps to TRNCF.SUL (f32 ->) or TRNCF.DUL (f64 ->)
   FP_TO_UINT64,
+
+  // RECIPF: Floating-point reciprocal (1.0 / x)
+  // Maps to RECIPF.S (f32) or RECIPF.D (f64)
+  // Faster than DIVF: 10 vs 14 cycles (f32), 22 vs 62 cycles (f64)
+  RECIPF,
 };
 } // namespace V850ISD
 

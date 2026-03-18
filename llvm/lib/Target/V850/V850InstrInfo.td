@@ -390,6 +390,10 @@ def SDT_V850SASF
                     2, [SDTCisVT<0, i32>, SDTCisVT<1, i32>, SDTCisVT<2, i32>]>;
 def V850sasf : SDNode<"V850ISD::SASF", SDT_V850SASF, [SDNPInGlue]>;
 
+// RECIPF - Floating-point reciprocal (1.0 / x)
+def SDT_V850RECIPF : SDTypeProfile<1, 1, [SDTCisFP<0>, SDTCisSameAs<0, 1>]>;
+def V850recipf : SDNode<"V850ISD::RECIPF", SDT_V850RECIPF>;
+
 //===----------------------------------------------------------------------===//
 // Pattern fragments for instruction selection
 //===----------------------------------------------------------------------===//
@@ -2199,8 +2203,9 @@ let Predicates = [HasV850FPU] in {
   // RECIPF.S reg2, reg3 - Single-precision floating-point reciprocal
   // reg3 = 1 / reg2
   // Encoding: rrrrr111111 00001 wwwww1000101110 0
+  // RECIPF.S is IEEE-compliant and faster than DIVF.S (10 vs 14 cycles).
   let Defs = [FPSR] in def RECIPFS
-      : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2),
+      : V850Inst32<(outs FPR:$reg3), (ins FPR:$reg2),
                    "recipf.s\t$reg2, $reg3", []> {
     bits<5> reg2;
     bits<5> reg3;
@@ -2220,7 +2225,7 @@ let Predicates = [HasV850FPU] in {
   // reg3 = 1 / sqrt(reg2)
   // Encoding: rrrrr111111 00010 wwwww1000101110 0
   let Defs = [FPSR] in def RSQRTFS
-      : V850Inst32<(outs GPR:$reg3), (ins GPR:$reg2),
+      : V850Inst32<(outs FPR:$reg3), (ins FPR:$reg2),
                    "rsqrtf.s\t$reg2, $reg3", []> {
     bits<5> reg2;
     bits<5> reg3;
@@ -2442,6 +2447,7 @@ let Predicates = [HasV850FPU] in {
 
   // RECIPF.D reg2, reg3 - Double-precision floating-point reciprocal
   // reg3 = 1 / reg2
+  // RECIPF.D is IEEE-compliant and faster than DIVF.D (22 vs 62 cycles).
   let Defs = [FPSR] in def RECIPFD
       : V850Inst32<(outs dprreg:$reg3), (ins dprreg:$reg2),
                    "recipf.d\t$reg2, $reg3", []> {
@@ -2951,6 +2957,12 @@ let Predicates = [HasV850FPU] in {
   def : Pat<(fsub(f64 DPR:$r2), (f64 DPR:$r1)), (SUBFD DPR:$r2, DPR:$r1)>;
   def : Pat<(fmul(f64 DPR:$r2), (f64 DPR:$r1)), (MULFD DPR:$r2, DPR:$r1)>;
   def : Pat<(fdiv(f64 DPR:$r2), (f64 DPR:$r1)), (DIVFD DPR:$r2, DPR:$r1)>;
+
+  // RECIPF: V850ISD::RECIPF → RECIPFS/RECIPFD
+  // (fdiv 1.0, x) is combined to V850ISD::RECIPF in DAGCombine
+  def : Pat<(V850recipf FPR:$r2), (RECIPFS FPR:$r2)>;
+  def : Pat<(V850recipf (f64 DPR:$r2)), (RECIPFD DPR:$r2)>;
+
   def : Pat<(fabs(f64 DPR:$r2)), (ABSFD DPR:$r2)>;
   def : Pat<(fneg(f64 DPR:$r2)), (NEGFD DPR:$r2)>;
   def : Pat<(fsqrt(f64 DPR:$r2)), (SQRTFD DPR:$r2)>;
