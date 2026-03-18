@@ -291,6 +291,9 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::FMINNUM, MVT::f64, Legal);
     setOperationAction(ISD::FMAXNUM, MVT::f64, Legal);
 
+    // No MADDF.D instruction exists — expand f64 FMA to fmul+fadd
+    setOperationAction(ISD::FMA, MVT::f64, Expand);
+
     // f32 <-> f64 conversions - Legal via CVTF.DS / CVTF.SD
     setOperationAction(ISD::FP_EXTEND, MVT::f64, Legal);
     setOperationAction(ISD::FP_ROUND, MVT::f32, Legal);
