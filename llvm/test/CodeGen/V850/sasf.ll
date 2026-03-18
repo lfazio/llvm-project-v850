@@ -19,10 +19,11 @@
 ; CHECK-LABEL: test_sasf_gt:
 ; CHECK:       cmp r7, r6
 ; CHECK-NEXT:  sasf gt, r8
-; For base V850 (no SASF), should use setf/shl/or sequence
+; For base V850 (no SASF), should use setf/add/or sequence
+; (shl 1 is optimized to add reg, reg)
 ; CHECK-NOSAS-LABEL: test_sasf_gt:
 ; CHECK-NOSAS:       setf gt
-; CHECK-NOSAS:       shl 1
+; CHECK-NOSAS:       add r8, r8
 ; CHECK-NOSAS:       or
 define i32 @test_sasf_gt(i32 %a, i32 %b, i32 %x) {
 entry:

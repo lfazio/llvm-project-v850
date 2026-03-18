@@ -671,6 +671,10 @@ let Constraints = "$rs = $reg2",
           0b010110, (outs GPR:$reg2), (ins GPR:$rs, uimm5:$imm5),
           "shl\t$imm5, $reg2", [(set GPR:$reg2, (shl GPR:$rs, uimm5:$imm5))]>;
 
+// Optimize: shl x, 1 → add x, x (1 cycle vs 3 cycles for SHL)
+let AddedComplexity = 1 in
+def : Pat<(shl GPR:$rs, (i32 1)), (ADD GPR:$rs, GPR:$rs)>;
+
 // MULH imm5, reg2 - Multiply halfword with immediate
 // Opcode: 010111 (0x17)
 let Constraints = "$rs = $reg2" in def MULHi
