@@ -116,6 +116,12 @@ enum NodeType : unsigned {
   // Maps to RECIPF.S (f32) or RECIPF.D (f64)
   // Faster than DIVF: 10 vs 14 cycles (f32), 22 vs 62 cycles (f64)
   RECIPF,
+
+  // ADF: Conditional add (V850E2+)
+  // reg3 = reg2 + reg1 + (cond ? 1 : 0)
+  // Used to optimize count += (a > b) ? 1 : 0 patterns
+  // Operands: (condcode, reg1, reg2, glue) → result
+  ADF,
 };
 } // namespace V850ISD
 

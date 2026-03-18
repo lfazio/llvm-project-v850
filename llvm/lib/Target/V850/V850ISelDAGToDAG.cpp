@@ -564,6 +564,26 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
     return;
   }
 
+  case V850ISD::ADF: {
+    // V850ISD::ADF condcode, reg1, reg2, glue → reg3
+    // ADF cccc, reg1, reg2, reg3: reg3 = reg2 + reg1 + (cond ? 1 : 0)
+    ConstantSDNode *CCNode = cast<ConstantSDNode>(Node->getOperand(0));
+    unsigned V850CC = CCNode->getZExtValue();
+    SDValue Reg1 = Node->getOperand(1);
+    SDValue Reg2 = Node->getOperand(2);
+    SDValue Glue = Node->getOperand(3);
+
+    SDValue CondVal = CurDAG->getTargetConstant(V850CC, DL, MVT::i32);
+
+    // ADF instruction: adf cond, reg1, reg2, reg3
+    // Operand order: (cond, reg1, reg2, glue)
+    SDValue Ops[] = {CondVal, Reg1, Reg2, Glue};
+    SDNode *AdfNode =
+        CurDAG->getMachineNode(V850::ADF, DL, MVT::i32, MVT::Glue, Ops);
+    ReplaceNode(Node, AdfNode);
+    return;
+  }
+
   case V850ISD::CALL: {
     // V850ISD::CALL chain, callee, [reg args...], regmask, [glue]
     SDValue Chain = Node->getOperand(0);
@@ -696,8 +716,8 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
     SDValue RegClass =
         CurDAG->getTargetConstant(V850::DPRRegClassID, DL, MVT::i32);
     SDValue Ops[] = {RegClass, Lo, SubLoIdx, Hi, SubHiIdx};
-    SDNode *Pair = CurDAG->getMachineNode(TargetOpcode::REG_SEQUENCE, DL,
-                                          MVT::f64, Ops);
+    SDNode *Pair =
+        CurDAG->getMachineNode(TargetOpcode::REG_SEQUENCE, DL, MVT::f64, Ops);
 
     // Select instruction based on signedness and destination type
     unsigned Opc;
@@ -706,8 +726,7 @@ void V850DAGToDAGISel::Select(SDNode *Node) {
     else
       Opc = (DstVT == MVT::f64) ? V850::CVTFULD : V850::CVTFULS;
 
-    SDNode *Conv =
-        CurDAG->getMachineNode(Opc, DL, DstVT, SDValue(Pair, 0));
+    SDNode *Conv = CurDAG->getMachineNode(Opc, DL, DstVT, SDValue(Pair, 0));
     ReplaceNode(Node, Conv);
     return;
   }

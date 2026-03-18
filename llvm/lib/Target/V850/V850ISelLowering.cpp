@@ -481,6 +481,8 @@ const char *V850TargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "V850ISD::FP_TO_UINT64";
   case V850ISD::RECIPF:
     return "V850ISD::RECIPF";
+  case V850ISD::ADF:
+    return "V850ISD::ADF";
   }
   return nullptr;
 }
@@ -1602,8 +1604,9 @@ static SDValue performADDECombine(SDNode *N, SelectionDAG &DAG,
 ///   sum_hi = add partial_hi, carry
 ///
 /// We look for the final add (sum_hi = add partial_hi, carry) and trace back.
-static SDValue performADDCombine(SDNode *N, SelectionDAG &DAG,
-                                 const V850Subtarget &Subtarget) {
+/// performADDCombine_MAC - Try to combine add chain into MAC/MACU.
+static SDValue performADDCombine_MAC(SDNode *N, SelectionDAG &DAG,
+                                     const V850Subtarget &Subtarget) {
   // Only V850E2M and later have MAC/MACU
   if (!Subtarget.hasV850E2M())
     return SDValue();
@@ -1717,6 +1720,95 @@ static SDValue performADDCombine(SDNode *N, SelectionDAG &DAG,
 
   // Return high part for this ADD node
   return Mac.getValue(1);
+}
+
+// Forward declaration - defined below after getV850CondCode
+static unsigned getV850CondCodeValue(ISD::CondCode CC);
+
+/// performADDCombine_ADF - Combine (add acc, (zext (setcc lhs, rhs, cc)))
+/// into CMP + ADF instruction.
+///
+/// Pattern: count += (a > b) ? 1 : 0
+///   setf gt, tmp     ; tmp = (gt ? 1 : 0)
+///   add tmp, count   ; count += tmp
+/// Becomes:
+///   cmp a, b
+///   adf gt, r0, count, count  ; count = count + 0 + (gt ? 1 : 0)
+///
+/// ADF cccc, reg1, reg2, reg3 → reg3 = reg2 + reg1 + (cond ? 1 : 0)
+/// With reg1=r0: reg3 = reg2 + (cond ? 1 : 0), i.e. conditional increment.
+static SDValue performADDCombine_ADF(SDNode *N, SelectionDAG &DAG,
+                                     const V850Subtarget &Subtarget) {
+  // ADF requires V850E2 or later
+  if (!Subtarget.hasV850E2())
+    return SDValue();
+
+  SDLoc DL(N);
+  SDValue LHS = N->getOperand(0);
+  SDValue RHS = N->getOperand(1);
+
+  // Find which operand is the condition (zext of setcc) and which is the
+  // accumulator
+  SDValue Acc, CondOp;
+  if (LHS.getOpcode() == ISD::ZERO_EXTEND &&
+      LHS.getOperand(0).getOpcode() == ISD::SETCC) {
+    CondOp = LHS.getOperand(0);
+    Acc = RHS;
+  } else if (RHS.getOpcode() == ISD::ZERO_EXTEND &&
+             RHS.getOperand(0).getOpcode() == ISD::SETCC) {
+    CondOp = RHS.getOperand(0);
+    Acc = LHS;
+  } else if (LHS.getOpcode() == ISD::SETCC) {
+    CondOp = LHS;
+    Acc = RHS;
+  } else if (RHS.getOpcode() == ISD::SETCC) {
+    CondOp = RHS;
+    Acc = LHS;
+  } else {
+    return SDValue();
+  }
+
+  // Only handle i32 adds
+  if (N->getValueType(0) != MVT::i32)
+    return SDValue();
+
+  // Extract comparison operands and condition code
+  SDValue CmpLHS = CondOp.getOperand(0);
+  SDValue CmpRHS = CondOp.getOperand(1);
+  ISD::CondCode CC = cast<CondCodeSDNode>(CondOp.getOperand(2))->get();
+
+  // Only handle integer comparisons
+  if (CmpLHS.getValueType() != MVT::i32)
+    return SDValue();
+
+  // Convert ISD condition code to V850 condition code
+  unsigned V850CC = getV850CondCodeValue(CC);
+  if (V850CC == ~0U)
+    return SDValue();
+
+  // Emit CMP instruction which produces Glue with PSW flags
+  SDValue Cmp = DAG.getNode(V850ISD::CMP, DL, MVT::Glue, CmpLHS, CmpRHS);
+
+  // ADF cccc, reg1, reg2, reg3 → reg3 = reg2 + reg1 + (cond ? 1 : 0)
+  // With reg1 = r0 (zero): reg3 = acc + 0 + (cond ? 1 : 0) = acc + cond
+  SDValue Zero = DAG.getRegister(V850::R0, MVT::i32);
+  SDValue CCVal = DAG.getConstant(V850CC, DL, MVT::i32);
+  // ADF operands: (cond, reg1, reg2, glue) -> reg3
+  SDValue AdfOps[] = {CCVal, Zero, Acc, Cmp};
+  return DAG.getNode(V850ISD::ADF, DL, MVT::i32, AdfOps);
+}
+
+static SDValue performADDCombine(SDNode *N, SelectionDAG &DAG,
+                                 const V850Subtarget &Subtarget) {
+  // Try MAC/MACU combine first (requires V850E2M)
+  if (SDValue Mac = performADDCombine_MAC(N, DAG, Subtarget))
+    return Mac;
+
+  // Try ADF conditional counting (requires V850E2)
+  if (SDValue Adf = performADDCombine_ADF(N, DAG, Subtarget))
+    return Adf;
+
+  return SDValue();
 }
 
 /// Convert V850 condition code enum to ISD condition code
