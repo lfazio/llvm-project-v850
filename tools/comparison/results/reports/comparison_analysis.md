@@ -197,20 +197,20 @@
 
 | # | Issue | Impact | Benchmark | Fix |
 |---|-------|--------|-----------|-----|
-| 4 | **Over-aggressive loop unrolling** | 2-5x bloat on small loops | control_flow, kernels | Tune `UnrollingPreferences` in TTI |
+| 4 | ~~Over-aggressive loop unrolling~~ | 2-5x bloat on small loops | control_flow, kernels | **Fixed**: Tuned `UnrollingPreferences` in TTI |
 | 5 | **Constant rematerialization in loops** | 20-30% bloat in crypto/DSP | crypto, dsp | Better LICM/constant hoisting |
-| 6 | **ADDI not used for small imm + dest reg** | 2 bytes per occurrence | arithmetic | Pattern: `add imm, src; mov src, dst` → `addi imm, src, dst` |
-| 7 | **mul_u32_to_u64 emits redundant MUL** | +2 bytes | arithmetic | Only emit MULU for unsigned widening |
+| 6 | **ADDI not used for small imm + dest reg** | 2 bytes per occurrence | arithmetic | Low value: ADD imm5(2B)+MOV(2B) = same size as ADDI(4B) |
+| 7 | ~~mul_u32_to_u64 emits redundant MUL~~ | +2 bytes | arithmetic | **Fixed**: Custom SMUL_LOHI/UMUL_LOHI lowering to single MUL/MULU |
 
 ### Tier 3 — Medium Impact (Performance)
 
 | # | Issue | Impact | Benchmark | Fix |
 |---|-------|--------|-----------|-----|
-| 8 | **SHL 1 not converted to ADD** | 1 extra cycle per shift-by-1 | bitwise | Peephole: `shl 1, r` → `add r, r` |
-| 9 | **FP comparison TRFSR overhead** | +1 insn per FP compare | float_ops, double_ops | Combine CMPF+TRFSR pattern |
-| 10 | **ADF not used for conditional counting** | +1 insn per count | control_flow | Pattern: `setf cc; add` → `adf cc` |
-| 11 | **Branch vs CMOV for chained conditionals** | 2x insn on clamp patterns | control_flow | Better if-conversion heuristics |
-| 12 | **RECIPF.D not used with -ffast-math** | 5 insn vs 1 | double_ops | Add RECIPF pattern under fast-math |
+| 8 | ~~SHL 1 not converted to ADD~~ | 1 extra cycle per shift-by-1 | bitwise | **Fixed**: ISel pattern `(shl x, 1)` → `(ADD x, x)` |
+| 9 | **FP comparison TRFSR overhead** | +1 insn per FP compare | float_ops, double_ops | Hardware limitation: CMPF→TRFSR required for PSW. CMOVF already avoids TRFSR for SELECT_CC. |
+| 10 | ~~ADF not used for conditional counting~~ | +1 insn per count | control_flow | **Fixed**: DAGCombine `(add acc, (zext (setcc)))` → CMP + ADF |
+| 11 | ~~Branch vs CMOV for chained conditionals~~ | 2x insn on clamp patterns | control_flow | **Not a bug**: LLVM's CMOV approach already produces smaller code (14B vs 18B) |
+| 12 | ~~RECIPF.D not used~~ | 5 insn vs 1 | double_ops | **Fixed**: DAGCombine `(fdiv 1.0, x)` → V850ISD::RECIPF (IEEE-compliant, no fast-math needed) |
 
 ### Tier 4 — Future / Low Priority
 

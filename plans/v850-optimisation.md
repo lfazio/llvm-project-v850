@@ -397,6 +397,64 @@ ISD::SSUBSAT → SATSUB (2-operand) or SATSUB_3 (3-operand)
 
 ---
 
+### 2.13 ADF Conditional Counting [IMPLEMENTED]
+
+**File:** `llvm/lib/Target/V850/V850ISelLowering.cpp`
+
+**Description:** Use ADF instruction for conditional counting patterns.
+
+**Pattern:**
+```c
+// Before:
+setf gt, tmp     ; tmp = (gt ? 1 : 0)
+add tmp, count   ; count += tmp
+
+// After:
+cmp a, b
+adf gt, r0, count, count  ; count = count + 0 + (gt ? 1 : 0)
+```
+
+**Implementation:**
+- DAG combine in `performADDCombine_ADF()` matches `(add acc, (zext (setcc lhs, rhs, cc)))`
+- Converts to `V850ISD::CMP` + `V850ISD::ADF` nodes
+- Custom instruction selection emits `CMP` + `ADF cc, r0, acc, result`
+- Supports all standard comparison conditions
+- V850ISD::ADF node type added with custom ISel in V850ISelDAGToDAG.cpp
+
+**Requirements:** V850E2 or later
+
+**Status:** Implemented with tests in `llvm/test/CodeGen/V850/adf-conditional-count.ll`
+
+---
+
+### 2.14 RECIPF Floating-Point Reciprocal [IMPLEMENTED]
+
+**File:** `llvm/lib/Target/V850/V850ISelLowering.cpp`
+
+**Description:** Use RECIPF.S/D for `fdiv 1.0, x` patterns.
+
+**Pattern:**
+```c
+// Before (DIVF):
+movhi/movea 1.0 → r11    ; materialize constant
+divf.s r6, r11, r10      ; 14 cycles (f32), 62 cycles (f64)
+
+// After (RECIPF):
+recipf.s r6, r10          ; 10 cycles (f32), 22 cycles (f64)
+```
+
+**Implementation:**
+- DAG combine in `performFDIVCombine()` matches `(fdiv ConstantFP(1.0), x)`
+- Converts to `V850ISD::RECIPF` custom node (runs before type legalization)
+- ISel patterns match `V850ISD::RECIPF` → `RECIPFS`/`RECIPFD`
+- IEEE-compliant: no fast-math flags required
+
+**Requirements:** V850E2M+ with FPU
+
+**Status:** Implemented with tests in `llvm/test/CodeGen/V850/fpu/recipf.ll`
+
+---
+
 ## 3. Frame Optimization
 
 ### 3.1 PREPARE/DISPOSE [IMPLEMENTED]
@@ -1105,6 +1163,11 @@ varargs_receiver:
 20. ~~Atomic Load/Store/Fence (1.4)~~ - DONE (custom lowering, shouldInsertFencesForAtomic, SYNCP fences)
 21. ~~RH850G3M Scheduling (4.4)~~ - DONE (faster div/FPU, branch prediction, G3M-specific instructions)
 22. ~~f64 CodeGen — DPR register class, ISel patterns, calling convention~~ - DONE (ADDFD/SUBFD/etc., CMOV_F64 pseudo, D6/D8/D10 ABI)
+23. ~~SHL-by-1 → ADD (2.8b)~~ - DONE (ISel pattern `(shl x, 1)` → `(ADD x, x)`, 1 cycle vs 3 cycles)
+24. ~~SMUL_LOHI/UMUL_LOHI (2.2b)~~ - DONE (Custom lowering to single MUL/MULU, avoids redundant multiply)
+25. ~~RECIPF Reciprocal (2.14)~~ - DONE (DAGCombine `fdiv 1.0, x` → RECIPF.S/D, IEEE-compliant)
+26. ~~ADF Conditional Counting (2.13)~~ - DONE (DAGCombine `add acc, (zext setcc)` → CMP + ADF)
+27. ~~Selective Loop Unrolling (6.1b)~~ - DONE (TTI UnrollingPreferences tuned for V850)
 
 ### High Priority (Next Phase)
 - None currently queued
