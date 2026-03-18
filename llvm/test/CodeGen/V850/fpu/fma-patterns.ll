@@ -110,4 +110,27 @@ define float @test_no_contract(float %a, float %b, float %c) {
   ret float %add
 }
 
+;===----------------------------------------------------------------------===;
+; FMULADD - lowered to MADDF.S via isFMAFasterThanFMulAndFAdd
+; This tests the -ffp-contract=on path where Clang emits llvm.fmuladd
+;===----------------------------------------------------------------------===;
+
+; CHECK-LABEL: test_fmuladd:
+; CHECK:       maddf.s r{{[0-9]+}}, r{{[0-9]+}}, r{{[0-9]+}}, r10
+; CHECK-NEXT:  jmp [r31]
+define float @test_fmuladd(float %a, float %b, float %c) {
+  %r = call float @llvm.fmuladd.f32(float %a, float %b, float %c)
+  ret float %r
+}
+
+; CHECK-LABEL: test_fmuladd_sub:
+; CHECK:       msubf.s r{{[0-9]+}}, r{{[0-9]+}}, r{{[0-9]+}}, r10
+; CHECK-NEXT:  jmp [r31]
+define float @test_fmuladd_sub(float %a, float %b, float %c) {
+  %nc = fneg float %c
+  %r = call float @llvm.fmuladd.f32(float %a, float %b, float %nc)
+  ret float %r
+}
+
 declare float @llvm.fma.f32(float, float, float)
+declare float @llvm.fmuladd.f32(float, float, float)

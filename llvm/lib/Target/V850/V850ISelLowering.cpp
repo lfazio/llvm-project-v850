@@ -258,8 +258,9 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::FP_TO_SINT, MVT::i32, Legal);
     setOperationAction(ISD::FP_TO_UINT, MVT::i32, Legal);
 
-    // i64 <-> FP via hardware instructions (CVTF.LS/LD/ULS/ULD, TRNCF.SL/DL/SUL/DUL)
-    // Custom lowering handles the i64 split into i32 pair + DPR register pair.
+    // i64 <-> FP via hardware instructions (CVTF.LS/LD/ULS/ULD,
+    // TRNCF.SL/DL/SUL/DUL) Custom lowering handles the i64 split into i32 pair
+    // + DPR register pair.
     setOperationAction(ISD::SINT_TO_FP, MVT::i64, Custom);
     setOperationAction(ISD::UINT_TO_FP, MVT::i64, Custom);
     setOperationAction(ISD::FP_TO_SINT, MVT::i64, Custom);
@@ -992,7 +993,7 @@ bool V850TargetLowering::shouldInsertFencesForAtomic(
 //===----------------------------------------------------------------------===//
 
 SDValue V850TargetLowering::LowerSINT_TO_FP_I64(SDValue Op,
-                                                 SelectionDAG &DAG) const {
+                                                SelectionDAG &DAG) const {
   SDLoc DL(Op);
   SDValue Src = Op.getOperand(0);
   EVT DstVT = Op.getValueType();
@@ -1012,7 +1013,7 @@ SDValue V850TargetLowering::LowerSINT_TO_FP_I64(SDValue Op,
 }
 
 SDValue V850TargetLowering::LowerUINT_TO_FP_I64(SDValue Op,
-                                                 SelectionDAG &DAG) const {
+                                                SelectionDAG &DAG) const {
   SDLoc DL(Op);
   SDValue Src = Op.getOperand(0);
   EVT DstVT = Op.getValueType();
@@ -1028,8 +1029,9 @@ SDValue V850TargetLowering::LowerUINT_TO_FP_I64(SDValue Op,
   return DAG.getNode(V850ISD::UINT64_TO_FP, DL, DstVT, Lo, Hi);
 }
 
-void V850TargetLowering::ReplaceNodeResults(
-    SDNode *N, SmallVectorImpl<SDValue> &Results, SelectionDAG &DAG) const {
+void V850TargetLowering::ReplaceNodeResults(SDNode *N,
+                                            SmallVectorImpl<SDValue> &Results,
+                                            SelectionDAG &DAG) const {
   SDLoc DL(N);
 
   switch (N->getOpcode()) {
@@ -1047,9 +1049,8 @@ void V850TargetLowering::ReplaceNodeResults(
 
     // Combine into i64 via BUILD_PAIR. The type legalizer will expand this
     // into the Lo/Hi pair for further processing.
-    SDValue Result =
-        DAG.getNode(ISD::BUILD_PAIR, DL, MVT::i64, Conv.getValue(0),
-                    Conv.getValue(1));
+    SDValue Result = DAG.getNode(ISD::BUILD_PAIR, DL, MVT::i64,
+                                 Conv.getValue(0), Conv.getValue(1));
     Results.push_back(Result);
     return;
   }
@@ -1062,9 +1063,8 @@ void V850TargetLowering::ReplaceNodeResults(
     SDVTList VTs = DAG.getVTList(MVT::i32, MVT::i32);
     SDValue Conv = DAG.getNode(V850ISD::FP_TO_UINT64, DL, VTs, Src);
 
-    SDValue Result =
-        DAG.getNode(ISD::BUILD_PAIR, DL, MVT::i64, Conv.getValue(0),
-                    Conv.getValue(1));
+    SDValue Result = DAG.getNode(ISD::BUILD_PAIR, DL, MVT::i64,
+                                 Conv.getValue(0), Conv.getValue(1));
     Results.push_back(Result);
     return;
   }
@@ -1835,6 +1835,25 @@ static SDValue performORCombine(SDNode *N, SelectionDAG &DAG,
   // The SASF consumes the glue from CMP to use PSW flags
   SDValue CCVal = DAG.getConstant(V850CC, DL, MVT::i32);
   return DAG.getNode(V850ISD::SASF, DL, MVT::i32, ShiftInput, CCVal, Cmp);
+}
+
+bool V850TargetLowering::isFMAFasterThanFMulAndFAdd(const MachineFunction &MF,
+                                                    EVT VT) const {
+  EVT SVT = VT.getScalarType();
+
+  if (!SVT.isSimple())
+    return false;
+
+  switch (SVT.getSimpleVT().SimpleTy) {
+  case MVT::f32:
+    // V850E2M+ has MADDF.S / MSUBF.S / NMADDF.S / NMSUBF.S
+    return Subtarget.hasV850FPU();
+  default:
+    break;
+  }
+
+  // V850 has no f64 FMA instruction (MADDF.D does not exist)
+  return false;
 }
 
 bool V850TargetLowering::getPostIndexedAddressParts(SDNode *N, SDNode *Op,

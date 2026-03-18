@@ -186,6 +186,13 @@ public:
                               AtomicOrdering Ord) const override;
   void emitAtomicCmpXchgNoStoreLLBalance(IRBuilderBase &Builder) const override;
 
+  /// isFMAFasterThanFMulAndFAdd - Return true if an FMA operation is faster
+  /// than a pair of fmul and fadd instructions. fmuladd intrinsics will be
+  /// expanded to FMAs when this method returns true, otherwise fmuladd is
+  /// expanded to fmul + fadd.
+  bool isFMAFasterThanFMulAndFAdd(const MachineFunction &MF,
+                                  EVT VT) const override;
+
   // Post-indexed addressing support (RH850G4MH+)
   bool getPostIndexedAddressParts(SDNode *N, SDNode *Op, SDValue &Base,
                                   SDValue &Offset, ISD::MemIndexedMode &AM,
