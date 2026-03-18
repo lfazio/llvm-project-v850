@@ -116,7 +116,15 @@ void V850TTIImpl::getUnrollingPreferences(
 
   UP.Partial = true;
   UP.Runtime = true;
-  UP.UnrollRemainder = true;
+  UP.UnrollRemainder = false;
+
+  // Limit unroll count to 4. V850 has 32 GPRs but 12 are callee-saved
+  // (r20-r31), leaving ~19 volatile registers. An unroll-by-8 of a typical
+  // 3-operand loop body (2 loads + op + store) exceeds this budget and
+  // causes excessive spilling. Unroll-by-4 matches V850E2M dual-issue
+  // pipeline depth and available register pressure.
+  UP.Count = 4;
+  UP.MaxCount = 4;
 
   // Force unrolling very small loops to eliminate branch overhead.
   if (Cost < 12)

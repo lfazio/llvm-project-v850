@@ -216,9 +216,9 @@
 
 | # | Issue | Impact | Benchmark | Fix |
 |---|-------|--------|-----------|-----|
-| 13 | **FXU CodeGen** | 4x improvement potential | fxu_vector | Implement FXU ISel patterns |
-| 14 | **CLZ/CTZ expansion** | 33% larger | bitwise | Study CCRH's more compact expansion |
-| 15 | **Short branch forms** | 2 bytes per branch | all | Use bnz9/bz9 when displacement fits |
+| 13 | ~~FXU CodeGen~~ | ~~4x improvement potential~~ | fxu_vector | **Root cause was loop over-unrolling (8x vs CCRH 4x), not missing FXU ISel. Fixed**: TTI `MaxCount=4`, `UnrollRemainder=false`. CCRH also uses scalar code, not FXU. fxu_vector: 5449→2897 lines (47% reduction). |
+| 14 | **CLZ/CTZ expansion** | 33% larger | bitwise | Only affects base V850 (no SCH instructions). V850E2+ uses hardware SCH1L/SCH1R. Not applicable to G4MH comparison. |
+| 15 | ~~Short branch forms~~ | ~~2 bytes per branch~~ | all | **Not a real issue**: V850 Bcond already uses 16-bit instructions. Branch relaxation handles out-of-range cases. |
 
 ---
 

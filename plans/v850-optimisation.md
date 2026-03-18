@@ -770,6 +770,31 @@ return_float_const:
 
 ---
 
+### 6.1b Loop Unrolling Constraint [IMPLEMENTED]
+
+**File:** `llvm/lib/Target/V850/V850TargetTransformInfo.cpp`
+
+**Description:** Constrains the loop unroller to prevent excessive code bloat on V850.
+
+**Implementation Details:**
+- `UP.MaxCount = 4` — Hard limit on unroll factor. V850 has 32 GPRs but 12 are
+  callee-saved (r20-r31), leaving ~19 volatile registers. 8x unrolling causes
+  register pressure and spilling; 4x matches CCRH's strategy and the V850E2M
+  dual-issue pipeline depth.
+- `UP.UnrollRemainder = false` — Remainder iterations use a scalar loop instead
+  of being fully unrolled. Saves code size vs 3 copies of the loop body.
+- `UP.OptSizeThreshold = 0` — Disables unrolling entirely for `-Os`/`-Oz`.
+- `UP.Force = true` for `Cost < 12` — Very small loops are force-unrolled to
+  eliminate branch overhead.
+
+**Impact:** fxu_vector benchmark: 5449 → 2897 lines (47% reduction). CCRH generates 2162 lines.
+
+**Test:** `llvm/test/CodeGen/V850/loop-unroll-limit.ll`
+
+**Status:** Fully implemented
+
+---
+
 ### 6.2 Post-Increment Addressing [HARDWARE LIMITATION]
 
 **Description:** Use post-increment load/store where available.
@@ -1167,7 +1192,7 @@ varargs_receiver:
 24. ~~SMUL_LOHI/UMUL_LOHI (2.2b)~~ - DONE (Custom lowering to single MUL/MULU, avoids redundant multiply)
 25. ~~RECIPF Reciprocal (2.14)~~ - DONE (DAGCombine `fdiv 1.0, x` → RECIPF.S/D, IEEE-compliant)
 26. ~~ADF Conditional Counting (2.13)~~ - DONE (DAGCombine `add acc, (zext setcc)` → CMP + ADF)
-27. ~~Selective Loop Unrolling (6.1b)~~ - DONE (TTI UnrollingPreferences tuned for V850)
+27. ~~Selective Loop Unrolling (6.1b)~~ - DONE (TTI UnrollingPreferences: MaxCount=4, UnrollRemainder=false — reduced fxu_vector 5449→2897 lines)
 
 ### High Priority (Next Phase)
 - None currently queued
