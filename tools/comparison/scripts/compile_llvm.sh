@@ -97,7 +97,7 @@ fi
 
 # Common flags
 COMMON_FLAGS="-target v850-unknown-elf -mcpu=$CPU $OPT_LEVEL"
-COMMON_FLAGS="$COMMON_FLAGS -fno-builtin -ffreestanding"
+COMMON_FLAGS="$COMMON_FLAGS -ffreestanding -fno-math-errno"
 COMMON_FLAGS="$COMMON_FLAGS -Wall -Wextra"
 COMMON_FLAGS="$COMMON_FLAGS $EXTRA_FLAGS"
 

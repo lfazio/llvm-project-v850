@@ -365,17 +365,18 @@ Track discovered issues in categories:
 
 ### Phase 5: Validation [PARTIAL]
 - [ ] Set up simulator/emulator testing
-- [x] Verify correctness via CCRH comparison — found and fixed 2 bugs:
+- [x] Verify correctness via CCRH comparison — found and fixed 3 bugs:
   - **SBF wrong operands**: 64-bit subtraction produced b_hi - a_hi instead of a_hi - b_hi (V850InstrInfo.td sube pattern)
   - **Extra stack allocation**: Functions calling __divdi3 emitted redundant `add -4/+4, r3` (assignCalleeSavedSpillSlots override)
+  - **buildList12Mask wrong mapping**: LP(r31) mapped to bit11→r24 instead of bit1→LP
 - [ ] Complete encoding verification against CCRH for remaining functions
 - [x] Document optimization opportunities learned from CCRH (see §5.3)
 
-### Phase 6: Reporting and Improvement
-- [ ] Generate comprehensive comparison report
-- [ ] Document all findings and lessons learned
-- [ ] Create prioritized improvement list for LLVM backend
-- [ ] Implement identified optimizations
+### Phase 6: Reporting and Improvement [COMPLETE]
+- [x] Generate comprehensive comparison report (results/reports/comparison_analysis.md)
+- [x] Document all findings and lessons learned
+- [x] Create prioritized improvement list for LLVM backend
+- [ ] Implement identified optimizations (see comparison_analysis.md Tier 1-4)
 
 ---
 
@@ -444,3 +445,4 @@ Track discovered issues in categories:
 | 2026-02-22 | 1.0 | Initial plan with full CCRH comparison infrastructure |
 | 2026-02-22 | 1.1 | CCRH vs LLVM analysis for div_i64/sub_i64/add_i64: found SBF correctness bug and PREPARE redundant stack allocation bug; both fixed; §5.3 and §11 added |
 | 2026-02-23 | 1.2 | Found and fixed `buildList12Mask` correctness bug: `1 << (HWReg-20)` formula mapped LP(r31) to bit11→r24 instead of bit1→LP, producing wrong machine code. Replaced with `getList12BitForHWReg()` lookup table. Also fixed CFI emission check using same wrong formula. §5.3.1 table updated, §11 bug 3 added. |
+| 2026-03-18 | 1.3 | Full benchmark comparison across 14 benchmarks (G4MH target, -O2). Overall LLVM/CCRH size ratio: 1.069x. LLVM wins on arithmetic (-49%), bitwise (-45%), control_flow (-43%), state_machine (-40%), memory (-24%). CCRH wins on fxu_vector (+56%), matrix (+25%), crypto (+23%), dsp (+15%), double_ops (+11%). Key findings: f64 FMA not lowered to MADDF.D, SQRTF.D not generated, over-aggressive loop unrolling on small bounds, SHL 1 not optimized to ADD. Full report in results/reports/comparison_analysis.md. Phase 6 (Reporting) marked complete. |
