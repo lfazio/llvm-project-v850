@@ -60,15 +60,16 @@ holding 4 × single-precision floats. FXU requires PSW.CU1 coprocessor enable bi
 
 ### Features to Implement
 
-| Category | Priority | Effort | Items |
-|----------|----------|--------|-------|
-| **Infrastructure** | High | Low | Subtarget features, processor models, Clang macros |
-| **Post-Increment Load/Store** | High | Medium | 16 instructions (LD.B/H/W/BU/HU + ST.B/H/W with [reg1]+/-) |
-| **CLIP Instructions** | Medium | Low | CLIP.B, CLIP.BU, CLIP.H, CLIP.HU (4 instructions) |
-| **MPU Load/Store** | Low | Low | LDM.MP, STM.MP (2 instructions, G4MH2 only) |
-| **FXU SIMD** | Low | High | 59 vector instructions, new register class |
-| **Virtualization** | Low | Medium | HVTRAP, LDM.GSR, STM.GSR (G4MH2 only) |
-| **G4MH Scheduling** | Low | Medium | New scheduling model with FXU latencies |
+| Category | Priority | Effort | Status |
+|----------|----------|--------|--------|
+| **Infrastructure** | High | Low | **DONE** — Subtarget features, processor models, Clang macros |
+| **Post-Increment Load/Store** | High | Medium | **DONE** — 16 instructions (LD.B/H/W/BU/HU + ST.B/H/W with [reg1]+/-) |
+| **CLIP Instructions** | Medium | Low | **DONE** — CLIP.B, CLIP.BU, CLIP.H, CLIP.HU (4 instructions) |
+| **MPU Load/Store** | Low | Low | **DONE** — LDM.MP, STM.MP (2 instructions, G4MH2 only) |
+| **FXU SIMD** | Low | High | **DONE** — 59 vector instructions, VGPR register class, ISel patterns, TTI cost model |
+| **Virtualization** | Low | Medium | **DONE** — HVTRAP, LDM.GSR, STM.GSR (G4MH2 only) |
+| **G4MH Scheduling** | Low | Medium | **DONE** — V850SchedRH850G4MH.td with FXU latencies |
+| **FXU Builtins** | Medium | Medium | TODO — 59 Clang builtins + LLVM intrinsics (see v850-intrinsics.md §18) |
 
 ---
 
@@ -492,10 +493,18 @@ def VGPR : RegisterClass<"V850", [v4f32], 128,
 9. Add LLVM intrinsics in `IntrinsicsV850.td`
 10. Implement CodeGen in `V850.cpp` (Clang) and ISel patterns
 
-**Sub-phase 5d: Auto-Vectorization (Future)**
-11. Add `TargetTransformInfo` hooks for vectorization cost model
-12. Register VGPR as a legal vector register class
-13. Add vector type legalization (v4f32)
+**Sub-phase 5d: Auto-Vectorization [DONE]**
+11. ~~Add `TargetTransformInfo` hooks for vectorization cost model~~ ✓
+12. ~~Register VGPR as a legal vector register class~~ ✓
+13. ~~Add vector type legalization (v4f32)~~ ✓
+14. ~~ISel patterns for 12 v4f32 operations + LDV_QW/STV_QW load/store~~ ✓
+15. ~~Custom lowering for BUILD_VECTOR, EXTRACT_VECTOR_ELT, INSERT_VECTOR_ELT, SCALAR_TO_VECTOR~~ ✓
+16. ~~TTI cost model: getMemoryOpCost (align<16 → cost 100), getVectorInstrCost (cost 10), alignment enforcement~~ ✓
+
+**Note:** Auto-vectorization of scalar `float*` loops is intentionally blocked by the TTI
+cost model — the vectorizer sees `align 4` on individual float loads but FXU requires
+`align 16`. Users must use explicit vector types (`v4sf*`) or builtins for SIMD. This is
+standard practice for embedded SIMD targets with strict alignment requirements.
 
 ### 5.5 Tests
 
@@ -670,11 +679,14 @@ def : ProcessorModel<"g4mh", RH850G4MHModel, [FeatureRH850G4MH, FeatureFPU]>;
 15. [4.3] ~~Tests~~ ✓
 
 ### Sprint 5: FXU Vector Unit [DONE]
-16. [5.4] ~~VGPR register class (wreg0-wreg31, 128-bit, v4f32)~~ ✓
-17. [5.4] ~~Instruction format classes (FormatM_2OP, 3OP, 4OP, Imm12, D)~~ ✓
-18. [5.4] ~~All 59 FXU instructions (MC layer: assembly, encoding, disassembly)~~ ✓
-19. [5.4] Builtins for FXU operations (deferred — requires vector type support)
-20. [5.5] ~~Tests (10 test files covering all 59 instructions + feature gating)~~ ✓
+16. [5.4a] ~~VGPR register class (wreg0-wreg31, 128-bit, v4f32)~~ ✓
+17. [5.4a] ~~Instruction format classes (FormatM_2OP, 3OP, 4OP, Imm12, D)~~ ✓
+18. [5.4b] ~~All 59 FXU instructions (MC layer: assembly, encoding, disassembly)~~ ✓
+19. [5.4c] Builtins for FXU operations (deferred — 59 intrinsics, see v850-intrinsics.md §18)
+20. [5.4d] ~~Auto-vectorization: v4f32 ISel patterns (12 ops + LDV_QW/STV_QW)~~ ✓
+21. [5.4d] ~~Auto-vectorization: TTI cost model (getMemoryOpCost, getVectorInstrCost, alignment)~~ ✓
+22. [5.4d] ~~Auto-vectorization: custom lowering (BUILD_VECTOR, EXTRACT/INSERT via stack)~~ ✓
+23. [5.5] ~~Tests (10 MC test files + 2 CodeGen tests: fxu-vector-ops.ll, fxu-no-vectorize-unaligned.ll)~~ ✓
 
 ### Sprint 6: Virtualization [DONE]
 21. [6.3] ~~HVTRAP, LDM.GSR, STM.GSR instructions~~ ✓
@@ -723,4 +735,5 @@ For each sprint:
 | 2026-03-10 | 1.3 | Phase 4 (MPU) DONE: LDM.MP/STM.MP MC layer with FormatXI_MPU class, custom asm parsing, G4MH2 decoder namespace |
 | 2026-03-10 | 1.4 | Phase 6 (Virtualization) DONE: HVTRAP, LDM.GSR, STM.GSR with FormatX_HVTRAP/FormatX_GSR classes, custom decoder |
 | 2026-03-12 | 1.5 | Phase 5 (FXU) DONE: 59 SIMD instructions with VGPR register class, Format M formats, FXURH850G4MH decoder namespace, 10 test files |
+| 2026-03-19 | 1.7 | Phase 5d (Auto-Vectorization) DONE: v4f32 ISel patterns for 12 ops + LDV_QW/STV_QW, TTI cost model (getMemoryOpCost align<16 → cost 100, getVectorInstrCost cost 10), custom lowering (BUILD_VECTOR, EXTRACT/INSERT via stack), tests (fxu-vector-ops.ll, fxu-no-vectorize-unaligned.ll). Sprint 5 fully complete. |
 | 2026-03-12 | 1.6 | Phase 7 (Scheduling) DONE: V850SchedRH850G4MH.td with FXU/post-inc/CLIP/MPU/virtualization timings, G4MH processor model updated |

@@ -1163,6 +1163,88 @@ varargs_receiver:
 
 ---
 
+## 11. FXU Auto-Vectorization (RH850G4MH)
+
+### 11.1 FXU Vector ISel Patterns [IMPLEMENTED]
+
+**Files:**
+- `llvm/lib/Target/V850/V850InstrFXU.td` — ISel patterns for v4f32 operations
+- `llvm/lib/Target/V850/V850ISelLowering.cpp` — v4f32 type registration, operation legality, custom lowering
+
+**Description:** Adds instruction selection patterns for v4f32 FXU vector operations,
+enabling explicit vector types to generate optimal FXU SIMD code.
+
+**Operations Supported (v4f32):**
+- Arithmetic: `fadd` → ADDF.S4, `fsub` → SUBF.S4, `fmul` → MULF.S4, `fdiv` → DIVF.S4
+- Unary: `fabs` → ABSF.S4, `fneg` → NEGF.S4, `fsqrt` → SQRTF.S4
+- FMA: `fma` → FMAF.S4
+- Min/Max: `fminnum` → MINF.S4, `fmaxnum` → MAXF.S4
+- Load/Store: `load` → LDV_QW, `store` → STV_QW
+
+**Custom Lowering (via stack roundtrip):**
+- `BUILD_VECTOR` — Stores elements to stack, LDV.QW
+- `EXTRACT_VECTOR_ELT` — STV.QW to stack, scalar LD.W
+- `INSERT_VECTOR_ELT` — STV.QW to stack, scalar ST.W, LDV.QW
+- `SCALAR_TO_VECTOR` — Scalar ST.W to stack, LDV.QW
+
+**Status:** Fully implemented
+
+---
+
+### 11.2 FXU Auto-Vectorization Cost Model [IMPLEMENTED]
+
+**Files:**
+- `llvm/lib/Target/V850/V850TargetTransformInfo.cpp` — TTI hooks
+- `llvm/lib/Target/V850/V850TargetTransformInfo.h` — Declarations
+
+**Description:** TTI cost model hooks that prevent the loop vectorizer from creating
+inefficient vectorized code for unaligned float arrays while allowing explicit vector
+types to generate optimal FXU code.
+
+**TTI Hooks Implemented:**
+
+| Hook | Purpose |
+|------|---------|
+| `getRegisterBitWidth` | Returns 128 for FXU fixed-width vectors |
+| `getNumberOfRegisters` | Returns 32 for VGPR class |
+| `allowsMisalignedMemoryAccesses` | Rejects 128-bit with align < 16 |
+| `isLegalToVectorizeLoadChain` | Requires 16-byte alignment for > 8 bytes |
+| `isLegalToVectorizeStoreChain` | Requires 16-byte alignment for > 8 bytes |
+| `getMemoryOpCost` | Returns cost 100 for vector with align < 16 |
+| `getVectorInstrCost` | Returns cost 10 for insert/extract (stack roundtrip) |
+
+**Design Decision:**
+FXU LDV.QW/STV.QW require 16-byte alignment (MAE on violation). The loop vectorizer
+queries `getMemoryOpCost` with the *original scalar* alignment (e.g. `align 4` for `float*`).
+Returning prohibitive cost correctly prevents auto-vectorization of scalar `float*` loops.
+Users must use explicit vector types (`v4sf*`) or builtins for SIMD on V850.
+
+**Code Generation Examples:**
+
+```asm
+; Explicit v4f32 vector loop — optimal FXU code
+test_vector_loop:
+    ldv.qw 0[r6], wreg0     ; vector load (16-byte aligned)
+    ldv.qw 0[r7], wreg1
+    addf.s4 wreg0, wreg1, wreg2
+    stv.qw wreg2, 0[r8]     ; vector store
+
+; Scalar float* loop — stays scalar (correct: avoids MAE)
+test_scalar_loop:
+    ld.w 0[r6], r10          ; scalar load
+    ld.w 0[r7], r11
+    addf.s r10, r11, r10
+    st.w r10, 0[r8]          ; scalar store
+```
+
+**Tests:**
+- `llvm/test/CodeGen/V850/fxu-vector-ops.ll` — FXU vector arithmetic, load/store, loop
+- `llvm/test/CodeGen/V850/fxu-no-vectorize-unaligned.ll` — Unaligned scalarization
+
+**Status:** Fully implemented
+
+---
+
 ## Implementation Priority Summary
 
 ### Completed
@@ -1193,24 +1275,25 @@ varargs_receiver:
 25. ~~RECIPF Reciprocal (2.14)~~ - DONE (DAGCombine `fdiv 1.0, x` → RECIPF.S/D, IEEE-compliant)
 26. ~~ADF Conditional Counting (2.13)~~ - DONE (DAGCombine `add acc, (zext setcc)` → CMP + ADF)
 27. ~~Selective Loop Unrolling (6.1b)~~ - DONE (TTI UnrollingPreferences: MaxCount=4, UnrollRemainder=false — reduced fxu_vector 5449→2897 lines)
+28. ~~FXU Vector ISel Patterns (11.1)~~ - DONE (v4f32 fadd/fsub/fmul/fdiv/fabs/fneg/fsqrt/fma/fminnum/fmaxnum + LDV_QW/STV_QW, custom BUILD_VECTOR/EXTRACT/INSERT via stack)
+29. ~~FXU Auto-Vectorization Cost Model (11.2)~~ - DONE (getMemoryOpCost cost 100 for align<16, getVectorInstrCost cost 10 for insert/extract, alignment enforcement in TTI)
 
 ### High Priority (Next Phase)
 - None currently queued
 
 ### Medium Priority
 - f64 scheduling rules (V850SchedV850E2M.td, V850SchedRH850G3M.td) — latencies for ADDFD/MULFD/DIVFD/SQRTFD
+- FXU builtins — Clang builtins for 59 FXU instructions (see `v850-intrinsics.md` §18)
 
 ### Hardware Limitations (Requires RH850G4MH Backend)
 1. Post-Increment Addressing (6.2) - RH850G4MH only, not available on V850E2M/G3M (see `plan-v850-g4m-g4mh.md` Phase 2)
-2. FXU Auto-Vectorization - RH850G4MH only, 128-bit SIMD via wreg0-wreg31 (see `plan-v850-g4m-g4mh.md` Phase 5)
 
 ### Low Priority / Future
-1. RH850G4MH Scheduling (4.5)
-2. f64 rounding intrinsics (CEILF.D*, FLOORF.D*, ROUNDF.D*)
-3. Hardware Loop Support (6.1)
-4. Loop Strength Reduction (6.3)
-5. Memory Barrier Optimization (8.3)
-6. Cache Control Intrinsics (10.7)
+1. f64 rounding intrinsics (CEILF.D*, FLOORF.D*, ROUNDF.D*)
+2. Hardware Loop Support (6.1)
+3. Loop Strength Reduction (6.3)
+4. Memory Barrier Optimization (8.3)
+5. Cache Control Intrinsics (10.7)
 
 ---
 
@@ -1292,6 +1375,7 @@ Metrics to track:
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-03-19 | 2.0 | FXU auto-vectorization complete: Added §11 (FXU Auto-Vectorization) with ISel patterns (v4f32 ops, LDV_QW/STV_QW, custom BUILD_VECTOR/EXTRACT/INSERT via stack) and TTI cost model (getMemoryOpCost cost 100 for align<16, getVectorInstrCost cost 10, alignment enforcement). Moved FXU Auto-Vectorization from Hardware Limitations to Completed. Added FXU builtins to Medium Priority. Removed RH850G4MH Scheduling from Low Priority (already done in plan-v850-g4m-g4mh.md Phase 7). |
 | 2026-03-08 | 1.9 | Updated G4MH entries: section 4.5 (G4MH scheduling with post-increment/CLIP/FXU/MPU timings), section 6.2 (post-increment addressing corrected to G4MH-only, not G3M), Hardware Limitations updated with FXU auto-vectorization entry. All reference plan-v850-g4m-g4mh.md. |
 | 2026-03-01 | 1.8 | f64 CodeGen complete: DPR register class, FADD/FSUB/FMUL/FDIV/FABS/FNEG/FSQRT/FMINNUM/FMAXNUM Legal, CVTFDS/CVTFSD/CVTFWD/TRNCFDW patterns, CMOV_F64 pseudo (SELECT_CC f64 via split CMOVr), LD_DW_F/ST_DW_F for G3M f64 memory, f64 calling convention (D6/D8 args, D10 return), setTruncStoreAction/setLoadExtAction for f32↔f64 interop. f64 scheduling rules remain TODO. |
 | 2026-02-11 | 1.7 | Added atomic load/store/fence custom lowering (SYNCP fences, shouldInsertFencesForAtomic, MaxAtomicInlineWidth) |
