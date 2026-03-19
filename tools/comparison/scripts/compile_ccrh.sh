@@ -60,8 +60,7 @@ find_ccrh() {
 CCRH=$(find_ccrh) || {
     echo "Error: CC-RH compiler not found."
     echo "Please set CCRH_PATH environment variable to CC-RH installation directory."
-    echo "Example: export CCRH_PATH=/usr/local/Renesas/CC-RH/V2.07.00/bin"
-    exit 1
+    CCRH_PATH=/usr/local/Renesas/CC-RH/V2.07.00/bin
 }
 echo "Using CC-RH: $CCRH"
 
@@ -158,7 +157,8 @@ OPT_FLAG=$(map_opt "$OPT_LEVEL")
 # -g : Debug info (useful for analysis)
 # -Xasm : Output assembly listing
 COMMON_FLAGS="$CPU_FLAG $OPT_FLAG"
-COMMON_FLAGS="$COMMON_FLAGS -Xcommon=rh850 -lang=c99 "
+COMMON_FLAGS="$COMMON_FLAGS -lang=c99 "
+COMMON_FLAGS="$COMMON_FLAGS -Xreserve_r2 -Xfloat=fpu -Xfxu=on -Xswitch=table -Xuse_fmaf"
 COMMON_FLAGS="$COMMON_FLAGS $EXTRA_FLAGS"
 COMMON_FLAGS="$COMMON_FLAGS -I$CCRH_PATH/../inc"
 

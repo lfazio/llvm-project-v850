@@ -45,6 +45,44 @@ public:
   void getUnrollingPreferences(Loop *L, ScalarEvolution &SE,
                                TTI::UnrollingPreferences &UP,
                                OptimizationRemarkEmitter *ORE) const override;
+
+  // Vector register width for FXU (128-bit SIMD on RH850G4MH)
+  TypeSize
+  getRegisterBitWidth(TargetTransformInfo::RegisterKind K) const override;
+
+  // Number of registers available for vectorization
+  unsigned getNumberOfRegisters(unsigned ClassID) const override;
+
+  // FXU vector loads/stores require 16-byte alignment
+  bool allowsMisalignedMemoryAccesses(LLVMContext &Context, unsigned BitWidth,
+                                      unsigned AddressSpace, Align Alignment,
+                                      unsigned *Fast) const override;
+
+  bool isLegalToVectorizeLoadChain(unsigned ChainSizeInBytes, Align Alignment,
+                                   unsigned AddrSpace) const override;
+
+  bool isLegalToVectorizeStoreChain(unsigned ChainSizeInBytes, Align Alignment,
+                                    unsigned AddrSpace) const override;
+
+  // FXU vector loads/stores require 16-byte alignment. When the vectorizer
+  // queries with alignment < 16 (from the original scalar load), return a
+  // high cost to prevent vectorization of unaligned data.
+  InstructionCost getMemoryOpCost(
+      unsigned Opcode, Type *Src, Align Alignment, unsigned AddressSpace,
+      TTI::TargetCostKind CostKind,
+      TTI::OperandValueInfo OpInfo = {TTI::OK_AnyValue, TTI::OP_None},
+      const Instruction *I = nullptr) const override;
+
+  // Vector insert/extract go through the stack on V850 (no direct GPR<->VGPR
+  // move). This accurately reflects the high cost so the vectorizer avoids
+  // scalarization patterns.
+  InstructionCost getVectorInstrCost(unsigned Opcode, Type *Val,
+                                     TTI::TargetCostKind CostKind,
+                                     unsigned Index, const Value *Op0,
+                                     const Value *Op1) const override;
+  InstructionCost getVectorInstrCost(const Instruction &I, Type *Val,
+                                     TTI::TargetCostKind CostKind,
+                                     unsigned Index) const override;
 };
 
 } // namespace llvm

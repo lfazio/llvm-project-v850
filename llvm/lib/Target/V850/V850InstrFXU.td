@@ -551,3 +551,54 @@ def TRFSRV_W4 : FormatM_2OP<0b11111, 0b10110100000,
 }
 
 } // Predicates = [HasRH850G4MH], DecoderNamespace = "FXURH850G4MH"
+
+//===----------------------------------------------------------------------===//
+// ISel Patterns for FXU vector instructions (v4f32)
+//===----------------------------------------------------------------------===//
+
+let Predicates = [HasRH850G4MH] in {
+
+// --- Arithmetic patterns ---
+
+def : Pat<(v4f32 (fadd VGPR:$wreg1, VGPR:$wreg2)),
+          (ADDF_S4 VGPR:$wreg1, VGPR:$wreg2)>;
+
+def : Pat<(v4f32 (fsub VGPR:$wreg1, VGPR:$wreg2)),
+          (SUBF_S4 VGPR:$wreg1, VGPR:$wreg2)>;
+
+def : Pat<(v4f32 (fmul VGPR:$wreg1, VGPR:$wreg2)),
+          (MULF_S4 VGPR:$wreg1, VGPR:$wreg2)>;
+
+def : Pat<(v4f32 (fdiv VGPR:$wreg1, VGPR:$wreg2)),
+          (DIVF_S4 VGPR:$wreg1, VGPR:$wreg2)>;
+
+def : Pat<(v4f32 (fabs VGPR:$wreg2)),
+          (ABSF_S4 VGPR:$wreg2)>;
+
+def : Pat<(v4f32 (fneg VGPR:$wreg2)),
+          (NEGF_S4 VGPR:$wreg2)>;
+
+def : Pat<(v4f32 (fsqrt VGPR:$wreg2)),
+          (SQRTF_S4 VGPR:$wreg2)>;
+
+def : Pat<(v4f32 (fminnum VGPR:$wreg1, VGPR:$wreg2)),
+          (MINF_S4 VGPR:$wreg1, VGPR:$wreg2)>;
+
+def : Pat<(v4f32 (fmaxnum VGPR:$wreg1, VGPR:$wreg2)),
+          (MAXF_S4 VGPR:$wreg1, VGPR:$wreg2)>;
+
+// --- FMA patterns ---
+
+def : Pat<(v4f32 (fma VGPR:$wreg1, VGPR:$wreg2, VGPR:$wreg3)),
+          (FMAF_S4 VGPR:$wreg1, VGPR:$wreg2, VGPR:$wreg3)>;
+
+// --- Load/Store patterns ---
+// LDV.QW: 128-bit aligned vector load
+def : Pat<(v4f32 (load GPR:$base)),
+          (LDV_QW GPR:$base, 0)>;
+
+// STV.QW: 128-bit aligned vector store
+def : Pat<(store (v4f32 VGPR:$wreg3), GPR:$base),
+          (STV_QW VGPR:$wreg3, GPR:$base, 0)>;
+
+} // Predicates = [HasRH850G4MH]

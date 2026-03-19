@@ -98,6 +98,7 @@ fi
 # Common flags
 COMMON_FLAGS="-target v850-unknown-elf -mcpu=$CPU $OPT_LEVEL"
 COMMON_FLAGS="$COMMON_FLAGS -ffreestanding -fno-math-errno"
+COMMON_FLAGS="$COMMON_FLAGS -fvectorize -fslp-vectorize"
 COMMON_FLAGS="$COMMON_FLAGS -Wall -Wextra"
 COMMON_FLAGS="$COMMON_FLAGS $EXTRA_FLAGS"
 
@@ -108,8 +109,14 @@ echo "  Output: $OUTPUT_FILE"
 
 if [ "$OUTPUT_TYPE" = "asm" ]; then
     $CLANG $COMMON_FLAGS -S "$SOURCE_FILE" -o "$OUTPUT_FILE"
+    if [ $? -gt 0 ]; then
+       echo  $CLANG $COMMON_FLAGS -S "$SOURCE_FILE" -o "$OUTPUT_FILE"
+    fi
 else
     $CLANG $COMMON_FLAGS -c "$SOURCE_FILE" -o "$OUTPUT_FILE"
+    if [ $? -gt 0 ]; then
+       echo  $CLANG $COMMON_FLAGS -c "$SOURCE_FILE" -o "$OUTPUT_FILE"
+    fi
 fi
 
 echo "Done."

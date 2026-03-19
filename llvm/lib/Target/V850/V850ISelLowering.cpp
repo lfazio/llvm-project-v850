@@ -58,6 +58,11 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
                       << (void *)getRegClassFor(MVT::f64) << "\n");
   }
 
+  // FXU vector unit: 128-bit SIMD (4 x f32)
+  if (STI.hasV850FXU()) {
+    addRegisterClass(MVT::v4f32, &V850::VGPRRegClass);
+  }
+
   // Compute derived properties from the register classes
   computeRegisterProperties(STI.getRegisterInfo());
   LLVM_DEBUG(dbgs() << "V850: after computeRegisterProperties, f64 isTypeLegal="
@@ -323,6 +328,45 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::BITCAST, MVT::f32, Legal);
   }
 
+  // FXU vector unit (RH850G4MH+): 128-bit SIMD, 4 x f32
+  if (STI.hasV850FXU()) {
+    // Arithmetic
+    setOperationAction(ISD::FADD, MVT::v4f32, Legal);
+    setOperationAction(ISD::FSUB, MVT::v4f32, Legal);
+    setOperationAction(ISD::FMUL, MVT::v4f32, Legal);
+    setOperationAction(ISD::FDIV, MVT::v4f32, Legal);
+    setOperationAction(ISD::FABS, MVT::v4f32, Legal);
+    setOperationAction(ISD::FNEG, MVT::v4f32, Legal);
+    setOperationAction(ISD::FSQRT, MVT::v4f32, Legal);
+    setOperationAction(ISD::FMINNUM, MVT::v4f32, Legal);
+    setOperationAction(ISD::FMAXNUM, MVT::v4f32, Legal);
+
+    // FMA: FMAF.S4
+    setOperationAction(ISD::FMA, MVT::v4f32, Legal);
+
+    // Vector construction/extraction: Custom lowering via stack.
+    // Following ARM/AArch64 pattern — never use Expand for these on
+    // registered vector types, as it creates circular legalization.
+    setOperationAction(ISD::BUILD_VECTOR, MVT::v4f32, Custom);
+    setOperationAction(ISD::EXTRACT_VECTOR_ELT, MVT::v4f32, Custom);
+    setOperationAction(ISD::INSERT_VECTOR_ELT, MVT::v4f32, Custom);
+    setOperationAction(ISD::SCALAR_TO_VECTOR, MVT::v4f32, Custom);
+    setOperationAction(ISD::VECTOR_SHUFFLE, MVT::v4f32, Expand);
+    setOperationAction(ISD::CONCAT_VECTORS, MVT::v4f32, Expand);
+
+    // No vector compare/select — scalarize via Custom lowering.
+    setOperationAction(ISD::VSELECT, MVT::v4f32, Expand);
+    setOperationAction(ISD::SELECT, MVT::v4f32, Expand);
+    setOperationAction(ISD::SELECT_CC, MVT::v4f32, Expand);
+    setOperationAction(ISD::SETCC, MVT::v4f32, Expand);
+
+    // FP <-> int conversions on vectors: expand to scalar
+    setOperationAction(ISD::FP_TO_SINT, MVT::v4i32, Expand);
+    setOperationAction(ISD::FP_TO_UINT, MVT::v4i32, Expand);
+    setOperationAction(ISD::SINT_TO_FP, MVT::v4f32, Expand);
+    setOperationAction(ISD::UINT_TO_FP, MVT::v4f32, Expand);
+  }
+
   // Set function alignment
   // V850 has both 16-bit and 32-bit instructions, so minimum is 2 bytes.
   // Preferred is 4 bytes for better instruction fetch of 32-bit instructions.
@@ -368,11 +412,119 @@ V850TargetLowering::V850TargetLowering(const TargetMachine &TM,
   }
 }
 
+// Lower BUILD_VECTOR v4f32 via stack: store 4 scalars, load as vector.
+static SDValue LowerBUILD_VECTOR(SDValue Op, SelectionDAG &DAG) {
+  SDLoc DL(Op);
+  EVT VT = Op.getValueType();
+  assert(VT == MVT::v4f32 && "Only v4f32 BUILD_VECTOR supported");
+
+  // Splat: if all elements are the same, store one and broadcast.
+  // For now, always use stack store/load approach.
+  MachineFrameInfo &MFI = DAG.getMachineFunction().getFrameInfo();
+  int FI = MFI.CreateStackObject(16, Align(16), false);
+  SDValue StackPtr = DAG.getFrameIndex(FI, MVT::i32);
+
+  SmallVector<SDValue, 5> Stores;
+  for (unsigned i = 0; i < 4; i++) {
+    SDValue Elt = Op.getOperand(i);
+    SDValue Offset = DAG.getConstant(i * 4, DL, MVT::i32);
+    SDValue Addr = DAG.getNode(ISD::ADD, DL, MVT::i32, StackPtr, Offset);
+    Stores.push_back(DAG.getStore(DAG.getEntryNode(), DL, Elt, Addr,
+                                  MachinePointerInfo::getFixedStack(
+                                      DAG.getMachineFunction(), FI, i * 4)));
+  }
+  SDValue Chain = DAG.getNode(ISD::TokenFactor, DL, MVT::Other, Stores);
+  return DAG.getLoad(
+      VT, DL, Chain, StackPtr,
+      MachinePointerInfo::getFixedStack(DAG.getMachineFunction(), FI));
+}
+
+// Lower EXTRACT_VECTOR_ELT v4f32 via stack: store vector, load element.
+static SDValue LowerEXTRACT_VECTOR_ELT(SDValue Op, SelectionDAG &DAG) {
+  SDLoc DL(Op);
+  SDValue Vec = Op.getOperand(0);
+  SDValue Idx = Op.getOperand(1);
+
+  MachineFrameInfo &MFI = DAG.getMachineFunction().getFrameInfo();
+  int FI = MFI.CreateStackObject(16, Align(16), false);
+  SDValue StackPtr = DAG.getFrameIndex(FI, MVT::i32);
+
+  SDValue Store = DAG.getStore(
+      DAG.getEntryNode(), DL, Vec, StackPtr,
+      MachinePointerInfo::getFixedStack(DAG.getMachineFunction(), FI));
+
+  // Compute element address: stackptr + idx * 4
+  SDValue Offset = DAG.getNode(ISD::SHL, DL, MVT::i32, Idx,
+                               DAG.getConstant(2, DL, MVT::i32));
+  SDValue Addr = DAG.getNode(ISD::ADD, DL, MVT::i32, StackPtr, Offset);
+  return DAG.getLoad(
+      MVT::f32, DL, Store, Addr,
+      MachinePointerInfo::getFixedStack(DAG.getMachineFunction(), FI));
+}
+
+// Lower INSERT_VECTOR_ELT v4f32 via stack: store vector, store element, reload.
+static SDValue LowerINSERT_VECTOR_ELT(SDValue Op, SelectionDAG &DAG) {
+  SDLoc DL(Op);
+  SDValue Vec = Op.getOperand(0);
+  SDValue Elt = Op.getOperand(1);
+  SDValue Idx = Op.getOperand(2);
+
+  MachineFrameInfo &MFI = DAG.getMachineFunction().getFrameInfo();
+  int FI = MFI.CreateStackObject(16, Align(16), false);
+  SDValue StackPtr = DAG.getFrameIndex(FI, MVT::i32);
+
+  // Store whole vector to stack
+  SDValue Store = DAG.getStore(
+      DAG.getEntryNode(), DL, Vec, StackPtr,
+      MachinePointerInfo::getFixedStack(DAG.getMachineFunction(), FI));
+
+  // Store element at idx
+  SDValue Offset = DAG.getNode(ISD::SHL, DL, MVT::i32, Idx,
+                               DAG.getConstant(2, DL, MVT::i32));
+  SDValue Addr = DAG.getNode(ISD::ADD, DL, MVT::i32, StackPtr, Offset);
+  SDValue StoreElt = DAG.getStore(
+      Store, DL, Elt, Addr,
+      MachinePointerInfo::getFixedStack(DAG.getMachineFunction(), FI));
+
+  // Reload as vector
+  return DAG.getLoad(
+      MVT::v4f32, DL, StoreElt, StackPtr,
+      MachinePointerInfo::getFixedStack(DAG.getMachineFunction(), FI));
+}
+
+// Lower SCALAR_TO_VECTOR v4f32: insert scalar at element 0, rest undef.
+static SDValue LowerSCALAR_TO_VECTOR(SDValue Op, SelectionDAG &DAG) {
+  SDLoc DL(Op);
+  SDValue Scalar = Op.getOperand(0);
+
+  MachineFrameInfo &MFI = DAG.getMachineFunction().getFrameInfo();
+  int FI = MFI.CreateStackObject(16, Align(16), false);
+  SDValue StackPtr = DAG.getFrameIndex(FI, MVT::i32);
+
+  // Store scalar at offset 0
+  SDValue Store = DAG.getStore(
+      DAG.getEntryNode(), DL, Scalar, StackPtr,
+      MachinePointerInfo::getFixedStack(DAG.getMachineFunction(), FI));
+
+  // Load as vector (elements 1-3 are undefined)
+  return DAG.getLoad(
+      MVT::v4f32, DL, Store, StackPtr,
+      MachinePointerInfo::getFixedStack(DAG.getMachineFunction(), FI));
+}
+
 SDValue V850TargetLowering::LowerOperation(SDValue Op,
                                            SelectionDAG &DAG) const {
   switch (Op.getOpcode()) {
   default:
     llvm_unreachable("unimplemented operation");
+  case ISD::BUILD_VECTOR:
+    return LowerBUILD_VECTOR(Op, DAG);
+  case ISD::EXTRACT_VECTOR_ELT:
+    return LowerEXTRACT_VECTOR_ELT(Op, DAG);
+  case ISD::INSERT_VECTOR_ELT:
+    return LowerINSERT_VECTOR_ELT(Op, DAG);
+  case ISD::SCALAR_TO_VECTOR:
+    return LowerSCALAR_TO_VECTOR(Op, DAG);
   case ISD::GlobalAddress:
     return LowerGlobalAddress(Op, DAG);
   case ISD::ExternalSymbol:
@@ -1973,6 +2125,30 @@ bool V850TargetLowering::isFMAFasterThanFMulAndFAdd(const MachineFunction &MF,
   }
 
   // V850 has no f64 FMA instruction (MADDF.D does not exist)
+  return false;
+}
+
+bool V850TargetLowering::allowsMisalignedMemoryAccesses(
+    EVT VT, unsigned AddrSpace, Align Alignment, MachineMemOperand::Flags Flags,
+    unsigned *Fast) const {
+  // FXU vector loads/stores (LDV.QW/STV.QW) require 16-byte alignment.
+  // Misaligned access causes MAE (Misalignment Exception).
+  if (VT == MVT::v4f32) {
+    if (Alignment >= Align(16)) {
+      if (Fast)
+        *Fast = 1;
+      return true;
+    }
+    return false;
+  }
+
+  // Scalar: V850 supports unaligned word access (with penalty).
+  if (VT.isScalarInteger() || VT == MVT::f32 || VT == MVT::f64) {
+    if (Fast)
+      *Fast = 0; // Not fast, but allowed
+    return true;
+  }
+
   return false;
 }
 
